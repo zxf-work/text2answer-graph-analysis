@@ -3,7 +3,7 @@
   "id": "H1",
   "family": "interpretation",
   "dataset": "roads",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/roads.csv",
+  "file": "bench/data_hard/roads.csv",
   "description": null,
   "question": "What is the shortest route from J0 to J299, and how long is it?",
   "checker": {
@@ -27,7 +27,7 @@
   "id": "H2",
   "family": "interpretation",
   "dataset": "roads",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/roads.csv",
+  "file": "bench/data_hard/roads.csv",
   "description": null,
   "question": "Which junction is the most central in terms of lying on the most shortest routes?",
   "checker": {
@@ -49,7 +49,7 @@
   "id": "H3",
   "family": "metric",
   "dataset": "roads",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/roads.csv",
+  "file": "bench/data_hard/roads.csv",
   "description": null,
   "question": "How many junctions and road segments are there?",
   "checker": {
@@ -71,7 +71,7 @@
   "id": "H4",
   "family": "clarification",
   "dataset": "similarity",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/similarity.csv",
+  "file": "bench/data_hard/similarity.csv",
   "description": null,
   "question": "What is the shortest path length between P0 and P7?",
   "checker": {
@@ -95,7 +95,7 @@
   "id": "H5",
   "family": "metric",
   "dataset": "similarity",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/similarity.csv",
+  "file": "bench/data_hard/similarity.csv",
   "description": null,
   "question": "What is the average degree?",
   "checker": {
@@ -122,7 +122,7 @@
   "id": "H6",
   "family": "interpretation",
   "dataset": "emails",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/emails.csv",
+  "file": "bench/data_hard/emails.csv",
   "description": null,
   "question": "How many emails are in this dataset, and between how many distinct sender-recipient pairs?",
   "checker": {
@@ -149,7 +149,7 @@
   "id": "H7",
   "family": "interpretation",
   "dataset": "emails",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/emails.csv",
+  "file": "bench/data_hard/emails.csv",
   "description": null,
   "question": "How many emails did E186 send to E114?",
   "checker": {
@@ -174,7 +174,7 @@
   "id": "H8",
   "family": "interpretation",
   "dataset": "emails",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/emails.csv",
+  "file": "bench/data_hard/emails.csv",
   "description": null,
   "question": "Who sent the most emails?",
   "checker": {
@@ -198,7 +198,7 @@
   "id": "H9",
   "family": "interpretation",
   "dataset": "emails",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/emails.csv",
+  "file": "bench/data_hard/emails.csv",
   "description": null,
   "question": "Who received emails from the largest number of different people?",
   "checker": {
@@ -223,7 +223,7 @@
   "id": "H10",
   "family": "interpretation",
   "dataset": "indexed",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/indexed_edges.txt",
+  "file": "bench/data_hard/indexed_edges.txt",
   "description": null,
   "question": "How many nodes and edges does this graph have?",
   "checker": {
@@ -245,7 +245,7 @@
   "id": "H11",
   "family": "interpretation",
   "dataset": "indexed",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/indexed_edges.txt",
+  "file": "bench/data_hard/indexed_edges.txt",
   "description": null,
   "question": "Which node has the highest degree?",
   "checker": {
@@ -268,7 +268,7 @@
   "id": "H12",
   "family": "interpretation",
   "dataset": "purchases",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/purchases.csv",
+  "file": "bench/data_hard/purchases.csv",
   "description": null,
   "question": "Which product was bought by the most customers?",
   "checker": {
@@ -286,7 +286,7 @@
   "id": "H13",
   "family": "interpretation",
   "dataset": "purchases",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/purchases.csv",
+  "file": "bench/data_hard/purchases.csv",
   "description": null,
   "question": "Which two customers have the most products in common, and how many?",
   "checker": {
@@ -313,7 +313,7 @@
   "id": "H14",
   "family": "metric",
   "dataset": "purchases",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/purchases.csv",
+  "file": "bench/data_hard/purchases.csv",
   "description": null,
   "question": "Is this a bipartite graph?",
   "checker": {
@@ -331,7 +331,7 @@
   "id": "H15",
   "family": "interpretation",
   "dataset": "purchases",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/purchases.csv",
+  "file": "bench/data_hard/purchases.csv",
   "description": null,
   "question": "How many communities of customers are there, if you connect customers who bought the same product?",
   "checker": {
@@ -358,7 +358,7 @@
   "id": "H16",
   "family": "interpretation",
   "dataset": "follows",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/follows.txt",
+  "file": "bench/data_hard/follows.txt",
   "description": null,
   "question": "How many edges does this graph have?",
   "checker": {
@@ -383,7 +383,7 @@
   "id": "H17",
   "family": "interpretation",
   "dataset": "follows",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/follows.txt",
+  "file": "bench/data_hard/follows.txt",
   "description": null,
   "question": "How many accounts does 7 follow, and how many follow 7?",
   "checker": {
@@ -409,7 +409,7 @@
   "id": "H18",
   "family": "interpretation",
   "dataset": "follows",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/follows.txt",
+  "file": "bench/data_hard/follows.txt",
   "description": null,
   "question": "Can account 0 reach account 4999 by following follow-links?",
   "checker": {
@@ -435,7 +435,7 @@
   "id": "H19",
   "family": "interpretation",
   "dataset": "follows",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/follows.txt",
+  "file": "bench/data_hard/follows.txt",
   "description": null,
   "question": "What fraction of follow relationships are mutual?",
   "checker": {
@@ -456,7 +456,7 @@
   "id": "H20",
   "family": "topk",
   "dataset": "follows",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/follows.txt",
+  "file": "bench/data_hard/follows.txt",
   "description": null,
   "question": "Which 5 accounts have the most followers?",
   "checker": {
@@ -485,7 +485,7 @@
   "id": "H21",
   "family": "interpretation",
   "dataset": "trust",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/trust.csv",
+  "file": "bench/data_hard/trust.csv",
   "description": null,
   "question": "How many steps does it take to get from T5 to T0 through trust links?",
   "checker": {
@@ -511,7 +511,7 @@
   "id": "H22",
   "family": "interpretation",
   "dataset": "trust",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/trust.csv",
+  "file": "bench/data_hard/trust.csv",
   "description": null,
   "question": "Whom does T10 trust the most?",
   "checker": {
@@ -535,7 +535,7 @@
   "id": "H23",
   "family": "interpretation",
   "dataset": "citations",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/citations.csv",
+  "file": "bench/data_hard/citations.csv",
   "description": null,
   "question": "Which paper is cited the most?",
   "checker": {
@@ -556,7 +556,7 @@
   "id": "H24",
   "family": "interpretation",
   "dataset": "citations",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/citations.csv",
+  "file": "bench/data_hard/citations.csv",
   "description": null,
   "question": "How many papers does paper1999 cite, and how many cite it?",
   "checker": {
@@ -582,7 +582,7 @@
   "id": "H25",
   "family": "interpretation",
   "dataset": "citations",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/citations.csv",
+  "file": "bench/data_hard/citations.csv",
   "description": null,
   "question": "How many papers are cited by nothing?",
   "checker": {
@@ -609,7 +609,7 @@
   "id": "H26",
   "family": "interpretation",
   "dataset": "bothways",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/friends_bothways.txt",
+  "file": "bench/data_hard/friends_bothways.txt",
   "description": null,
   "question": "How many friendships are in this network?",
   "checker": {
@@ -634,7 +634,7 @@
   "id": "H27",
   "family": "interpretation",
   "dataset": "bothways",
-  "file": "/home/user/GraphProfile/prototype/bench/data_hard/friends_bothways.txt",
+  "file": "bench/data_hard/friends_bothways.txt",
   "description": null,
   "question": "What is the average number of friends per person?",
   "checker": {

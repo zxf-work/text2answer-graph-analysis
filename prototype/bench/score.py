@@ -295,7 +295,7 @@ def score_answer(q: dict, res: dict, graphs: dict | None = None) -> tuple[float,
 
 def score_plan(q: dict, res: dict) -> tuple[float | None, str]:
     """Plan correctness: expected ops present and expected assumptions matched. None when not applicable."""
-    if res.get("system") == "codegen":
+    if str(res.get("system", "")).startswith("codegen"):
         return None, "n/a (opaque code)"
     ops = set(res.get("ops_used") or [])
     exp = q.get("expected_ops") or []

@@ -3,7 +3,7 @@
   "id": "X1",
   "family": "metric",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "How many nodes and edges are there?",
   "checker": {
@@ -25,7 +25,7 @@
   "id": "X2",
   "family": "topk",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "Which 10 nodes have the highest degree?",
   "checker": {
@@ -56,7 +56,7 @@
   "id": "X3",
   "family": "metric",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "How many triangles does the graph contain?",
   "checker": {
@@ -75,7 +75,7 @@
   "id": "X4",
   "family": "topk",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "Who are the top 10 nodes by PageRank?",
   "checker": {
@@ -106,7 +106,7 @@
   "id": "X5",
   "family": "metric",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "What is the diameter of the network (an estimate is acceptable)?",
   "checker": {
@@ -125,7 +125,7 @@
   "id": "X6",
   "family": "topk",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "List the 10 nodes with the highest betweenness centrality (an approximation is acceptable).",
   "checker": {
@@ -156,7 +156,7 @@
   "id": "X7",
   "family": "metric",
   "dataset": "ba_10m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_10m.txt",
+  "file": "bench/big/ba_10m.txt",
   "description": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
   "question": "What is the largest k for which a non-empty k-core exists?",
   "checker": {
@@ -178,7 +178,7 @@
   "id": "X8",
   "family": "topk",
   "dataset": "ba_12m_directed",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_12m_directed.txt",
+  "file": "bench/big/ba_12m_directed.txt",
   "description": "Synthetic directed preferential-attachment network, 3M nodes, 12M edges; a row 'u v' is an arc from u to v",
   "question": "Which 10 nodes have the most incoming arcs?",
   "checker": {
@@ -212,7 +212,7 @@
   "id": "X9",
   "family": "interpretation",
   "dataset": "ba_12m_directed",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_12m_directed.txt",
+  "file": "bench/big/ba_12m_directed.txt",
   "description": "Synthetic directed preferential-attachment network, 3M nodes, 12M edges; a row 'u v' is an arc from u to v",
   "question": "How many nodes can node 2999999 reach by following arcs?",
   "checker": {
@@ -236,7 +236,7 @@
   "id": "X10",
   "family": "metric",
   "dataset": "ba_12m_directed",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_12m_directed.txt",
+  "file": "bench/big/ba_12m_directed.txt",
   "description": "Synthetic directed preferential-attachment network, 3M nodes, 12M edges; a row 'u v' is an arc from u to v",
   "question": "How many strongly connected components are there?",
   "checker": {
@@ -258,7 +258,7 @@
   "id": "X11",
   "family": "metric",
   "dataset": "ba_50m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_50m.txt",
+  "file": "bench/big/ba_50m.txt",
   "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once",
   "question": "How many nodes and edges are there, and is the graph connected?",
   "checker": {
@@ -286,7 +286,7 @@
   "id": "X12",
   "family": "topk",
   "dataset": "ba_50m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_50m.txt",
+  "file": "bench/big/ba_50m.txt",
   "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once",
   "question": "Which 10 nodes have the highest degree?",
   "checker": {
@@ -317,7 +317,7 @@
   "id": "X13",
   "family": "metric",
   "dataset": "ba_50m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_50m.txt",
+  "file": "bench/big/ba_50m.txt",
   "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once",
   "question": "What is the average clustering coefficient?",
   "checker": {
@@ -336,7 +336,7 @@
   "id": "X14",
   "family": "metric",
   "dataset": "ba_50m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_50m.txt",
+  "file": "bench/big/ba_50m.txt",
   "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once",
   "question": "Roughly what is the diameter of the network?",
   "checker": {
@@ -355,7 +355,7 @@
   "id": "X15",
   "family": "topk",
   "dataset": "ba_50m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_50m.txt",
+  "file": "bench/big/ba_50m.txt",
   "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once",
   "question": "Which 10 nodes have the highest betweenness centrality? An approximation is fine.",
   "checker": {
@@ -386,7 +386,7 @@
   "id": "X16",
   "family": "path",
   "dataset": "ba_50m",
-  "file": "/home/user/GraphProfile/prototype/bench/big/ba_50m.txt",
+  "file": "bench/big/ba_50m.txt",
   "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once",
   "question": "How many hops separate node 0 and node 9999999?",
   "checker": {

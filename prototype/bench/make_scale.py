@@ -20,9 +20,9 @@ from t2r.ops import CATALOGUE, Ctx  # noqa: E402
 
 B = os.path.join(HERE, "big")
 DS = {
-    "ba_10m": {"path": os.path.join(B, "ba_10m.txt"), "directed": False, "weighted": False, "skip_in_scoring": True},
-    "ba_12m_directed": {"path": os.path.join(B, "ba_12m_directed.txt"), "directed": True, "weighted": False, "skip_in_scoring": True},
-    "ba_50m": {"path": os.path.join(B, "ba_50m.txt"), "directed": False, "weighted": False, "skip_in_scoring": True},
+    "ba_10m": {"path": "bench/big/ba_10m.txt", "directed": False, "weighted": False, "skip_in_scoring": True},
+    "ba_12m_directed": {"path": "bench/big/ba_12m_directed.txt", "directed": True, "weighted": False, "skip_in_scoring": True},
+    "ba_50m": {"path": "bench/big/ba_50m.txt", "directed": False, "weighted": False, "skip_in_scoring": True},
 }
 DESC = {
     "ba_10m": "Synthetic undirected preferential-attachment network, 2M nodes, 10M edges, each edge listed once",
@@ -50,7 +50,7 @@ def timed(label, fn):
 if "ba_10m" in DONE:
     print("skip ba_10m (cached)")
 else:
-  t = time.time(); lg = load_graph("ba_10m", DS["ba_10m"]["path"], "", override={"directed": False, "weighted": False}); print("loaded 10m", round(time.time() - t))
+  t = time.time(); lg = load_graph("ba_10m", os.path.join(B, "ba_10m.txt"), "", override={"directed": False, "weighted": False}); print("loaded 10m", round(time.time() - t))
   g = lg.g; ctx = Ctx(lg)
   add("X1", "metric", "ba_10m", "How many nodes and edges are there?", {"type": "facts", "facts": {"n": g.vcount(), "m": g.ecount()}}, [["node_count", "edge_count"]])
   deg = timed("degree", lambda: CATALOGUE["degree"].fn(ctx))
@@ -75,7 +75,7 @@ if "ba_12m_directed" in DONE:
     print("skip ba_12m_directed (cached)")
 else:
 # ---------------------------------------------------------------- 12M directed
-  t = time.time(); lg = load_graph("ba_12m_directed", DS["ba_12m_directed"]["path"], "", override={"directed": True, "weighted": False}); print("loaded 12m dir", round(time.time() - t))
+  t = time.time(); lg = load_graph("ba_12m_directed", os.path.join(B, "ba_12m_directed.txt"), "", override={"directed": True, "weighted": False}); print("loaded 12m dir", round(time.time() - t))
   g = lg.g; ctx = Ctx(lg)
   indeg = timed("in-degree", lambda: CATALOGUE["degree"].fn(ctx, mode="in"))
   top_in = [n for n, _ in sorted(indeg.items(), key=lambda kv: -kv[1])[:10]]
@@ -92,7 +92,7 @@ else:
 DONE_Q = {q["id"] for q in Q}
 NEED = [x for x in ("X11", "X12", "X13", "X14", "X15", "X16") if x not in DONE_Q]
 if NEED:
-  t = time.time(); lg = load_graph("ba_50m", DS["ba_50m"]["path"], "", override={"directed": False, "weighted": False}); print("loaded 50m", round(time.time() - t), flush=True)
+  t = time.time(); lg = load_graph("ba_50m", os.path.join(B, "ba_50m.txt"), "", override={"directed": False, "weighted": False}); print("loaded 50m", round(time.time() - t), flush=True)
   g = lg.g; ctx = Ctx(lg)
 
   def ckpt():

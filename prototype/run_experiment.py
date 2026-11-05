@@ -26,7 +26,7 @@ DFILE = os.environ.get("T2R_DATASETS", "datasets.json")
 QUESTIONS = json.load(open(os.path.join(HERE, "bench", QFILE)))
 RESULTS = os.path.join(HERE, os.environ.get("T2R_RESULTS", "results"))
 RAW = os.path.join(RESULTS, "raw")
-SYSTEMS_ALL = ["full", "no_verify", "no_interp", "flat", "codegen"]
+SYSTEMS_ALL = ["full", "no_verify", "no_interp", "flat", "codegen", "codegen_nofacts"]
 
 
 def run_one_subprocess(system: str, q: dict, timeout: int, model: str) -> dict:

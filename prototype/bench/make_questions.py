@@ -58,7 +58,7 @@ Q: list[dict] = []
 
 
 def add(qid, family, ds, question, checker, expected_ops, expected_assumptions=None, description=True):
-    Q.append({"id": qid, "family": family, "dataset": ds, "file": path_of(ds),
+    Q.append({"id": qid, "family": family, "dataset": ds, "file": os.path.relpath(path_of(ds), os.path.dirname(HERE)),
               "description": DESC[ds] if description else None, "question": question,
               "checker": checker, "expected_ops": expected_ops, "expected_assumptions": expected_assumptions or {}})
 

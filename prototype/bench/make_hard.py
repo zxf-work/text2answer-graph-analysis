@@ -27,7 +27,7 @@ Q: list[dict] = []
 
 
 def add(qid, family, ds, question, checker, expected_ops, expected_assumptions=None):
-    Q.append({"id": qid, "family": family, "dataset": ds, "file": DS[ds]["path"], "description": None,
+    Q.append({"id": qid, "family": family, "dataset": ds, "file": os.path.relpath(DS[ds]["path"], os.path.dirname(HERE)), "description": None,
               "question": question, "checker": checker, "expected_ops": expected_ops, "expected_assumptions": expected_assumptions or {}})
 
 
@@ -128,7 +128,7 @@ with open(os.path.join(D, "citations.csv"), "w", newline="") as f:
 DS["citations"] = {"path": os.path.join(D, "citations.csv"), "directed": True, "weighted": False}
 
 # ------------------------------------------------------------------ 9. both-ways undirected, no header (facebook stored twice)
-fbp = "/home/user/GraphProfile/Graph Data/facebook_combined.txt"
+fbp = os.path.join(HERE, "data", "facebook_combined.txt")
 with open(fbp) as fi, open(os.path.join(D, "friends_bothways.txt"), "w") as fo:
     for line in fi:
         a, b = line.split()

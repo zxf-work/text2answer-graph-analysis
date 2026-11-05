@@ -296,13 +296,20 @@ The JSON line must be the answer object:
 Reply with only the script inside a ```python fence."""
 
 
-def run_codegen(qid: str, lg_path: str, name: str, description: Optional[str], question: str, llm: LLM, timeout: int = 600, cache: Optional[dict] = None) -> Result:
+CODEGEN_NOFACTS_NOTE = """You have not seen the file and no statistics about it are given. Your script must inspect the file itself (delimiter, header, column roles, whether both directions of an edge are listed, repeated rows, weight column and what the weights look like) and decide directed/weighted/multigraph from what it finds, stating the decision in the assumptions."""
+
+
+def run_codegen(qid: str, lg_path: str, name: str, description: Optional[str], question: str, llm: LLM, timeout: int = 600, cache: Optional[dict] = None, facts: bool = True) -> Result:
+    """Code generation. facts=False is the ablation: the model gets the path and the question only, no file statistics."""
     t0 = time.time(); mark = _usage_mark(llm)
-    res = Result(system="codegen", qid=qid)
-    facts = read_facts(lg_path)
-    fx = {k: v for k, v in asdict(facts).items() if k not in ("sha1",)}
-    user = f"File path: {os.path.abspath(lg_path)}\nFile facts: {json.dumps(fx, default=str)}\n{user_message(os.path.basename(lg_path), description, question)}"
-    system = CODEGEN_SYSTEM.format(schema=ANSWER_SCHEMA)
+    res = Result(system="codegen" if facts else "codegen_nofacts", qid=qid)
+    if facts:
+        fx = {k: v for k, v in asdict(read_facts(lg_path)).items() if k not in ("sha1",)}
+        user = f"File path: {os.path.abspath(lg_path)}\nFile facts: {json.dumps(fx, default=str)}\n{user_message(os.path.basename(lg_path), description, question)}"
+        system = CODEGEN_SYSTEM.format(schema=ANSWER_SCHEMA)
+    else:
+        user = f"File path: {os.path.abspath(lg_path)}\n{user_message(os.path.basename(lg_path), description, question)}"
+        system = CODEGEN_SYSTEM.replace("Decide directed/weighted from the file facts and the description.", CODEGEN_NOFACTS_NOTE).format(schema=ANSWER_SCHEMA)
     try:
         reply = llm.chat(system, user)
         code = _extract_code(reply.text)
@@ -363,4 +370,5 @@ SYSTEMS = {
     "no_interp": lambda *a, **k: run_full(*a, interp=False, verifier=True, **k),
     "flat": run_flat,
     "codegen": run_codegen,
+    "codegen_nofacts": lambda *a, **k: run_codegen(*a, facts=False, **k),
 }

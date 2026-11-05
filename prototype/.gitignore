@@ -1,5 +1,5 @@
 results*/raw/
-results*/run.log
+results*/*.log
 results*/check_gold.log
 results_haiku.log
 bench/big/*.txt
