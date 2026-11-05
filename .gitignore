@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+prototype/results*/raw/
+prototype/results*/run.log
+prototype/bench/big/*.txt
+prototype/bench/questions_scale.partial.json
+prototype/bench/make_scale.log

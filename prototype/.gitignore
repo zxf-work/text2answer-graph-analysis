@@ -1,0 +1,10 @@
+results*/raw/
+results*/run.log
+results*/check_gold.log
+results_haiku.log
+bench/big/*.txt
+bench/big/*.log
+bench/make_scale.log
+bench/questions_scale.partial.json
+__pycache__/
+*.pyc
