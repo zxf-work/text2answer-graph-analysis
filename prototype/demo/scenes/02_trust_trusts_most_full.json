@@ -1,0 +1,604 @@
+{
+ "title": "2a. Direction matters: typed plan",
+ "subtitle": "The same graph, the opposite direction. Compare with the tool agent on the same question (switch executor tabs).",
+ "note": "Scene 2 of 4: 'trusts' means outgoing edges. The plan states mode=out and the verifier confirms the question and the plan agree.",
+ "card": {
+  "name": "trust",
+  "file": "trust.csv",
+  "n_nodes": 600,
+  "n_edges": 1794,
+  "density": 0.004992,
+  "degree": {
+   "min": 3,
+   "median": 3.0,
+   "mean": 5.98,
+   "max": 222
+  },
+  "node_id_type": "string label",
+  "sample_node_ids": [
+   "T0",
+   "T1",
+   "T10",
+   "T100",
+   "T101",
+   "T97",
+   "T98",
+   "T99"
+  ],
+  "n_components_weak": 1,
+  "largest_component_fraction": 1.0,
+  "n_components_strong": 600,
+  "largest_scc_fraction": 0.0017,
+  "reciprocity": 0.0,
+  "is_bipartite": false,
+  "size_class": "small",
+  "columns": {
+   "header": [
+    "source",
+    "target",
+    "trust"
+   ],
+   "source_col": 0,
+   "target_col": 1,
+   "weight_col": 2
+  },
+  "semantics": {
+   "directed": true,
+   "weighted": true,
+   "weight_semantics": "strength",
+   "multigraph": false,
+   "labelled": true,
+   "confidence": {
+    "directed": 0.85,
+    "weighted": 0.9,
+    "weight_semantics": 0.6,
+    "multigraph": 0.95
+   },
+   "evidence": {
+    "directed": "only 0.0% of rows are reciprocated: either undirected stored once (likely) or a directed graph with no mutual edges; column names ['trust'] denote an asymmetric relation",
+    "weighted": "numeric column 'trust' with 10 distinct values in [1.0, 10.0]",
+    "weight_semantics": "integer counts starting at 1 look like interaction counts (strength), not distances",
+    "multigraph": "no duplicate rows"
+   },
+   "needs_clarification": [
+    "weight_semantics"
+   ]
+  },
+  "facts": {
+   "rows": 1794,
+   "header": [
+    "source",
+    "target",
+    "trust"
+   ],
+   "n_columns": 3,
+   "sample_rows": [
+    [
+     "T1",
+     "T0",
+     "5"
+    ],
+    [
+     "T2",
+     "T0",
+     "2"
+    ],
+    [
+     "T2",
+     "T1",
+     "1"
+    ],
+    [
+     "T3",
+     "T0",
+     "9"
+    ]
+   ],
+   "reciprocity_of_rows": 0.0,
+   "distinct_pairs_directed": 1794,
+   "distinct_pairs_undirected": 1794,
+   "self_loops": 0,
+   "weight_column": "trust",
+   "weight_range": [
+    1.0,
+    10.0
+   ],
+   "weight_has_fractions": false,
+   "row_index_column": false,
+   "ids_numeric": false
+  }
+ },
+ "result": {
+  "system": "full",
+  "qid": "trust_trusts_most_full",
+  "answer": {
+   "most_people_trusted (out-degree)": [
+    {
+     "node": "T10",
+     "value": 3.0
+    },
+    {
+     "node": "T100",
+     "value": 3.0
+    },
+    {
+     "node": "T101",
+     "value": 3.0
+    },
+    {
+     "node": "T102",
+     "value": 3.0
+    },
+    {
+     "node": "T103",
+     "value": 3.0
+    },
+    {
+     "node": "T104",
+     "value": 3.0
+    },
+    {
+     "node": "T105",
+     "value": 3.0
+    },
+    {
+     "node": "T106",
+     "value": 3.0
+    },
+    {
+     "node": "T107",
+     "value": 3.0
+    },
+    {
+     "node": "T108",
+     "value": 3.0
+    }
+   ],
+   "most_trust_given (out-strength)": [
+    {
+     "node": "T564",
+     "value": 30.0
+    },
+    {
+     "node": "T180",
+     "value": 29.0
+    },
+    {
+     "node": "T341",
+     "value": 29.0
+    },
+    {
+     "node": "T450",
+     "value": 28.0
+    },
+    {
+     "node": "T406",
+     "value": 27.0
+    },
+    {
+     "node": "T414",
+     "value": 27.0
+    },
+    {
+     "node": "T486",
+     "value": 27.0
+    },
+    {
+     "node": "T49",
+     "value": 27.0
+    },
+    {
+     "node": "T97",
+     "value": 27.0
+    },
+    {
+     "node": "T134",
+     "value": 26.0
+    }
+   ]
+  },
+  "assumptions": {
+   "directed": true,
+   "weighted": true,
+   "use_weights": false,
+   "largest_component_only": false,
+   "measure": "out-degree (number of distinct people a node trusts; an edge source -> target is read as 'source trusts target')",
+   "node_resolution": {},
+   "tier_notes": []
+  },
+  "clarification": null,
+  "variants": [
+   {
+    "label": "by degree",
+    "answer": [
+     {
+      "node": "T10",
+      "value": 3.0
+     },
+     {
+      "node": "T100",
+      "value": 3.0
+     },
+     {
+      "node": "T101",
+      "value": 3.0
+     },
+     {
+      "node": "T102",
+      "value": 3.0
+     },
+     {
+      "node": "T103",
+      "value": 3.0
+     },
+     {
+      "node": "T104",
+      "value": 3.0
+     },
+     {
+      "node": "T105",
+      "value": 3.0
+     },
+     {
+      "node": "T106",
+      "value": 3.0
+     },
+     {
+      "node": "T107",
+      "value": 3.0
+     },
+     {
+      "node": "T108",
+      "value": 3.0
+     }
+    ]
+   },
+   {
+    "label": "by strength",
+    "answer": [
+     {
+      "node": "T564",
+      "value": 30.0
+     },
+     {
+      "node": "T180",
+      "value": 29.0
+     },
+     {
+      "node": "T341",
+      "value": 29.0
+     },
+     {
+      "node": "T450",
+      "value": 28.0
+     },
+     {
+      "node": "T406",
+      "value": 27.0
+     },
+     {
+      "node": "T414",
+      "value": 27.0
+     },
+     {
+      "node": "T486",
+      "value": 27.0
+     },
+     {
+      "node": "T49",
+      "value": 27.0
+     },
+     {
+      "node": "T97",
+      "value": 27.0
+     },
+     {
+      "node": "T134",
+      "value": 26.0
+     }
+    ]
+   }
+  ],
+  "ops_used": [
+   "degree",
+   "top_k",
+   "strength",
+   "top_k"
+  ],
+  "plan": {
+   "interpretation": {
+    "directed": true,
+    "weighted": true,
+    "use_weights": false,
+    "largest_component_only": false,
+    "measure": "out-degree (number of distinct people a node trusts; an edge source -> target is read as 'source trusts target')",
+    "node_resolution": {}
+   },
+   "clarification": null,
+   "variants": [
+    "out-strength (sum of trust weights given)"
+   ],
+   "steps": [
+    {
+     "id": "s1",
+     "op": "degree",
+     "args": {
+      "graph": "G",
+      "mode": "out"
+     },
+     "note": "Count of outgoing trust edges per node = how many people each node trusts"
+    },
+    {
+     "id": "s2",
+     "op": "top_k",
+     "args": {
+      "map": "s1",
+      "k": 10,
+      "ascending": false
+     },
+     "note": "Rank nodes by number of people trusted"
+    },
+    {
+     "id": "s3",
+     "op": "strength",
+     "args": {
+      "graph": "G",
+      "mode": "out"
+     },
+     "note": "Variant: total trust given (sum of 'trust' weights on outgoing edges)"
+    },
+    {
+     "id": "s4",
+     "op": "top_k",
+     "args": {
+      "map": "s3",
+      "k": 10,
+      "ascending": false
+     },
+     "note": "Rank by total trust given, to see whether weighting changes the leader"
+    }
+   ],
+   "answer": {
+    "step": null,
+    "field": null,
+    "steps": {
+     "most_people_trusted (out-degree)": "s2",
+     "most_trust_given (out-strength)": "s4"
+    },
+    "kind": "table"
+   },
+   "rationale": "'Trusts the most people' counts distinct trustees, so the measure is unweighted out-degree, with edges read as source trusts target. The weight meaning is unclear but does not affect a count. Out-strength is reported alongside to show whether trust intensity changes the ranking."
+  },
+  "trace": [
+   {
+    "step": "s1",
+    "op": "degree",
+    "args": {
+     "graph": "G",
+     "mode": "out"
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": {
+     "type": "NodeMap",
+     "n": 600,
+     "sample": {
+      "T0": 0.0,
+      "T1": 1.0,
+      "T10": 3.0,
+      "T100": 3.0,
+      "T101": 3.0
+     }
+    }
+   },
+   {
+    "step": "s2",
+    "op": "top_k",
+    "args": {
+     "map": "s1",
+     "k": 10,
+     "ascending": false
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": [
+     {
+      "node": "T10",
+      "value": 3.0
+     },
+     {
+      "node": "T100",
+      "value": 3.0
+     },
+     {
+      "node": "T101",
+      "value": 3.0
+     },
+     {
+      "node": "T102",
+      "value": 3.0
+     },
+     {
+      "node": "T103",
+      "value": 3.0
+     },
+     {
+      "node": "T104",
+      "value": 3.0
+     },
+     {
+      "node": "T105",
+      "value": 3.0
+     },
+     {
+      "node": "T106",
+      "value": 3.0
+     },
+     {
+      "node": "T107",
+      "value": 3.0
+     },
+     {
+      "node": "T108",
+      "value": 3.0
+     }
+    ]
+   },
+   {
+    "step": "s3",
+    "op": "strength",
+    "args": {
+     "graph": "G",
+     "mode": "out"
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": {
+     "type": "NodeMap",
+     "n": 600,
+     "sample": {
+      "T0": 0.0,
+      "T1": 5.0,
+      "T10": 16.0,
+      "T100": 16.0,
+      "T101": 18.0
+     }
+    }
+   },
+   {
+    "step": "s4",
+    "op": "top_k",
+    "args": {
+     "map": "s3",
+     "k": 10,
+     "ascending": false
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": [
+     {
+      "node": "T564",
+      "value": 30.0
+     },
+     {
+      "node": "T180",
+      "value": 29.0
+     },
+     {
+      "node": "T341",
+      "value": 29.0
+     },
+     {
+      "node": "T450",
+      "value": 28.0
+     },
+     {
+      "node": "T406",
+      "value": 27.0
+     },
+     {
+      "node": "T414",
+      "value": 27.0
+     },
+     {
+      "node": "T486",
+      "value": 27.0
+     },
+     {
+      "node": "T49",
+      "value": 27.0
+     },
+     {
+      "node": "T97",
+      "value": 27.0
+     },
+     {
+      "node": "T134",
+      "value": 26.0
+     }
+    ]
+   }
+  ],
+  "findings": [],
+  "explanation": "No single person stands out: the highest out-degree is 3, and the top 10 returned (T10, T100, T101, T102, T103, T104, T105, T106, T107, T108) all trust exactly 3 people. These ten are listed in node-ID order, which suggests the tie extends to more nodes than the top 10 shown, but the full count of tied nodes was not reported. I treated the graph as directed (an edge source \u2192 target means \"source trusts target\") and counted distinct trustees with unweighted out-degree over all 600 nodes, not just the largest component. When edge weights are summed (out-strength), the ranking changes: T564 leads with 30, followed by T180 and T341 with 29 each. So if \"trusts the most\" means trust intensity rather than number of people, the answer would be different. These rankings are exact; no approximation was used.",
+  "error": null,
+  "llm_calls": 2,
+  "tokens_in": 9708,
+  "tokens_out": 1009,
+  "cost_usd": 0.0589294,
+  "seconds": 15.888552188873291,
+  "plan_graph": {
+   "nodes": [
+    {
+     "id": "s1",
+     "op": "degree",
+     "args": {
+      "graph": "G",
+      "mode": "out"
+     },
+     "note": "Count of outgoing trust edges per node = how many people each node trusts",
+     "returns": "NodeMap",
+     "cost": "O(n+m)",
+     "doc": "Degree of every node as a NodeMap. mode in {all,in,out}."
+    },
+    {
+     "id": "s2",
+     "op": "top_k",
+     "args": {
+      "map": "s1",
+      "k": 10,
+      "ascending": false
+     },
+     "note": "Rank nodes by number of people trusted",
+     "returns": "Table",
+     "cost": "O(n log n)",
+     "doc": "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}."
+    },
+    {
+     "id": "s3",
+     "op": "strength",
+     "args": {
+      "graph": "G",
+      "mode": "out"
+     },
+     "note": "Variant: total trust given (sum of 'trust' weights on outgoing edges)",
+     "returns": "NodeMap",
+     "cost": "O(n+m)",
+     "doc": "Weighted degree (sum of edge weights, or number of parallel edges in a multigraph) per node as NodeMap."
+    },
+    {
+     "id": "s4",
+     "op": "top_k",
+     "args": {
+      "map": "s3",
+      "k": 10,
+      "ascending": false
+     },
+     "note": "Rank by total trust given, to see whether weighting changes the leader",
+     "returns": "Table",
+     "cost": "O(n log n)",
+     "doc": "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}."
+    }
+   ],
+   "edges": [
+    {
+     "from": "s1",
+     "to": "s2",
+     "arg": "map"
+    },
+    {
+     "from": "s3",
+     "to": "s4",
+     "arg": "map"
+    }
+   ],
+   "answer_steps": [
+    "s2",
+    "s4"
+   ]
+  },
+  "question": "Who trusts the most people?",
+  "dataset": "trust",
+  "model": "claude-opus-5-5"
+ }
+}

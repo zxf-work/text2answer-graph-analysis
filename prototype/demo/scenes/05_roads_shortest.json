@@ -1,0 +1,342 @@
+{
+ "title": "3. Ambiguity gets a clarification or both readings",
+ "subtitle": "Weights are kilometres. 'Shortest' can mean fewest hops or least distance; the system either asks or computes both and says which is which.",
+ "note": "Scene 3 of 4: ambiguous questions are not guessed. Look for a clarification or variants under the answer.",
+ "card": {
+  "name": "roads",
+  "file": "roads.csv",
+  "n_nodes": 300,
+  "n_edges": 605,
+  "density": 0.013489,
+  "degree": {
+   "min": 2,
+   "median": 4.0,
+   "mean": 4.03,
+   "max": 6
+  },
+  "node_id_type": "string label",
+  "sample_node_ids": [
+   "J0",
+   "J1",
+   "J10",
+   "J100",
+   "J101",
+   "J97",
+   "J98",
+   "J99"
+  ],
+  "n_components_weak": 1,
+  "largest_component_fraction": 1.0,
+  "is_bipartite": false,
+  "size_class": "small",
+  "columns": {
+   "header": [
+    "from_junction",
+    "to_junction",
+    "distance_km"
+   ],
+   "source_col": 0,
+   "target_col": 1,
+   "weight_col": 2
+  },
+  "semantics": {
+   "directed": false,
+   "weighted": true,
+   "weight_semantics": "distance",
+   "multigraph": false,
+   "labelled": true,
+   "confidence": {
+    "directed": 0.6,
+    "weighted": 0.9,
+    "weight_semantics": 0.9,
+    "multigraph": 0.95
+   },
+   "evidence": {
+    "directed": "only 0.0% of rows are reciprocated: either undirected stored once (likely) or a directed graph with no mutual edges",
+    "weighted": "numeric column 'distance_km' with 471 distinct values in [0.62, 39.04]",
+    "weight_semantics": "column name 'distance_km' denotes a distance or cost",
+    "multigraph": "no duplicate rows"
+   },
+   "needs_clarification": [
+    "directed"
+   ]
+  },
+  "facts": {
+   "rows": 605,
+   "header": [
+    "from_junction",
+    "to_junction",
+    "distance_km"
+   ],
+   "n_columns": 3,
+   "sample_rows": [
+    [
+     "J0",
+     "J1",
+     "5.31"
+    ],
+    [
+     "J0",
+     "J15",
+     "1.55"
+    ],
+    [
+     "J1",
+     "J2",
+     "4.84"
+    ],
+    [
+     "J1",
+     "J16",
+     "5.18"
+    ]
+   ],
+   "reciprocity_of_rows": 0.0,
+   "distinct_pairs_directed": 605,
+   "distinct_pairs_undirected": 605,
+   "self_loops": 0,
+   "weight_column": "distance_km",
+   "weight_range": [
+    0.62,
+    39.04
+   ],
+   "weight_has_fractions": true,
+   "row_index_column": false,
+   "ids_numeric": false
+  }
+ },
+ "result": {
+  "system": "full",
+  "qid": "roads_shortest",
+  "answer": {
+   "shortest_route_by_distance_km": {
+    "length": 67.24,
+    "path": [
+     "J0",
+     "J15",
+     "J16",
+     "J17",
+     "J32",
+     "J33",
+     "J48",
+     "J49",
+     "J297",
+     "J298",
+     "J299"
+    ],
+    "reachable": true,
+    "hops": 10
+   },
+   "fewest_segments_route": {
+    "length": 10,
+    "path": [
+     "J0",
+     "J1",
+     "J16",
+     "J17",
+     "J18",
+     "J19",
+     "J34",
+     "J49",
+     "J297",
+     "J298",
+     "J299"
+    ],
+    "reachable": true,
+    "hops": 10
+   }
+  },
+  "assumptions": {
+   "directed": false,
+   "weighted": true,
+   "use_weights": true,
+   "largest_component_only": false,
+   "measure": "weighted shortest path (Dijkstra) using distance_km as edge length",
+   "node_resolution": {
+    "J0": "J0",
+    "J299": "J299"
+   },
+   "tier_notes": []
+  },
+  "clarification": null,
+  "variants": [],
+  "ops_used": [
+   "shortest_path",
+   "shortest_path"
+  ],
+  "plan": {
+   "interpretation": {
+    "directed": false,
+    "weighted": true,
+    "use_weights": true,
+    "largest_component_only": false,
+    "measure": "weighted shortest path (Dijkstra) using distance_km as edge length",
+    "node_resolution": {
+     "J0": "J0",
+     "J299": "J299"
+    }
+   },
+   "clarification": null,
+   "variants": [
+    "hop-count shortest path (fewest road segments)"
+   ],
+   "steps": [
+    {
+     "id": "s1",
+     "op": "shortest_path",
+     "args": {
+      "graph": "G",
+      "source": "J0",
+      "target": "J299",
+      "use_weights": true
+     },
+     "note": "Shortest route by total distance_km. The edges are treated as undirected (two-way roads) because none of the rows are reciprocated, which most likely means each road is stored once."
+    },
+    {
+     "id": "s2",
+     "op": "shortest_path",
+     "args": {
+      "graph": "G",
+      "source": "J0",
+      "target": "J299",
+      "use_weights": false
+     },
+     "note": "Alternative: route with the fewest road segments, to show whether it differs from the distance-optimal route."
+    }
+   ],
+   "answer": {
+    "step": null,
+    "field": null,
+    "steps": {
+     "shortest_route_by_distance_km": "s1",
+     "fewest_segments_route": "s2"
+    },
+    "kind": "table"
+   },
+   "rationale": "The weights are road distances in km, so Dijkstra over distance_km gives the shortest route. The graph has one connected component, so a route exists. Roads are assumed to be two-way (undirected), the more plausible reading given that no edges are reciprocated. The hop-count route is also computed for comparison."
+  },
+  "trace": [
+   {
+    "step": "s1",
+    "op": "shortest_path",
+    "args": {
+     "graph": "G",
+     "source": "J0",
+     "target": "J299",
+     "use_weights": true
+    },
+    "seconds": 0.001,
+    "cached": false,
+    "summary": {
+     "length": 67.24,
+     "path": [
+      "J0",
+      "J15",
+      "J16",
+      "J17",
+      "J32",
+      "J33",
+      "J48",
+      "J49",
+      "J297",
+      "J298",
+      "J299"
+     ],
+     "reachable": true,
+     "hops": 10
+    }
+   },
+   {
+    "step": "s2",
+    "op": "shortest_path",
+    "args": {
+     "graph": "G",
+     "source": "J0",
+     "target": "J299",
+     "use_weights": false
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": {
+     "length": 10,
+     "path": [
+      "J0",
+      "J1",
+      "J16",
+      "J17",
+      "J18",
+      "J19",
+      "J34",
+      "J49",
+      "J297",
+      "J298",
+      "J299"
+     ],
+     "reachable": true,
+     "hops": 10
+    }
+   }
+  ],
+  "findings": [
+   {
+    "check": "s1: returned path is a valid walk",
+    "ok": true,
+    "detail": "10 hops",
+    "severity": "info"
+   },
+   {
+    "check": "s2: returned path is a valid walk",
+    "ok": true,
+    "detail": "10 hops",
+    "severity": "info"
+   }
+  ],
+  "explanation": "The shortest route from J0 to J299 by road distance is J0 \u2192 J15 \u2192 J16 \u2192 J17 \u2192 J32 \u2192 J33 \u2192 J48 \u2192 J49 \u2192 J297 \u2192 J298 \u2192 J299. It totals 67.24 km over 10 road segments. This was computed with Dijkstra's algorithm using distance_km as the edge length on the full graph, which is a single connected component. Roads were treated as two-way (undirected) because no edges in the data are reciprocated. For comparison, the fewest-segments route (unweighted) also takes 10 hops, J0 \u2192 J1 \u2192 J16 \u2192 J17 \u2192 J18 \u2192 J19 \u2192 J34 \u2192 J49 \u2192 J297 \u2192 J298 \u2192 J299, but its distance in km was not computed, so the two routes can't be compared on length. Both returned paths were checked as valid walks in the graph, and there were no verification warnings.",
+  "error": null,
+  "llm_calls": 2,
+  "tokens_in": 9131,
+  "tokens_out": 782,
+  "cost_usd": 0.049773399999999995,
+  "seconds": 12.67853593826294,
+  "plan_graph": {
+   "nodes": [
+    {
+     "id": "s1",
+     "op": "shortest_path",
+     "args": {
+      "graph": "G",
+      "source": "J0",
+      "target": "J299",
+      "use_weights": true
+     },
+     "note": "Shortest route by total distance_km. The edges are treated as undirected (two-way roads) because none of the rows are reciprocated, which most likely means each road is stored once.",
+     "returns": "Path",
+     "cost": "O(n+m)",
+     "doc": "Shortest path between two nodes (hop count, or weighted if use_weights and weights are distances). Returns length and node list."
+    },
+    {
+     "id": "s2",
+     "op": "shortest_path",
+     "args": {
+      "graph": "G",
+      "source": "J0",
+      "target": "J299",
+      "use_weights": false
+     },
+     "note": "Alternative: route with the fewest road segments, to show whether it differs from the distance-optimal route.",
+     "returns": "Path",
+     "cost": "O(n+m)",
+     "doc": "Shortest path between two nodes (hop count, or weighted if use_weights and weights are distances). Returns length and node list."
+    }
+   ],
+   "edges": [],
+   "answer_steps": [
+    "s1",
+    "s2"
+   ]
+  },
+  "question": "What is the shortest route from J0 to J299?",
+  "dataset": "roads",
+  "model": "claude-opus-5-5"
+ }
+}

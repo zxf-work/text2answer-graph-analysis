@@ -1,0 +1,164 @@
+{
+ "title": "2b. Direction matters: tool agent",
+ "subtitle": "The conventional agent answers the same question. There is no plan to inspect and no check between the question and what was computed.",
+ "note": "Scene 2 of 4 (contrast): a transcript instead of a plan, and nothing that verifies the direction.",
+ "card": {
+  "name": "trust",
+  "file": "trust.csv",
+  "n_nodes": 600,
+  "n_edges": 1794,
+  "density": 0.004992,
+  "degree": {
+   "min": 3,
+   "median": 3.0,
+   "mean": 5.98,
+   "max": 222
+  },
+  "node_id_type": "string label",
+  "sample_node_ids": [
+   "T0",
+   "T1",
+   "T10",
+   "T100",
+   "T101",
+   "T97",
+   "T98",
+   "T99"
+  ],
+  "n_components_weak": 1,
+  "largest_component_fraction": 1.0,
+  "n_components_strong": 600,
+  "largest_scc_fraction": 0.0017,
+  "reciprocity": 0.0,
+  "is_bipartite": false,
+  "size_class": "small",
+  "columns": {
+   "header": [
+    "source",
+    "target",
+    "trust"
+   ],
+   "source_col": 0,
+   "target_col": 1,
+   "weight_col": 2
+  },
+  "semantics": {
+   "directed": true,
+   "weighted": true,
+   "weight_semantics": "strength",
+   "multigraph": false,
+   "labelled": true,
+   "confidence": {
+    "directed": 0.85,
+    "weighted": 0.9,
+    "weight_semantics": 0.6,
+    "multigraph": 0.95
+   },
+   "evidence": {
+    "directed": "only 0.0% of rows are reciprocated: either undirected stored once (likely) or a directed graph with no mutual edges; column names ['trust'] denote an asymmetric relation",
+    "weighted": "numeric column 'trust' with 10 distinct values in [1.0, 10.0]",
+    "weight_semantics": "integer counts starting at 1 look like interaction counts (strength), not distances",
+    "multigraph": "no duplicate rows"
+   },
+   "needs_clarification": [
+    "weight_semantics"
+   ]
+  },
+  "facts": {
+   "rows": 1794,
+   "header": [
+    "source",
+    "target",
+    "trust"
+   ],
+   "n_columns": 3,
+   "sample_rows": [
+    [
+     "T1",
+     "T0",
+     "5"
+    ],
+    [
+     "T2",
+     "T0",
+     "2"
+    ],
+    [
+     "T2",
+     "T1",
+     "1"
+    ],
+    [
+     "T3",
+     "T0",
+     "9"
+    ]
+   ],
+   "reciprocity_of_rows": 0.0,
+   "distinct_pairs_directed": 1794,
+   "distinct_pairs_undirected": 1794,
+   "self_loops": 0,
+   "weight_column": "trust",
+   "weight_range": [
+    1.0,
+    10.0
+   ],
+   "weight_has_fractions": false,
+   "row_index_column": false,
+   "ids_numeric": false
+  }
+ },
+ "result": {
+  "system": "flat",
+  "qid": "trust_trusts_most_flat",
+  "answer": "T564",
+  "assumptions": {
+   "directed": true,
+   "weighted": true,
+   "use_weights": true,
+   "largest_component_only": false,
+   "measure": "out-strength (sum of outgoing trust weights), used because out-degree is tied",
+   "tie_note": "By plain count, nearly everyone is tied: the out-degree maximum is 3, and 597 of 600 nodes (e.g. T10, T100, T101, ...) are in the top histogram bin (2.7 to 3.0), so they trust 3 people each."
+  },
+  "clarification": "Counting the people someone trusts gives a 597-way tie at 3, so it doesn't pick anyone out. The answer T564 instead uses total trust given (out-strength 30). If you meant the plain count, the answer is a 597-way tie at 3 people each.",
+  "variants": [
+   {
+    "label": "by number of people trusted (out-degree)",
+    "answer": "597-way tie at 3 (e.g. T10, T100, T101, T102, T103)"
+   },
+   {
+    "label": "by total trust given (out-strength), top 5",
+    "answer": [
+     "T564",
+     "T180",
+     "T341",
+     "T450",
+     "T406"
+    ]
+   }
+  ],
+  "ops_used": [
+   "file_facts",
+   "load_graph",
+   "degree",
+   "top_k",
+   "degree_stats",
+   "strength",
+   "top_k"
+  ],
+  "plan": null,
+  "trace": "Graph file: trust.csv\nDataset description: none given.\nQuestion: Who trusts the most people?\n\nASSISTANT: {\"tool\": \"file_facts\", \"args\": {}}\nTOOL: {\"path\": \"/home/user/text2answer-graph-analysis/prototype/bench/data_hard/trust.csv\", \"n_lines\": 1795, \"header\": [\"source\", \"target\", \"trust\"], \"n_columns\": 3, \"sample_rows\": [[\"T1\", \"T0\", \"5\"], [\"T2\", \"T0\", \"2\"], [\"T2\", \"T1\", \"1\"], [\"T3\", \"T0\", \"9\"], [\"T3\", \"T1\", \"10\"]], \"ids_numeric\": false, \"n_distinct_ids\": 600, \"n_rows\": 1794, \"n_rows_dedup_directed\": 1794, \"n_rows_dedup_undirected\": 1794, \"n_self_loops\": 0, \"reciprocity\": 0.0, \"weight_column_numeric\": true, \"weight_values_distinct\": 10, \"weight_min\": 1.0, \"weight_max\": 10.0, \"weight_column_name\": \"trust\", \"columns_used\": [0, 1, 2], \"row_index_column\": false, \"weight_has_fractions\": false, \"id_ranges_disjoint\": false}\n\nASSISTANT: {\"tool\": \"load_graph\", \"args\": {\"directed\": true, \"weighted\": true}}\nTOOL: {\"loaded\": true, \"n\": 600, \"m\": 1794, \"directed\": true, \"weighted\": true}\n\nASSISTANT: {\"tool\": \"degree\", \"args\": {\"graph\": \"G\", \"mode\": \"out\"}, \"save_as\": \"outdeg\"}\nTOOL: {\"type\": \"NodeMap\", \"n\": 600, \"sample\": {\"T0\": 0.0, \"T1\": 1.0, \"T10\": 3.0, \"T100\": 3.0, \"T101\": 3.0}}\n\nASSISTANT: {\"tool\": \"top_k\", \"args\": {\"map\": \"outdeg\", \"k\": 5, \"ascending\": false}}\nTOOL: [{\"node\": \"T10\", \"value\": 3.0}, {\"node\": \"T100\", \"value\": 3.0}, {\"node\": \"T101\", \"value\": 3.0}, {\"node\": \"T102\", \"value\": 3.0}, {\"node\": \"T103\", \"value\": 3.0}]\n\nASSISTANT: {\"tool\": \"degree_stats\", \"args\": {\"graph\": \"G\", \"mode\": \"out\"}}\nTOOL: {\"min\": 0, \"median\": 3.0, \"mean\": 2.99, \"max\": 3, \"std\": 0.15242484486898233, \"histogram\": [{\"range\": [0.0, 0.3], \"count\": 1}, {\"range\": [0.3, 0.6], \"count\": 0}, {\"range\": [0.6, 0.8999999999999999], \"count\": 0}, {\"range\": [0.8999999999999999, 1.2], \"count\": 1}, {\"range\": [1.2, 1.5], \"count\": 0}, {\"range\": [1.5, 1.7999999999999998], \"count\": 0}, {\"range\": [1.7999999999999998, 2.1], \"count\": 1}, {\"range\": [2.1, 2.4], \"count\": 0}, {\"range\": [2.4, 2.6999999999999997], \"count\": 0}, {\"range\": [2.6999999999999997, 3.0], \"count\": 597}]}\n\nASSISTANT: {\"tool\": \"strength\", \"args\": {\"graph\": \"G\", \"mode\": \"out\"}, \"save_as\": \"outstr\"}\nTOOL: {\"type\": \"NodeMap\", \"n\": 600, \"sample\": {\"T0\": 0.0, \"T1\": 5.0, \"T10\": 16.0, \"T100\": 16.0, \"T101\": 18.0}}\n\nASSISTANT: {\"tool\": \"top_k\", \"args\": {\"map\": \"outstr\", \"k\": 5, \"ascending\": false}}\nTOOL: [{\"node\": \"T564\", \"value\": 30.0}, {\"node\": \"T180\", \"value\": 29.0}, {\"node\": \"T341\", \"value\": 29.0}, {\"node\": \"T450\", \"value\": 28.0}, {\"node\": \"T406\", \"value\": 27.0}]",
+  "findings": null,
+  "explanation": "{\"final\": {\"answer\": \"T564\", \"assumptions\": {\"directed\": true, \"weighted\": true, \"use_weights\": true, \"largest_component_only\": false, \"measure\": \"out-strength (sum of outgoing trust weights), used because out-degree is tied\", \"tie_note\": \"By plain count, nearly everyone is tied: the out-degree maximum is 3, and 597 of 600 nodes (e.g. T10, T100, T101, ...) are in the top histogram bin (2.7 to 3.0), so they trust 3 people each.\"}, \"clarification\": \"Counting the people someone trusts gives a 597-way tie at 3, so it doesn't pick anyone out. The answer T564 instead uses total trust given (out-strength 30). If you meant the plain count, the answer is a 597-way tie at 3 people each.\", \"variants\": [{\"label\": \"by number of people trusted (out-degree)\", \"answer\": \"597-way tie at 3 (e.g. T10, T100, T101, T102, T103)\"}, {\"label\": \"by total trust given (out-strength), top 5\", \"answer\": [\"T564\", \"T180\", \"T341\", \"T450\", \"T406\"]}]}}",
+  "error": null,
+  "llm_calls": 8,
+  "tokens_in": 51416,
+  "tokens_out": 1038,
+  "cost_usd": 0.19353120000000001,
+  "seconds": 34.22766733169556,
+  "plan_graph": null,
+  "question": "Who trusts the most people?",
+  "dataset": "trust",
+  "model": "claude-opus-5-5"
+ }
+}

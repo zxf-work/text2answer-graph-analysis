@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>text2answer graph analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="7" cy="9" r="3.2"/><circle cx="25" cy="7" r="3.2"/><circle cx="16" cy="18" r="3.6"/><circle cx="8" cy="26" r="3.2"/><circle cx="26" cy="24" r="3.2"/><path d="M9.5 10.8 14 15.4M22.8 8.6 18.4 15.2M14 20.8 10 23.6M18.6 20.6 23.4 22.6" /></svg>
+    <div><div class="name">text2answer <span>graph analysis</span></div><div class="tag">ask about a graph in plain words, get a computed, verified result</div></div>
+  </div>
+  <nav class="modes" role="tablist" aria-label="Executor">
+    <button class="mode active" data-system="full" title="Typed plan: interpretation, validated dataflow plan, verifier, cost model">Typed plan</button>
+    <button class="mode" data-system="flat" title="Conventional agent: the model calls one tool at a time">Tool agent</button>
+    <button class="mode" data-system="codegen" title="The model writes a Python script that is executed">Code generation</button>
+  </nav>
+  <div class="right">
+    <label class="model">model <select id="model"><option value="claude-opus-5-5">Opus</option><option value="claude-haiku-5-5">Haiku</option></select></label>
+    <button id="btn-scenes" class="ghost">Guided demo</button>
+    <button id="btn-help" class="ghost" aria-label="How it works">?</button>
+  </div>
+</header>
+
+<ol class="steps" id="steps">
+  <li class="step current" data-step="1"><b>1</b><span>Pick a graph file</span><small>any edge list: csv or whitespace, with or without a header</small></li>
+  <li class="step" data-step="2"><b>2</b><span>Read the profile card</span><small>what the system worked out about the file before anything is asked</small></li>
+  <li class="step" data-step="3"><b>3</b><span>Ask in plain words</span><small>no query language; ambiguous questions get a clarification</small></li>
+  <li class="step" data-step="4"><b>4</b><span>Inspect plan, checks, answer</span><small>every number comes from a validated plan the verifier has checked</small></li>
+</ol>
+
+<main class="layout">
+  <aside class="rail">
+    <section class="card" id="graph-card">
+      <h2><span class="num">1</span>Graph</h2>
+      <div class="ds-list" id="ds-list"></div>
+      <div class="upload" id="upload"><input type="file" id="file" hidden><span>Drop an edge list here or <a href="#" id="upload-link">choose a file</a></span></div>
+    </section>
+    <section class="card" id="profile-card">
+      <h2><span class="num">2</span>Profile card <span class="hint">what the system sees</span></h2>
+      <div id="profile" class="profile empty">Pick a graph to see its profile.</div>
+    </section>
+  </aside>
+
+  <section class="main">
+    <section class="card ask" id="ask-card">
+      <h2><span class="num">3</span>Ask</h2>
+      <div class="askrow">
+        <textarea id="question" rows="2" placeholder="e.g. Who is the most trusted person?"></textarea>
+        <button id="run" class="primary" disabled>Ask</button>
+      </div>
+      <div class="chips" id="examples"></div>
+      <div class="desc-row"><label>Description you'd give a colleague <small>(optional; the system works without it)</small></label><input id="description" placeholder="e.g. who-trusts-whom network, each row is truster,trustee,strength"></div>
+    </section>
+
+    <section class="card progress hidden" id="progress-card">
+      <div class="prog-head"><div id="prog-title">Working</div><div id="prog-time" class="mono"></div></div>
+      <ol class="stages" id="stages"></ol>
+    </section>
+
+    <section id="result" class="result hidden">
+      <div class="result-grid">
+        <section class="card answer" id="answer-card">
+          <h2><span class="num">4</span>Answer</h2>
+          <div id="answer"></div>
+          <div id="clarification" class="clarify hidden"></div>
+          <div id="explanation" class="explanation"></div>
+          <div id="variants" class="variants"></div>
+        </section>
+        <section class="card interp" id="interp-card">
+          <h2>Interpretation <span class="hint">the assumptions behind the answer</span></h2>
+          <div id="interp" class="kv"></div>
+        </section>
+      </div>
+
+      <div class="result-grid two">
+        <section class="card plan" id="plan-card">
+          <h2>Plan <span class="hint" id="plan-hint">typed dataflow the executor ran</span></h2>
+          <div id="plan"></div>
+        </section>
+        <section class="card verify" id="verify-card">
+          <h2>Verification <span class="hint">checks made without knowing the right answer</span></h2>
+          <div id="findings"></div>
+        </section>
+      </div>
+
+      <section class="card cost" id="cost-card">
+        <h2>Cost <span class="hint">what this answer took</span></h2>
+        <div id="cost" class="tiles"></div>
+        <div id="tiers" class="tiers"></div>
+      </section>
+    </section>
+  </section>
+</main>
+
+<div class="drawer hidden" id="scenes">
+  <div class="drawer-head"><h3>Guided demo</h3><button class="ghost" id="scenes-close">close</button></div>
+  <p class="muted">Recorded runs that replay instantly, no model call. Each one shows one thing the system guarantees.</p>
+  <div id="scene-list"></div>
+</div>
+
+<div class="modal hidden" id="help">
+  <div class="modal-box">
+    <h3>How it works</h3>
+    <p>You give the system an edge-list file and a question in plain language. The language model never sees the graph. It sees a <b>profile card</b>: statistics the system computed from the file (is each edge listed once or in both directions, is there a header, which column looks like a weight, are there repeated rows), with the semantics it inferred and its confidence.</p>
+    <p>From the card and your question the model writes a <b>typed plan</b>: a small dataflow of operators from a fixed catalogue (degree, shortest path, communities, betweenness, ...). The plan is validated against the catalogue's types, its cost is estimated, and expensive steps are switched to approximate tiers when the graph is large. Then the plan is executed, not the model's prose.</p>
+    <p>A <b>verifier</b> checks the result without knowing the right answer: invariants (a partition covers every node, PageRank sums to one), agreement between methods, and consistency between your question, the stated interpretation and the plan ("you asked for followers, the plan used out-degree"). When the question is genuinely ambiguous the system asks you instead of guessing.</p>
+    <p>The <b>Tool agent</b> and <b>Code generation</b> tabs run the same question through two conventional baselines, so you can compare what they return and what they cannot show you.</p>
+    <button class="primary" id="help-close">Got it</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

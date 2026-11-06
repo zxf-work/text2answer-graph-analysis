@@ -1,0 +1,45 @@
+{
+ "name": "ba_50m",
+ "file": "ba_50m.txt",
+ "n_nodes": 10000000,
+ "n_edges": 49999985,
+ "density": 1e-06,
+ "degree": {
+  "min": 5,
+  "median": 7.0,
+  "mean": 10.0,
+  "max": 7003
+ },
+ "node_id_type": "integer",
+ "sample_node_ids": [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "9999997",
+  "9999998",
+  "9999999"
+ ],
+ "n_components_weak": 1,
+ "largest_component_fraction": 1.0,
+ "size_class": "very large",
+ "semantics": {
+  "directed": false,
+  "weighted": false,
+  "weight_semantics": null,
+  "multigraph": false,
+  "labelled": false,
+  "confidence": {
+   "directed": 1.0,
+   "weighted": 1.0,
+   "multigraph": 0.95
+  },
+  "evidence": {
+   "directed": "declared by user",
+   "weighted": "declared by user",
+   "multigraph": "no duplicate rows"
+  },
+  "needs_clarification": []
+ }
+}

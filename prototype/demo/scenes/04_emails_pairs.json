@@ -1,0 +1,267 @@
+{
+ "title": "2c. Repeated rows: pairs or messages?",
+ "subtitle": "An email log with one row per message. 'Pairs' means distinct sender-recipient pairs, not rows; the multigraph check watches for the confusion.",
+ "note": "Scene 2 of 4: the profile card marks the file as a multigraph and the plan counts distinct pairs.",
+ "card": {
+  "name": "emails",
+  "file": "emails.csv",
+  "n_nodes": 400,
+  "n_edges": 2957,
+  "density": 0.018528,
+  "degree": {
+   "min": 3,
+   "median": 9.0,
+   "mean": 14.79,
+   "max": 302
+  },
+  "node_id_type": "string label",
+  "sample_node_ids": [
+   "E0",
+   "E1",
+   "E10",
+   "E100",
+   "E101",
+   "E97",
+   "E98",
+   "E99"
+  ],
+  "n_components_weak": 1,
+  "largest_component_fraction": 1.0,
+  "n_components_strong": 400,
+  "largest_scc_fraction": 0.0025,
+  "reciprocity": 0.0,
+  "is_bipartite": false,
+  "size_class": "small",
+  "n_edges_distinct_pairs": 1194,
+  "columns": {
+   "header": [
+    "sender",
+    "recipient",
+    "timestamp"
+   ],
+   "source_col": 0,
+   "target_col": 1,
+   "weight_col": null
+  },
+  "semantics": {
+   "directed": true,
+   "weighted": false,
+   "weight_semantics": null,
+   "multigraph": true,
+   "labelled": true,
+   "confidence": {
+    "directed": 0.85,
+    "weighted": 0.95,
+    "multigraph": 0.8
+   },
+   "evidence": {
+    "directed": "only 0.0% of rows are reciprocated: either undirected stored once (likely) or a directed graph with no mutual edges; column names ['sender', 'recipient'] denote an asymmetric relation",
+    "weighted": "third column is constant",
+    "multigraph": "1763 repeated rows (59.6%): rows look like events (repeated interactions), kept as parallel edges; use distinct_edge_count for unique pairs"
+   },
+   "needs_clarification": []
+  },
+  "facts": {
+   "rows": 2957,
+   "header": [
+    "sender",
+    "recipient",
+    "timestamp"
+   ],
+   "n_columns": 3,
+   "sample_rows": [
+    [
+     "E286",
+     "E14",
+     "1606988263"
+    ],
+    [
+     "E19",
+     "E3",
+     "1610635873"
+    ],
+    [
+     "E3",
+     "E0",
+     "1610104298"
+    ],
+    [
+     "E366",
+     "E146",
+     "1624107834"
+    ]
+   ],
+   "reciprocity_of_rows": 0.0,
+   "distinct_pairs_directed": 1194,
+   "distinct_pairs_undirected": 1194,
+   "self_loops": 0,
+   "weight_column": null,
+   "weight_range": null,
+   "weight_has_fractions": false,
+   "row_index_column": false,
+   "ids_numeric": false
+  }
+ },
+ "result": {
+  "system": "full",
+  "qid": "emails_pairs",
+  "answer": {
+   "distinct_pairs_with_email": 1194,
+   "total_emails": 2957,
+   "reciprocity_two_way_fraction": 0.0
+  },
+  "assumptions": {
+   "directed": true,
+   "weighted": false,
+   "use_weights": false,
+   "largest_component_only": false,
+   "measure": "distinct connected node pairs (unique sender\u2013recipient pairs, collapsing repeated emails)",
+   "node_resolution": {},
+   "tier_notes": []
+  },
+  "clarification": null,
+  "variants": [],
+  "ops_used": [
+   "distinct_edge_count",
+   "edge_count",
+   "reciprocity"
+  ],
+  "plan": {
+   "interpretation": {
+    "directed": true,
+    "weighted": false,
+    "use_weights": false,
+    "largest_component_only": false,
+    "measure": "distinct connected node pairs (unique sender\u2013recipient pairs, collapsing repeated emails)",
+    "node_resolution": {}
+   },
+   "clarification": null,
+   "variants": [
+    "reciprocity (fraction of pairs where email went both ways)"
+   ],
+   "steps": [
+    {
+     "id": "s1",
+     "op": "distinct_edge_count",
+     "args": {
+      "graph": "G"
+     },
+     "note": "The graph is a multigraph where each row is one email. Counting distinct pairs collapses repeated emails between the same two people."
+    },
+    {
+     "id": "s2",
+     "op": "edge_count",
+     "args": {
+      "graph": "G"
+     },
+     "note": "Total number of emails (parallel edges), for context against the distinct-pair count."
+    },
+    {
+     "id": "s3",
+     "op": "reciprocity",
+     "args": {
+      "graph": "G"
+     },
+     "note": "Checks the stricter reading of 'exchanged' as mail going in both directions. With reciprocity 0, ordered and unordered distinct pairs are the same number."
+    }
+   ],
+   "answer": {
+    "step": null,
+    "field": null,
+    "steps": {
+     "distinct_pairs_with_email": "s1",
+     "total_emails": "s2",
+     "reciprocity_two_way_fraction": "s3"
+    },
+    "kind": "table"
+   },
+   "rationale": "The file has one row per email (59.6% repeated rows), so the number of pairs is the count of distinct connected node pairs, which distinct_edge_count gives. Reciprocity is reported too: if 'exchanged' means mail in both directions, a reciprocity of 0 means no pair qualifies, and it also confirms that each sender\u2013recipient pair is counted only once."
+  },
+  "trace": [
+   {
+    "step": "s1",
+    "op": "distinct_edge_count",
+    "args": {
+     "graph": "G"
+    },
+    "seconds": 0.001,
+    "cached": false,
+    "summary": 1194
+   },
+   {
+    "step": "s2",
+    "op": "edge_count",
+    "args": {
+     "graph": "G"
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": 2957
+   },
+   {
+    "step": "s3",
+    "op": "reciprocity",
+    "args": {
+     "graph": "G"
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": 0.0
+   }
+  ],
+  "findings": [],
+  "explanation": "**1,194 distinct pairs of people** have emailed each other, collapsed from 2,957 individual emails (many pairs exchanged repeated messages). This is the count of unique sender\u2013recipient pairs in the directed graph, without weights and across all components. Reciprocity is 0.0, so no pair has mail in both directions, which means 1,194 is also the number of unordered pairs. If \"exchanged\" means each person emailed the other, the answer is zero pairs. No approximation was used, and verification raised no warnings.",
+  "error": null,
+  "llm_calls": 2,
+  "tokens_in": 8867,
+  "tokens_out": 1167,
+  "cost_usd": 0.0553614,
+  "seconds": 17.306300163269043,
+  "plan_graph": {
+   "nodes": [
+    {
+     "id": "s1",
+     "op": "distinct_edge_count",
+     "args": {
+      "graph": "G"
+     },
+     "note": "The graph is a multigraph where each row is one email. Counting distinct pairs collapses repeated emails between the same two people.",
+     "returns": "Scalar",
+     "cost": "O(m)",
+     "doc": "Number of distinct node pairs connected (collapses parallel edges in a multigraph)."
+    },
+    {
+     "id": "s2",
+     "op": "edge_count",
+     "args": {
+      "graph": "G"
+     },
+     "note": "Total number of emails (parallel edges), for context against the distinct-pair count.",
+     "returns": "Scalar",
+     "cost": "O(1)",
+     "doc": "Number of edges (undirected edges counted once; directed arcs counted once)."
+    },
+    {
+     "id": "s3",
+     "op": "reciprocity",
+     "args": {
+      "graph": "G"
+     },
+     "note": "Checks the stricter reading of 'exchanged' as mail going in both directions. With reciprocity 0, ordered and unordered distinct pairs are the same number.",
+     "returns": "Scalar",
+     "cost": "O(m)",
+     "doc": "Fraction of directed edges whose reverse also exists. Directed graphs only."
+    }
+   ],
+   "edges": [],
+   "answer_steps": [
+    "s1",
+    "s2",
+    "s3"
+   ]
+  },
+  "question": "How many pairs of people have exchanged email?",
+  "dataset": "emails",
+  "model": "claude-opus-5-5"
+ }
+}

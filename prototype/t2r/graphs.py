@@ -5,7 +5,9 @@ The profile card is the only description of the graph that an LLM ever sees.
 from __future__ import annotations
 
 import csv
+import dataclasses
 import hashlib
+import json
 import os
 import re
 from dataclasses import dataclass, field, asdict
@@ -398,7 +400,7 @@ class LoadedGraph:
         return {"matched": None, "method": "none", "candidates": (contained or close)[:k]}
 
 
-def load_graph(name: str, path: str, description: str = "", override: Optional[dict] = None) -> LoadedGraph:
+def _load_graph_uncached(name: str, path: str, description: str = "", override: Optional[dict] = None) -> LoadedGraph:
     """Load an edge list and build an igraph.Graph according to inferred (or overridden) semantics."""
     big = os.path.getsize(path) > BIG_FILE_BYTES
     if big:
@@ -471,6 +473,21 @@ class _RangeIndex:
     def __len__(self) -> int:
         return self.n
 
+
+
+_GRAPH_CACHE: dict = {}
+
+
+def load_graph(name: str, path: str, description: str = "", override: Optional[dict] = None) -> LoadedGraph:
+    """Load a graph. With T2R_GRAPH_CACHE=1 (the demo server) loaded graphs stay in memory and are shared across questions."""
+    if os.environ.get("T2R_GRAPH_CACHE") != "1":
+        return _load_graph_uncached(name, path, description, override)
+    key = (os.path.abspath(path), os.path.getmtime(path), json.dumps(override, sort_keys=True) if override else "")
+    lg = _GRAPH_CACHE.get(key)
+    if lg is None:
+        lg = _load_graph_uncached(name, path, description, override)
+        _GRAPH_CACHE[key] = lg
+    return dataclasses.replace(lg, strict=False)
 
 def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGraph:
     u, v, w = arrays

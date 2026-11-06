@@ -1,0 +1,652 @@
+{
+ "title": "1. See the plan, not just the answer",
+ "subtitle": "No description given. The profile card says the file is directed with integer strengths; the plan uses in-degree; the verifier checks every step.",
+ "note": "Scene 1 of 4: every decision that produced the number is on screen: profile card, interpretation, typed plan, checks.",
+ "card": {
+  "name": "trust",
+  "file": "trust.csv",
+  "n_nodes": 600,
+  "n_edges": 1794,
+  "density": 0.004992,
+  "degree": {
+   "min": 3,
+   "median": 3.0,
+   "mean": 5.98,
+   "max": 222
+  },
+  "node_id_type": "string label",
+  "sample_node_ids": [
+   "T0",
+   "T1",
+   "T10",
+   "T100",
+   "T101",
+   "T97",
+   "T98",
+   "T99"
+  ],
+  "n_components_weak": 1,
+  "largest_component_fraction": 1.0,
+  "n_components_strong": 600,
+  "largest_scc_fraction": 0.0017,
+  "reciprocity": 0.0,
+  "is_bipartite": false,
+  "size_class": "small",
+  "columns": {
+   "header": [
+    "source",
+    "target",
+    "trust"
+   ],
+   "source_col": 0,
+   "target_col": 1,
+   "weight_col": 2
+  },
+  "semantics": {
+   "directed": true,
+   "weighted": true,
+   "weight_semantics": "strength",
+   "multigraph": false,
+   "labelled": true,
+   "confidence": {
+    "directed": 0.85,
+    "weighted": 0.9,
+    "weight_semantics": 0.6,
+    "multigraph": 0.95
+   },
+   "evidence": {
+    "directed": "only 0.0% of rows are reciprocated: either undirected stored once (likely) or a directed graph with no mutual edges; column names ['trust'] denote an asymmetric relation",
+    "weighted": "numeric column 'trust' with 10 distinct values in [1.0, 10.0]",
+    "weight_semantics": "integer counts starting at 1 look like interaction counts (strength), not distances",
+    "multigraph": "no duplicate rows"
+   },
+   "needs_clarification": [
+    "weight_semantics"
+   ]
+  },
+  "facts": {
+   "rows": 1794,
+   "header": [
+    "source",
+    "target",
+    "trust"
+   ],
+   "n_columns": 3,
+   "sample_rows": [
+    [
+     "T1",
+     "T0",
+     "5"
+    ],
+    [
+     "T2",
+     "T0",
+     "2"
+    ],
+    [
+     "T2",
+     "T1",
+     "1"
+    ],
+    [
+     "T3",
+     "T0",
+     "9"
+    ]
+   ],
+   "reciprocity_of_rows": 0.0,
+   "distinct_pairs_directed": 1794,
+   "distinct_pairs_undirected": 1794,
+   "self_loops": 0,
+   "weight_column": "trust",
+   "weight_range": [
+    1.0,
+    10.0
+   ],
+   "weight_has_fractions": false,
+   "row_index_column": false,
+   "ids_numeric": false
+  }
+ },
+ "result": {
+  "system": "full",
+  "qid": "trust_most_trusted",
+  "answer": {
+   "most_trusted_by_total_trust_received": [
+    {
+     "node": "T0",
+     "value": 1149.0
+    },
+    {
+     "node": "T1",
+     "value": 748.0
+    },
+    {
+     "node": "T5",
+     "value": 623.0
+    },
+    {
+     "node": "T2",
+     "value": 459.0
+    },
+    {
+     "node": "T17",
+     "value": 439.0
+    }
+   ],
+   "most_trusted_by_number_of_trusters": [
+    {
+     "node": "T0",
+     "value": 222.0
+    },
+    {
+     "node": "T1",
+     "value": 144.0
+    },
+    {
+     "node": "T5",
+     "value": 111.0
+    },
+    {
+     "node": "T2",
+     "value": 85.0
+    },
+    {
+     "node": "T17",
+     "value": 74.0
+    }
+   ],
+   "most_trusted_by_pagerank": [
+    {
+     "node": "T0",
+     "value": 0.20474086990801033
+    },
+    {
+     "node": "T1",
+     "value": 0.09585882262224156
+    },
+    {
+     "node": "T2",
+     "value": 0.03479540562833247
+    },
+    {
+     "node": "T3",
+     "value": 0.032414024105757895
+    },
+    {
+     "node": "T5",
+     "value": 0.028944542301511954
+    }
+   ]
+  },
+  "assumptions": {
+   "directed": true,
+   "weighted": true,
+   "use_weights": false,
+   "largest_component_only": false,
+   "measure": "weighted in-strength: the sum of the 'trust' ratings a person receives on incoming edges. The ratings are treated as strengths and are never used as path lengths.",
+   "node_resolution": {},
+   "tier_notes": []
+  },
+  "clarification": null,
+  "variants": [
+   {
+    "label": "by strength",
+    "answer": [
+     {
+      "node": "T0",
+      "value": 1149.0
+     },
+     {
+      "node": "T1",
+      "value": 748.0
+     },
+     {
+      "node": "T5",
+      "value": 623.0
+     },
+     {
+      "node": "T2",
+      "value": 459.0
+     },
+     {
+      "node": "T17",
+      "value": 439.0
+     }
+    ]
+   },
+   {
+    "label": "by degree",
+    "answer": [
+     {
+      "node": "T0",
+      "value": 222.0
+     },
+     {
+      "node": "T1",
+      "value": 144.0
+     },
+     {
+      "node": "T5",
+      "value": 111.0
+     },
+     {
+      "node": "T2",
+      "value": 85.0
+     },
+     {
+      "node": "T17",
+      "value": 74.0
+     }
+    ]
+   },
+   {
+    "label": "by pagerank",
+    "answer": [
+     {
+      "node": "T0",
+      "value": 0.20474086990801033
+     },
+     {
+      "node": "T1",
+      "value": 0.09585882262224156
+     },
+     {
+      "node": "T2",
+      "value": 0.03479540562833247
+     },
+     {
+      "node": "T3",
+      "value": 0.032414024105757895
+     },
+     {
+      "node": "T5",
+      "value": 0.028944542301511954
+     }
+    ]
+   }
+  ],
+  "ops_used": [
+   "strength",
+   "top_k",
+   "degree",
+   "top_k",
+   "pagerank",
+   "top_k"
+  ],
+  "plan": {
+   "interpretation": {
+    "directed": true,
+    "weighted": true,
+    "use_weights": false,
+    "largest_component_only": false,
+    "measure": "weighted in-strength: the sum of the 'trust' ratings a person receives on incoming edges. The ratings are treated as strengths and are never used as path lengths.",
+    "node_resolution": {}
+   },
+   "clarification": null,
+   "variants": [
+    "in-degree (number of people who trust the person, ignoring rating values)",
+    "PageRank (trust received from people who are themselves trusted)"
+   ],
+   "steps": [
+    {
+     "id": "s1",
+     "op": "strength",
+     "args": {
+      "graph": "G",
+      "mode": "in"
+     },
+     "note": "Total trust received per person: the sum of incoming 'trust' ratings. Weights are treated as strengths, not distances."
+    },
+    {
+     "id": "s2",
+     "op": "top_k",
+     "args": {
+      "map": "s1",
+      "k": 5,
+      "ascending": false
+     },
+     "note": "Primary answer: people with the highest total trust received."
+    },
+    {
+     "id": "s3",
+     "op": "degree",
+     "args": {
+      "graph": "G",
+      "mode": "in"
+     },
+     "note": "Variant: number of distinct people who trust each person, regardless of rating."
+    },
+    {
+     "id": "s4",
+     "op": "top_k",
+     "args": {
+      "map": "s3",
+      "k": 5,
+      "ascending": false
+     },
+     "note": "Top people by in-degree, to check whether the ranking depends on the rating values."
+    },
+    {
+     "id": "s5",
+     "op": "pagerank",
+     "args": {
+      "graph": "G",
+      "damping": 0.85
+     },
+     "note": "Variant: recursive trust, where being trusted by trusted people counts more. No path lengths are involved."
+    },
+    {
+     "id": "s6",
+     "op": "top_k",
+     "args": {
+      "map": "s5",
+      "k": 5,
+      "ascending": false
+     },
+     "note": "Top people by PageRank."
+    }
+   ],
+   "answer": {
+    "step": null,
+    "field": null,
+    "steps": {
+     "most_trusted_by_total_trust_received": "s2",
+     "most_trusted_by_number_of_trusters": "s4",
+     "most_trusted_by_pagerank": "s6"
+    },
+    "kind": "table"
+   },
+   "rationale": "'Most trusted' means trust received, so the primary measure is weighted in-strength. It sums the 1-10 trust ratings on incoming edges and treats them as strengths, not distances, so no weighted shortest paths are used (use_weights=false). In-degree and PageRank are also computed so the user can see whether the top person stays the same across these definitions."
+  },
+  "trace": [
+   {
+    "step": "s1",
+    "op": "strength",
+    "args": {
+     "graph": "G",
+     "mode": "in"
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": {
+     "type": "NodeMap",
+     "n": 600,
+     "sample": {
+      "T0": 1149.0,
+      "T1": 748.0,
+      "T10": 436.0,
+      "T100": 10.0,
+      "T101": 0.0
+     }
+    }
+   },
+   {
+    "step": "s2",
+    "op": "top_k",
+    "args": {
+     "map": "s1",
+     "k": 5,
+     "ascending": false
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": [
+     {
+      "node": "T0",
+      "value": 1149.0
+     },
+     {
+      "node": "T1",
+      "value": 748.0
+     },
+     {
+      "node": "T5",
+      "value": 623.0
+     },
+     {
+      "node": "T2",
+      "value": 459.0
+     },
+     {
+      "node": "T17",
+      "value": 439.0
+     }
+    ]
+   },
+   {
+    "step": "s3",
+    "op": "degree",
+    "args": {
+     "graph": "G",
+     "mode": "in"
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": {
+     "type": "NodeMap",
+     "n": 600,
+     "sample": {
+      "T0": 222.0,
+      "T1": 144.0,
+      "T10": 71.0,
+      "T100": 1.0,
+      "T101": 0.0
+     }
+    }
+   },
+   {
+    "step": "s4",
+    "op": "top_k",
+    "args": {
+     "map": "s3",
+     "k": 5,
+     "ascending": false
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": [
+     {
+      "node": "T0",
+      "value": 222.0
+     },
+     {
+      "node": "T1",
+      "value": 144.0
+     },
+     {
+      "node": "T5",
+      "value": 111.0
+     },
+     {
+      "node": "T2",
+      "value": 85.0
+     },
+     {
+      "node": "T17",
+      "value": 74.0
+     }
+    ]
+   },
+   {
+    "step": "s5",
+    "op": "pagerank",
+    "args": {
+     "graph": "G",
+     "damping": 0.85
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": {
+     "type": "NodeMap",
+     "n": 600,
+     "sample": {
+      "T0": 0.20474086990801033,
+      "T1": 0.09585882262224156,
+      "T10": 0.0266855429413934,
+      "T100": 0.0006930636093188706,
+      "T101": 0.000540049565703016
+     }
+    }
+   },
+   {
+    "step": "s6",
+    "op": "top_k",
+    "args": {
+     "map": "s5",
+     "k": 5,
+     "ascending": false
+    },
+    "seconds": 0.0,
+    "cached": false,
+    "summary": [
+     {
+      "node": "T0",
+      "value": 0.20474086990801033
+     },
+     {
+      "node": "T1",
+      "value": 0.09585882262224156
+     },
+     {
+      "node": "T2",
+      "value": 0.03479540562833247
+     },
+     {
+      "node": "T3",
+      "value": 0.032414024105757895
+     },
+     {
+      "node": "T5",
+      "value": 0.028944542301511954
+     }
+    ]
+   }
+  ],
+  "findings": [
+   {
+    "check": "s5: pagerank sums to 1",
+    "ok": true,
+    "detail": "sum=1.000000",
+    "severity": "info"
+   },
+   {
+    "check": "top-k agreement pagerank vs degree",
+    "ok": true,
+    "detail": "overlap@k=0.80; measures agree on the leaders",
+    "severity": "info"
+   }
+  ],
+  "explanation": "T0 is the most trusted person, receiving a total trust of 1149.0 from 222 people. That is well ahead of T1 (748.0 from 144 people) and T5 (623.0 from 111 people). The main measure is weighted in-strength on the directed trust graph: each person's score is the sum of the 1-10 trust ratings on their incoming edges. The ratings count as strengths, not path lengths, and the full graph of 600 people was used rather than only the largest component. The results are exact, with no approximation. In-degree gives the same top five in the same order (T0, T1, T5, T2, T17), and PageRank also ranks T0 first (0.2047) and T1 second. Lower down, PageRank places T2 and T3 ahead of T5 and drops T17 from its top five. The check found PageRank and in-degree share 80% of their top-5 leaders, so there is no disagreement about who ranks first.",
+  "error": null,
+  "llm_calls": 3,
+  "tokens_in": 17685,
+  "tokens_out": 2336,
+  "cost_usd": 0.1492774,
+  "seconds": 29.201305389404297,
+  "plan_graph": {
+   "nodes": [
+    {
+     "id": "s1",
+     "op": "strength",
+     "args": {
+      "graph": "G",
+      "mode": "in"
+     },
+     "note": "Total trust received per person: the sum of incoming 'trust' ratings. Weights are treated as strengths, not distances.",
+     "returns": "NodeMap",
+     "cost": "O(n+m)",
+     "doc": "Weighted degree (sum of edge weights, or number of parallel edges in a multigraph) per node as NodeMap."
+    },
+    {
+     "id": "s2",
+     "op": "top_k",
+     "args": {
+      "map": "s1",
+      "k": 5,
+      "ascending": false
+     },
+     "note": "Primary answer: people with the highest total trust received.",
+     "returns": "Table",
+     "cost": "O(n log n)",
+     "doc": "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}."
+    },
+    {
+     "id": "s3",
+     "op": "degree",
+     "args": {
+      "graph": "G",
+      "mode": "in"
+     },
+     "note": "Variant: number of distinct people who trust each person, regardless of rating.",
+     "returns": "NodeMap",
+     "cost": "O(n+m)",
+     "doc": "Degree of every node as a NodeMap. mode in {all,in,out}."
+    },
+    {
+     "id": "s4",
+     "op": "top_k",
+     "args": {
+      "map": "s3",
+      "k": 5,
+      "ascending": false
+     },
+     "note": "Top people by in-degree, to check whether the ranking depends on the rating values.",
+     "returns": "Table",
+     "cost": "O(n log n)",
+     "doc": "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}."
+    },
+    {
+     "id": "s5",
+     "op": "pagerank",
+     "args": {
+      "graph": "G",
+      "damping": 0.85
+     },
+     "note": "Variant: recursive trust, where being trusted by trusted people counts more. No path lengths are involved.",
+     "returns": "NodeMap",
+     "cost": "O(k(n+m))",
+     "doc": "PageRank as NodeMap (directed if graph directed)."
+    },
+    {
+     "id": "s6",
+     "op": "top_k",
+     "args": {
+      "map": "s5",
+      "k": 5,
+      "ascending": false
+     },
+     "note": "Top people by PageRank.",
+     "returns": "Table",
+     "cost": "O(n log n)",
+     "doc": "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}."
+    }
+   ],
+   "edges": [
+    {
+     "from": "s1",
+     "to": "s2",
+     "arg": "map"
+    },
+    {
+     "from": "s3",
+     "to": "s4",
+     "arg": "map"
+    },
+    {
+     "from": "s5",
+     "to": "s6",
+     "arg": "map"
+    }
+   ],
+   "answer_steps": [
+    "s2",
+    "s4",
+    "s6"
+   ]
+  },
+  "question": "Who is the most trusted person?",
+  "dataset": "trust",
+  "model": "claude-opus-5-5"
+ }
+}

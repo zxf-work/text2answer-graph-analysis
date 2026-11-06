@@ -5,3 +5,6 @@ prototype/results*/run.log
 prototype/bench/big/*.txt
 prototype/bench/questions_scale.partial.json
 prototype/bench/make_scale.log
+prototype/demo/uploads/
+prototype/demo/dist/
+prototype/demo/*.log

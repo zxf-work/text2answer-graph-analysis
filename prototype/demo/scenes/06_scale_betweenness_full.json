@@ -1,0 +1,299 @@
+{
+ "title": "4a. 50M edges: the cost model takes over",
+ "subtitle": "The planner asked for 500 betweenness pivots; the cost model cut it to 125 to fit the budget; the run finished in 20 minutes.",
+ "note": "Scene 4 of 4: recorded on a 10M-node, 50M-edge graph. See the cost model decision under Cost.",
+ "card": {
+  "name": "ba_50m",
+  "file": "ba_50m.txt",
+  "n_nodes": 10000000,
+  "n_edges": 49999985,
+  "density": 1e-06,
+  "degree": {
+   "min": 5,
+   "median": 7.0,
+   "mean": 10.0,
+   "max": 7003
+  },
+  "node_id_type": "integer",
+  "sample_node_ids": [
+   "0",
+   "1",
+   "2",
+   "3",
+   "4",
+   "9999997",
+   "9999998",
+   "9999999"
+  ],
+  "n_components_weak": 1,
+  "largest_component_fraction": 1.0,
+  "size_class": "very large",
+  "semantics": {
+   "directed": false,
+   "weighted": false,
+   "weight_semantics": null,
+   "multigraph": false,
+   "labelled": false,
+   "confidence": {
+    "directed": 1.0,
+    "weighted": 1.0,
+    "multigraph": 0.95
+   },
+   "evidence": {
+    "directed": "declared by user",
+    "weighted": "declared by user",
+    "multigraph": "no duplicate rows"
+   },
+   "needs_clarification": []
+  }
+ },
+ "result": {
+  "system": "full",
+  "qid": "X15",
+  "answer": [
+   {
+    "node": "6",
+    "value": 2079528851414.5488
+   },
+   {
+    "node": "9",
+    "value": 1565041241613.3362
+   },
+   {
+    "node": "3",
+    "value": 1255177565069.7256
+   },
+   {
+    "node": "2",
+    "value": 1122391405127.47
+   },
+   {
+    "node": "1",
+    "value": 944084575713.5619
+   },
+   {
+    "node": "42",
+    "value": 932450991620.0414
+   },
+   {
+    "node": "4",
+    "value": 909438597469.7424
+   },
+   {
+    "node": "15",
+    "value": 842947370356.7131
+   },
+   {
+    "node": "11",
+    "value": 637775809197.6997
+   },
+   {
+    "node": "23",
+    "value": 584751885549.6614
+   }
+  ],
+  "assumptions": {
+   "directed": false,
+   "weighted": false,
+   "use_weights": false,
+   "largest_component_only": false,
+   "measure": "betweenness centrality (approximate, sampled pivots), as explicitly requested",
+   "node_resolution": {},
+   "tier_notes": [
+    "s1: betweenness pivots reduced to 125 to stay within budget"
+   ]
+  },
+  "clarification": null,
+  "variants": [],
+  "ops_used": [
+   "betweenness",
+   "top_k"
+  ],
+  "plan": {
+   "interpretation": {
+    "directed": false,
+    "weighted": false,
+    "use_weights": false,
+    "largest_component_only": false,
+    "measure": "betweenness centrality (approximate, sampled pivots), as explicitly requested",
+    "node_resolution": {}
+   },
+   "clarification": null,
+   "variants": [],
+   "steps": [
+    {
+     "id": "s1",
+     "op": "betweenness",
+     "args": {
+      "graph": "G",
+      "tier": "approx",
+      "k": 125,
+      "use_weights": false
+     },
+     "note": "Graph has 10M nodes and 50M edges, so exact O(nm) betweenness is infeasible. The user accepts an approximation, so sample 500 pivot sources. The graph is unweighted, so hop counts are used."
+    },
+    {
+     "id": "s2",
+     "op": "top_k",
+     "args": {
+      "map": "s1",
+      "k": 10,
+      "ascending": false
+     },
+     "note": "The 10 nodes with the highest estimated betweenness."
+    }
+   ],
+   "answer": {
+    "step": "s2",
+    "field": null,
+    "steps": null,
+    "kind": "ranking"
+   },
+   "rationale": "The user named betweenness and accepted an approximation, so no alternative measure is needed. Pivot-sampled betweenness on this very large, connected, undirected, unweighted graph is used, and the top 10 nodes are ranked."
+  },
+  "trace": [
+   {
+    "step": "s1",
+    "op": "betweenness",
+    "args": {
+     "graph": "G",
+     "tier": "approx",
+     "k": 125,
+     "use_weights": false
+    },
+    "seconds": 860.084,
+    "cached": false,
+    "summary": {
+     "type": "NodeMap",
+     "n": 10000000,
+     "sample": {
+      "0": 343660005844.073,
+      "1": 944084575713.5619,
+      "2": 1122391405127.47,
+      "3": 1255177565069.7256,
+      "4": 909438597469.7424
+     }
+    }
+   },
+   {
+    "step": "s2",
+    "op": "top_k",
+    "args": {
+     "map": "s1",
+     "k": 10,
+     "ascending": false
+    },
+    "seconds": 5.365,
+    "cached": false,
+    "summary": [
+     {
+      "node": "6",
+      "value": 2079528851414.5488
+     },
+     {
+      "node": "9",
+      "value": 1565041241613.3362
+     },
+     {
+      "node": "3",
+      "value": 1255177565069.7256
+     },
+     {
+      "node": "2",
+      "value": 1122391405127.47
+     },
+     {
+      "node": "1",
+      "value": 944084575713.5619
+     },
+     {
+      "node": "42",
+      "value": 932450991620.0414
+     },
+     {
+      "node": "4",
+      "value": 909438597469.7424
+     },
+     {
+      "node": "15",
+      "value": 842947370356.7131
+     },
+     {
+      "node": "11",
+      "value": 637775809197.6997
+     },
+     {
+      "node": "23",
+      "value": 584751885549.6614
+     }
+    ]
+   }
+  ],
+  "findings": [
+   {
+    "check": "s1: betweenness within theoretical bound",
+    "ok": true,
+    "detail": "max=2079528851414.5, bound=49999985000001.0",
+    "severity": "info"
+   },
+   {
+    "check": "s1: approximate with 125 pivots",
+    "ok": true,
+    "detail": "relative error on top ranks typically < 10% with 125 pivots on graphs of this size; exact values would need O(nm)=5.0e+14 operations",
+    "severity": "info"
+   }
+  ],
+  "explanation": "The 10 nodes with the highest approximate betweenness centrality are, in descending order: 6 (\u22482079528851414.5), 9 (\u22481565041241613.3), 3 (\u22481255177565069.7), 2 (\u22481122391405127.5), 1 (\u2248944084575713.6), 42 (\u2248932450991620.0), 4 (\u2248909438597469.7), 15 (\u2248842947370356.7), 11 (\u2248637775809197.7) and 23 (\u2248584751885549.7). These come from pivot-sampled betweenness on the full graph (10,000,000 nodes), treated as undirected and unweighted, with no largest-component filtering. To stay within the compute budget, the sample was reduced to 125 pivots; exact betweenness would need about 5.0e+14 operations. At this sample size, relative error on the top ranks is typically under 10%, so close pairs such as nodes 1, 42 and 4 could swap places. Verification found no problems: all values are within the theoretical bound of 49999985000001.0.",
+  "error": null,
+  "llm_calls": 2,
+  "tokens_in": 9279,
+  "tokens_out": 811,
+  "cost_usd": 0.0515374,
+  "seconds": 1216.2370960712433,
+  "plan_graph": {
+   "nodes": [
+    {
+     "id": "s1",
+     "op": "betweenness",
+     "args": {
+      "graph": "G",
+      "tier": "approx",
+      "k": 125,
+      "use_weights": false
+     },
+     "note": "Graph has 10M nodes and 50M edges, so exact O(nm) betweenness is infeasible. The user accepts an approximation, so sample 500 pivot sources. The graph is unweighted, so hop counts are used.",
+     "returns": "NodeMap",
+     "cost": "O(nm)",
+     "doc": "Betweenness centrality as NodeMap. tier exact O(nm); tier approx samples k pivot sources (default 500). use_weights=true treats edge weights as distances (only for distance-like weights)."
+    },
+    {
+     "id": "s2",
+     "op": "top_k",
+     "args": {
+      "map": "s1",
+      "k": 10,
+      "ascending": false
+     },
+     "note": "The 10 nodes with the highest estimated betweenness.",
+     "returns": "Table",
+     "cost": "O(n log n)",
+     "doc": "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}."
+    }
+   ],
+   "edges": [
+    {
+     "from": "s1",
+     "to": "s2",
+     "arg": "map"
+    }
+   ],
+   "answer_steps": [
+    "s2"
+   ]
+  },
+  "question": "Which 10 nodes have the highest betweenness centrality? An approximation is fine.",
+  "dataset": "ba_50m",
+  "model": "claude-opus-5-5"
+ },
+ "description": "Synthetic undirected preferential-attachment network, 10M nodes, 50M edges, each edge listed once"
+}
