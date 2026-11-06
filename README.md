@@ -18,6 +18,7 @@ It started as a branch of the older GraphProfile repository and was moved here t
 | `docs/headline-experiment-results.md` | experiment 1: five systems on 60 questions over real graphs (Opus and Haiku) |
 | `docs/experiment-2-results.md` | experiment 2: hard interpretation set, fault injection, 10M to 50M-edge scale tier, conclusions and decision |
 | `docs/experiment-3-codegen-without-facts.md` | experiment 3: code generation without file facts, the ablation that shows what the interpretation stage is worth |
+| `docs/demo-paper-plan.md` | plan for a SIGMOD/VLDB demo paper: claim, venues, demo scenario, build list, paper outline, related work, risks |
 | `prototype/` | the working prototype: loaders, operator catalogue, plan IR, verifier, the five compared systems, benchmark generators, scorer, experiment runner |
 
 ## State of the work (November 2026)
