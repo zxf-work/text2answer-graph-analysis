@@ -35,6 +35,8 @@ from t2r.ir import _ref_of  # noqa: E402
 from t2r.llm import LLM  # noqa: E402
 from t2r.ops import CATALOGUE  # noqa: E402
 from t2r.systems import SYSTEMS  # noqa: E402
+sys.path.insert(0, HERE)
+from viz import make_viz  # noqa: E402
 
 STATIC = os.path.join(HERE, "static")
 SCENES = os.path.join(HERE, "scenes")
@@ -100,6 +102,10 @@ def _profile(path: str, name: str, description: str) -> dict:
                      "distinct_pairs_undirected": f.n_rows_dedup_undirected, "self_loops": f.n_self_loops,
                      "weight_column": f.weight_column_name, "weight_range": [f.weight_min, f.weight_max] if f.weight_column_numeric else None,
                      "weight_has_fractions": f.weight_has_fractions, "row_index_column": f.row_index_column, "ids_numeric": f.ids_numeric}
+    try:
+        card["viz"] = make_viz(lg)  # overview: neighbourhood of the hubs, nothing highlighted
+    except Exception as e:  # noqa: BLE001
+        card["viz"] = {"error": str(e)}
     return card
 
 
@@ -151,6 +157,12 @@ def _run_job(job: dict) -> None:
         d["card"] = card
         d["plan_graph"] = _plan_graph(d.get("plan")) if isinstance(d.get("plan"), dict) else None
         d["question"] = req["question"]; d["dataset"] = req["name"]; d["model"] = llm.model
+        try:
+            ov = {k: v for k, v in (d.get("assumptions") or {}).items() if k in ("directed", "weighted") and isinstance(v, bool)}
+            lg = load_graph(req["name"], req["path"], req.get("description") or "", override=ov or None)
+            d["viz"] = make_viz(lg, d.get("answer"))
+        except Exception as e:  # noqa: BLE001
+            d["viz"] = {"error": str(e)}
         job["result"] = json.loads(json.dumps(d, default=str))
         job["status"] = "done"
     except Exception as e:  # noqa: BLE001

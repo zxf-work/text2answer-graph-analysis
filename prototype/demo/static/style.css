@@ -223,3 +223,31 @@ pre.code { background: #14171b; color: #e6e6e6; border-radius: 10px; padding: 12
   .askrow { flex-direction: column; }
   .drawer { width: 100vw; }
 }
+
+/* graph visualisation */
+.graph-card { min-width: 0; }
+.viz { position: relative; background: var(--panel-2); border-radius: 12px; overflow: hidden; }
+.viz svg { width: 100%; height: auto; display: block; }
+.viz .ctx { fill: var(--muted); fill-opacity: .55; stroke: var(--panel); stroke-width: .6; }
+.viz .ans { fill: var(--accent); stroke: var(--panel); stroke-width: 1.2; }
+.viz .pth { fill: var(--t-path); stroke: var(--panel); stroke-width: 1; }
+.viz .e { stroke: var(--muted); stroke-opacity: .28; stroke-width: .6; fill: none; }
+.viz .e.hl { stroke: var(--t-path); stroke-opacity: .95; stroke-width: 2.2; }
+.viz .e.touch { stroke: var(--accent); stroke-opacity: .55; stroke-width: .9; }
+.viz .lbl { font-family: var(--sans); font-size: 7.5px; fill: var(--ink); paint-order: stroke; stroke: var(--panel); stroke-width: 2.4px; stroke-linejoin: round; font-weight: 600; }
+.viz .rk { font-family: var(--sans); font-size: 6.5px; fill: #fff; font-weight: 700; text-anchor: middle; pointer-events: none; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); align-items: center; }
+.viz-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.viz-legend .n { margin-left: auto; }
+
+/* result: answer first, details on demand */
+.result .answer { position: relative; }
+.summary-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.summary-items { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--ink-2); flex: 1; }
+.summary-items .ok { color: var(--ok); font-weight: 600; } .summary-items .warn { color: var(--warn); font-weight: 600; } .summary-items .bad { color: var(--bad); font-weight: 600; }
+.summary-items .sep { color: var(--line); }
+.details { display: flex; flex-direction: column; gap: 16px; }
+.top-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.top-grid.solo { grid-template-columns: 1fr; }
+.top-grid.solo .viz svg { max-height: 420px; }
+@media (max-width: 1000px) { .top-grid { grid-template-columns: 1fr; } }

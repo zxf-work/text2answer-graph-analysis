@@ -16,6 +16,8 @@ from dataclasses import asdict
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE); sys.path.insert(0, ROOT); sys.path.insert(0, HERE)
 os.environ["T2R_GRAPH_CACHE"] = "1"
 from server import _plan_graph, _profile  # noqa: E402
+from viz import make_viz  # noqa: E402
+from t2r.graphs import load_graph  # noqa: E402
 from t2r.llm import LLM  # noqa: E402
 from t2r.systems import SYSTEMS  # noqa: E402
 
@@ -75,6 +77,8 @@ def main():
         d = json.loads(json.dumps(asdict(res), default=str))
         d["plan_graph"] = _plan_graph(d.get("plan")) if isinstance(d.get("plan"), dict) else None
         d["question"] = sc["question"]; d["dataset"] = sc["dataset"]; d["model"] = llm.model
+        ov = {k: v for k, v in (d.get("assumptions") or {}).items() if k in ("directed", "weighted") and isinstance(v, bool)}
+        d["viz"] = make_viz(load_graph(sc["dataset"], sc["path"], "", override=ov or None), d.get("answer"))
         json.dump({"title": sc["title"], "subtitle": sc["subtitle"], "note": sc["note"], "card": card, "result": d},
                   open(os.path.join(out_dir, f"{i:02d}_{sc['name']}.json"), "w"), indent=1, default=str)
         print("  ->", str(d.get("answer"))[:80], "| error", d.get("error"), flush=True)

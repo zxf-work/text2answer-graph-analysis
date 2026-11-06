@@ -38,7 +38,7 @@
     $("#examples").innerHTML = (d.examples || []).map((q) => `<button class="chip">${esc(q)}</button>`).join("");
     $$("#examples .chip").forEach((c) => c.onclick = () => { $("#question").value = c.textContent; $("#question").focus(); setStep(3); });
     $("#run").disabled = false;
-    if (!silent) { $("#result").classList.add("hidden"); }
+    if (!silent) { $("#result").classList.add("hidden"); $("#details").classList.add("hidden"); $("#top-grid").classList.add("solo"); }
     setStep(2);
     $("#profile").className = "profile empty"; $("#profile").textContent = "Loading and profiling the file…";
     try {
@@ -47,6 +47,7 @@
       else card = await (await fetch(`/api/profile?path=${encodeURIComponent(d.path)}&name=${encodeURIComponent(d.name)}&description=${encodeURIComponent(d.description || "")}`)).json();
       if (card.error) throw new Error(card.error);
       state.card = card; renderProfile(card);
+      if (!state.replay) { drawViz(card.viz, { highlights: false }); $("#top-grid").classList.add("solo"); }
     } catch (e) { $("#profile").innerHTML = `<div class="error">Could not profile this file: ${esc(e.message)}</div>`; }
   }
 
@@ -88,7 +89,7 @@
     const q = $("#question").value.trim(); if (!q || !state.ds) return;
     if (state.static) { alert("This is a static preview: it replays recorded scenes only. Run demo/server.py for live questions."); return; }
     setStep(4);
-    $("#result").classList.add("hidden"); $("#progress-card").classList.remove("hidden");
+    $("#result").classList.add("hidden"); $("#details").classList.add("hidden"); $("#progress-card").classList.remove("hidden");
     $("#prog-title").textContent = `Asking the ${labelOf(state.system)} executor…`;
     const req = { path: state.ds.path, name: state.ds.name, description: $("#description").value.trim(), question: q, system: state.system, model: $("#model").value };
     const r = await (await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) })).json();
@@ -112,7 +113,10 @@
   // ------------------------------------------------------------------ render a result
   function render(r) {
     $("#result").classList.remove("hidden"); setStep(4);
-    renderAnswer(r); renderInterp(r); renderPlan(r); renderFindings(r); renderCost(r);
+    renderAnswer(r); renderInterp(r); renderPlan(r); renderFindings(r); renderCost(r); renderSummary(r);
+    drawViz(r.viz || state.card?.viz, { highlights: !!r.viz });
+    $("#top-grid").classList.toggle("solo", $("#viz-card").classList.contains("hidden"));
+    setDetails(detailsOpen);
     $("#result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -146,7 +150,11 @@
     if (r.clarification) { cl.classList.remove("hidden"); cl.innerHTML = `<b>The system asks:</b> ${esc(r.clarification)}`; } else cl.classList.add("hidden");
     const ex = (r.explanation || "").trim(); const isJson = ex.startsWith("{") && ex.endsWith("}");
     $("#explanation").innerHTML = ex && !isJson ? esc(ex).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") : (isJson ? `<span class="muted">The agent returned its answer object with no explanation.</span>` : "");
-    const vs = r.variants || [];
+    // variants that merely repeat a part of the main answer add nothing: drop them
+    const seen = new Set();
+    const walk = (v, d = 0) => { if (v == null || d > 3) return; seen.add(JSON.stringify(v)); if (Array.isArray(v)) seen.add(JSON.stringify(v.map((x) => x && typeof x === "object" && "node" in x ? x.node : x))); if (typeof v === "object") Object.values(v).forEach((x) => walk(x, d + 1)); };
+    walk(r.answer);
+    const vs = (r.variants || []).filter((v) => { const j = JSON.stringify(v.answer); const nodes = Array.isArray(v.answer) ? JSON.stringify(v.answer.map((x) => x && typeof x === "object" && "node" in x ? x.node : x)) : null; return !(seen.has(j) || (nodes && seen.has(nodes))); });
     $("#variants").innerHTML = vs.length ? `<div class="muted" style="font-size:12.5px">Also computed, under other readings of the question:</div>` + vs.map((v) => `<div class="variant"><b>${esc(v.label || "variant")}</b>${answerHtml(v.answer)}</div>`).join("") : "";
   }
 
@@ -255,6 +263,66 @@
     $("#tiers").innerHTML = notes.length ? `<div class="muted" style="background:none;color:var(--muted);padding:0;font-size:12.5px">Cost model decisions:</div>` + notes.map((n) => `<div>${esc(n)}</div>`).join("") : "";
   }
 
+  // ------------------------------------------------------------------ graph visualisation
+  function drawViz(viz, { highlights } = { highlights: true }) {
+    const card = $("#viz-card"), el = $("#viz"), lg = $("#viz-legend");
+    if (!viz || viz.error || !viz.nodes) { card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    const W = 640, H = 400, P = 26;
+    const ansIds = new Set(viz.nodes.filter((n) => n.role === "answer").map((n) => n.id));
+    const maxDeg = Math.max(1, ...viz.nodes.map((n) => n.deg));
+    const r = (n) => Math.max(2.2, Math.min(9, 2 + 7 * Math.sqrt(n.deg / maxDeg))) + (n.role === "answer" ? 3.5 : n.role === "path" ? 1.5 : 0);
+    const X = (n) => P + n.x * (W - 2 * P), Y = (n) => P + n.y * (H - 2 * P);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="graph neighbourhood">`;
+    if (viz.directed) svg += `<defs><marker id="varr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)" fill-opacity=".5"/></marker></defs>`;
+    const byId = Object.fromEntries(viz.nodes.map((n) => [n.id, n]));
+    const edges = [...viz.edges].sort((a, b) => (a.hl ? 1 : 0) - (b.hl ? 1 : 0));
+    for (const e of edges) {
+      const a = byId[e.s], b = byId[e.t]; if (!a || !b) continue;
+      const touch = highlights && (ansIds.has(e.s) || ansIds.has(e.t));
+      svg += `<line class="e ${e.hl && highlights ? "hl" : touch ? "touch" : ""}" x1="${X(a).toFixed(1)}" y1="${Y(a).toFixed(1)}" x2="${X(b).toFixed(1)}" y2="${Y(b).toFixed(1)}"${viz.directed && (touch || e.hl) ? ' marker-end="url(#varr)"' : ""}/>`;
+    }
+    const rank3 = (n) => n.role === "context" ? 0 : n.role === "path" ? 1 : 2;
+    const order = [...viz.nodes].sort((a, b) => rank3(a) - rank3(b));
+    for (const n of order) {
+      const role = highlights ? n.role : "context"; const rr = r(highlights ? n : { ...n, role: "context" });
+      svg += `<g><title>${esc(n.label)} · degree ${n.deg}${n.rank ? ` · rank ${n.rank}` : ""}</title><circle class="${role === "answer" ? "ans" : role === "path" ? "pth" : "ctx"}" cx="${X(n).toFixed(1)}" cy="${Y(n).toFixed(1)}" r="${rr.toFixed(1)}"/>`;
+      if (role === "answer" && n.rank && n.rank <= 20) svg += `<text class="rk" x="${X(n).toFixed(1)}" y="${(Y(n) + 2.3).toFixed(1)}">${n.rank}</text>`;
+      if (role !== "context" || (!highlights && n.deg >= maxDeg * 0.6)) svg += `<text class="lbl" x="${(X(n) + rr + 2).toFixed(1)}" y="${(Y(n) + 2.5).toFixed(1)}">${esc(n.label)}</text>`;
+      svg += `</g>`;
+    }
+    el.innerHTML = svg + `</svg>`;
+    const parts = [];
+    if (highlights && viz.highlighted) parts.push(`<span><i style="background:var(--accent)"></i>named in the answer${viz.highlighted > 1 ? " (numbers = rank)" : ""}</span>`);
+    if (highlights && viz.paths) parts.push(`<span><i style="background:var(--t-path)"></i>on the returned path</span>`);
+    parts.push(`<span><i style="background:var(--muted);opacity:.55"></i>neighbourhood</span>`);
+    parts.push(`<span class="n">showing ${fmt(viz.n_shown)} of ${fmt(viz.n_total)} nodes · ${fmt(viz.m_shown)} of ${fmt(viz.m_total)} edges${viz.directed ? " · directed" : ""}</span>`);
+    lg.innerHTML = parts.join("");
+    $("#viz-hint").textContent = highlights && viz.highlighted ? "nodes named in the answer, with their neighbourhood" : highlights ? (viz.note || "a neighbourhood of the graph") : "a neighbourhood of the graph's hubs; answer nodes will be highlighted here";
+  }
+
+  function renderSummary(r) {
+    const items = [];
+    const f = Array.isArray(r.findings) ? r.findings : null;
+    if (f) {
+      const bad = f.filter((x) => !x.ok && x.severity === "error").length, warn = f.filter((x) => !x.ok && x.severity === "warn").length;
+      items.push(bad ? `<span class="bad">✕ ${bad} check${bad > 1 ? "s" : ""} failed</span>` : warn ? `<span class="warn">! ${warn} warning${warn > 1 ? "s" : ""}</span>` : `<span class="ok">✓ ${f.length ? `all ${f.length} checks passed` : "verified, no issues found"}</span>`);
+    } else items.push(`<span class="warn">not verified</span>`);
+    const steps = r.plan?.steps?.length;
+    items.push(steps ? `plan of ${steps} step${steps > 1 ? "s" : ""}` : r.system?.startsWith("codegen") ? "one generated script" : typeof r.trace === "string" ? "tool transcript" : "no plan");
+    items.push(`${r.llm_calls ?? 0} model call${(r.llm_calls ?? 0) === 1 ? "" : "s"}`);
+    items.push(`$${(r.cost_usd ?? 0).toFixed(3)}`);
+    items.push(`${(r.seconds ?? 0) >= 100 ? Math.round(r.seconds) : (r.seconds ?? 0).toFixed(1)} s`);
+    $("#summary-items").innerHTML = items.join(`<span class="sep">·</span>`);
+  }
+
+  let detailsOpen = false; try { detailsOpen = localStorage.getItem("t2a_details") === "1"; } catch {}
+  function setDetails(open) {
+    detailsOpen = open; $("#details").classList.toggle("hidden", !open);
+    const b = $("#toggle-details"); b.textContent = open ? "Hide the details" : "Show how this was computed"; b.setAttribute("aria-expanded", String(open));
+    try { localStorage.setItem("t2a_details", open ? "1" : "0"); } catch {}
+  }
+
   // ------------------------------------------------------------------ scenes
   async function loadScenes() {
     try { state.scenes = state.static ? (window.T2A_SCENES || []) : await (await fetch("/api/scenes")).json(); } catch { state.scenes = []; }
@@ -286,6 +354,7 @@
   // ------------------------------------------------------------------ wiring
   $$(".mode").forEach((b) => b.onclick = () => { setSystem(b.dataset.system); if (state.replay) { const alt = state.scenes.find((s) => s.result.question === state.replay.result.question && s.result.system === b.dataset.system); if (alt) playScene(alt); } });
   $("#run").onclick = ask;
+  $("#toggle-details").onclick = () => setDetails(!detailsOpen);
   $("#question").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
   $("#question").addEventListener("focus", () => setStep(3));
   $("#btn-scenes").onclick = () => { $("#scenes").classList.toggle("hidden"); };

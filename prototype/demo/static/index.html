@@ -62,38 +62,48 @@
       <ol class="stages" id="stages"></ol>
     </section>
 
-    <section id="result" class="result hidden">
-      <div class="result-grid">
+    <div class="top-grid solo" id="top-grid">
+      <section id="result" class="result hidden">
         <section class="card answer" id="answer-card">
           <h2><span class="num">4</span>Answer</h2>
           <div id="answer"></div>
           <div id="clarification" class="clarify hidden"></div>
           <div id="explanation" class="explanation"></div>
           <div id="variants" class="variants"></div>
+          <div class="summary-strip" id="summary">
+            <div id="summary-items" class="summary-items"></div>
+            <button class="ghost" id="toggle-details" aria-expanded="false">Show how this was computed</button>
+          </div>
         </section>
+      </section>
+      <section class="card graph-card hidden" id="viz-card">
+        <h2>Graph <span class="hint" id="viz-hint">a neighbourhood of the graph</span></h2>
+        <div id="viz" class="viz"></div>
+        <div class="viz-legend" id="viz-legend"></div>
+      </section>
+    </div>
+
+      <div id="details" class="details hidden">
         <section class="card interp" id="interp-card">
           <h2>Interpretation <span class="hint">the assumptions behind the answer</span></h2>
           <div id="interp" class="kv"></div>
         </section>
-      </div>
-
-      <div class="result-grid two">
-        <section class="card plan" id="plan-card">
-          <h2>Plan <span class="hint" id="plan-hint">typed dataflow the executor ran</span></h2>
-          <div id="plan"></div>
+        <div class="result-grid two">
+          <section class="card plan" id="plan-card">
+            <h2>Plan <span class="hint" id="plan-hint">typed dataflow the executor ran</span></h2>
+            <div id="plan"></div>
+          </section>
+          <section class="card verify" id="verify-card">
+            <h2>Verification <span class="hint">checks made without knowing the right answer</span></h2>
+            <div id="findings"></div>
+          </section>
+        </div>
+        <section class="card cost" id="cost-card">
+          <h2>Cost <span class="hint">what this answer took</span></h2>
+          <div id="cost" class="tiles"></div>
+          <div id="tiers" class="tiers"></div>
         </section>
-        <section class="card verify" id="verify-card">
-          <h2>Verification <span class="hint">checks made without knowing the right answer</span></h2>
-          <div id="findings"></div>
-        </section>
       </div>
-
-      <section class="card cost" id="cost-card">
-        <h2>Cost <span class="hint">what this answer took</span></h2>
-        <div id="cost" class="tiles"></div>
-        <div id="tiers" class="tiers"></div>
-      </section>
-    </section>
   </section>
 </main>
 
