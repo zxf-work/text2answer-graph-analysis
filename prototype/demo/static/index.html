@@ -22,6 +22,10 @@
   <div class="right">
     <label class="model">model <select id="model"><option value="claude-opus-5-5">Opus</option><option value="claude-haiku-5-5">Haiku</option></select></label>
     <button id="btn-scenes" class="ghost">Guided demo</button>
+    <button id="btn-theme" class="ghost icon" aria-label="Switch between light and dark" title="Light / dark">
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+    </button>
     <button id="btn-help" class="ghost" aria-label="How it works">?</button>
   </div>
 </header>
@@ -78,7 +82,15 @@
       </section>
       <section class="card graph-card hidden" id="viz-card">
         <h2>Graph <span class="hint" id="viz-hint">a neighbourhood of the graph</span></h2>
-        <div id="viz" class="viz"></div>
+        <div id="viz" class="viz">
+          <div class="viz-ctl" role="group" aria-label="Zoom">
+            <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+            <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+            <button id="zoom-fit" title="Fit to view" aria-label="Fit to view">⤢</button>
+          </div>
+          <div id="viz-svg"></div>
+          <div class="viz-tip">scroll to zoom · drag to pan · double-click to reset</div>
+        </div>
         <div class="viz-legend" id="viz-legend"></div>
       </section>
     </div>

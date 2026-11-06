@@ -263,9 +263,35 @@
     $("#tiers").innerHTML = notes.length ? `<div class="muted" style="background:none;color:var(--muted);padding:0;font-size:12.5px">Cost model decisions:</div>` + notes.map((n) => `<div>${esc(n)}</div>`).join("") : "";
   }
 
+
+  // zoom and pan on the graph svg: wheel zooms at the cursor, drag pans, double-click or the fit button resets
+  function attachZoom(svg, W, H) {
+    const vp = svg.querySelector(".vp"); let k = 1, tx = 0, ty = 0; let drag = null;
+    const apply = () => { vp.setAttribute("transform", `translate(${tx.toFixed(2)},${ty.toFixed(2)}) scale(${k.toFixed(3)})`); };
+    const pt = (e) => { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
+    const zoomAt = (f, cx, cy) => { const nk = Math.min(12, Math.max(0.5, k * f)); f = nk / k; tx = cx - (cx - tx) * f; ty = cy - (cy - ty) * f; k = nk; apply(); };
+    svg.addEventListener("wheel", (e) => { e.preventDefault(); const p = pt(e); zoomAt(Math.exp(-e.deltaY * 0.0015), p.x, p.y); }, { passive: false });
+    svg.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, tx, ty }; svg.setPointerCapture(e.pointerId); svg.classList.add("dragging"); });
+    svg.addEventListener("pointermove", (e) => { if (!drag) return; const r = svg.getBoundingClientRect(); tx = drag.tx + (e.clientX - drag.x) * W / r.width; ty = drag.ty + (e.clientY - drag.y) * H / r.height; apply(); });
+    const end = (e) => { if (!drag) return; drag = null; svg.classList.remove("dragging"); try { svg.releasePointerCapture(e.pointerId); } catch {} };
+    svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+    svg.addEventListener("dblclick", () => { k = 1; tx = ty = 0; apply(); });
+    $("#zoom-in").onclick = () => zoomAt(1.4, W / 2, H / 2);
+    $("#zoom-out").onclick = () => zoomAt(1 / 1.4, W / 2, H / 2);
+    $("#zoom-fit").onclick = () => { k = 1; tx = ty = 0; apply(); };
+  }
+
+  // theme: explicit choice sets data-theme on the root and is remembered; otherwise the system setting applies
+  function applyTheme(t) {
+    if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme");
+    try { if (t) localStorage.setItem("t2a_theme", t); else localStorage.removeItem("t2a_theme"); } catch {}
+  }
+  function currentDark() { const t = document.documentElement.getAttribute("data-theme"); return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; }
+  try { const t = localStorage.getItem("t2a_theme"); if (t) applyTheme(t); } catch {}
+
   // ------------------------------------------------------------------ graph visualisation
   function drawViz(viz, { highlights } = { highlights: true }) {
-    const card = $("#viz-card"), el = $("#viz"), lg = $("#viz-legend");
+    const card = $("#viz-card"), el = $("#viz-svg"), lg = $("#viz-legend");
     if (!viz || viz.error || !viz.nodes) { card.classList.add("hidden"); return; }
     card.classList.remove("hidden");
     const W = 640, H = 400, P = 26;
@@ -275,6 +301,7 @@
     const X = (n) => P + n.x * (W - 2 * P), Y = (n) => P + n.y * (H - 2 * P);
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="graph neighbourhood">`;
     if (viz.directed) svg += `<defs><marker id="varr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)" fill-opacity=".5"/></marker></defs>`;
+    svg += `<rect width="${W}" height="${H}" fill="transparent"/><g class="vp">`;
     const byId = Object.fromEntries(viz.nodes.map((n) => [n.id, n]));
     const edges = [...viz.edges].sort((a, b) => (a.hl ? 1 : 0) - (b.hl ? 1 : 0));
     for (const e of edges) {
@@ -291,7 +318,8 @@
       if (role !== "context" || (!highlights && n.deg >= maxDeg * 0.6)) svg += `<text class="lbl" x="${(X(n) + rr + 2).toFixed(1)}" y="${(Y(n) + 2.5).toFixed(1)}">${esc(n.label)}</text>`;
       svg += `</g>`;
     }
-    el.innerHTML = svg + `</svg>`;
+    el.innerHTML = svg + `</g></svg>`;
+    attachZoom(el.querySelector("svg"), W, H);
     const parts = [];
     if (highlights && viz.highlighted) parts.push(`<span><i style="background:var(--accent)"></i>named in the answer${viz.highlighted > 1 ? " (numbers = rank)" : ""}</span>`);
     if (highlights && viz.paths) parts.push(`<span><i style="background:var(--t-path)"></i>on the returned path</span>`);
@@ -355,6 +383,7 @@
   $$(".mode").forEach((b) => b.onclick = () => { setSystem(b.dataset.system); if (state.replay) { const alt = state.scenes.find((s) => s.result.question === state.replay.result.question && s.result.system === b.dataset.system); if (alt) playScene(alt); } });
   $("#run").onclick = ask;
   $("#toggle-details").onclick = () => setDetails(!detailsOpen);
+  $("#btn-theme").onclick = () => applyTheme(currentDark() ? "light" : "dark");
   $("#question").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
   $("#question").addEventListener("focus", () => setStep(3));
   $("#btn-scenes").onclick = () => { $("#scenes").classList.toggle("hidden"); };
