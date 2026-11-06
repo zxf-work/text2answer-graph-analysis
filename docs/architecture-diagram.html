@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>text2answer architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* layout: one column of figures, each a full-width SVG with a caption; prose kept to captions and a short legend */
+  :root { --bg: #f5f4ef; --fg: #1c1b18; --fg-2: #4f4d46; --muted: #85827a; --line: #d9d6cc; --panel: #ffffff; --panel-2: #eeede6;
+          --accent: #0f6e68; --accent-2: #d9f0ec; --model: #b4541f; --model-2: #fbe9dc; --store: #5b6abf; --store-2: #e4e7f7;
+          --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #15171a; --fg: #ecebe6; --fg-2: #c3c1b9; --muted: #8b8980; --line: #363b42; --panel: #1d2024; --panel-2: #262a30;
+          --accent: #58b9b0; --accent-2: #173532; --model: #f0a06a; --model-2: #3a2616; --store: #9aa6f0; --store-2: #23283d; } }
+  :root[data-theme="dark"] { color-scheme: dark; --bg: #15171a; --fg: #ecebe6; --fg-2: #c3c1b9; --muted: #8b8980; --line: #363b42; --panel: #1d2024; --panel-2: #262a30;
+          --accent: #58b9b0; --accent-2: #173532; --model: #f0a06a; --model-2: #3a2616; --store: #9aa6f0; --store-2: #23283d; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+  main { max-width: 1240px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 26px; letter-spacing: -.01em; margin: 0 0 4px; text-wrap: balance; }
+  .lede { color: var(--fg-2); max-width: 70ch; margin: 0 0 22px; }
+  figure { margin: 0 0 36px; }
+  figure svg { width: 100%; height: auto; display: block; max-width: 100%; }
+  figcaption { color: var(--fg-2); font-size: 14px; margin-top: 10px; max-width: 80ch; }
+  figcaption b { color: var(--fg); }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-2); margin: 28px 0 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--fg-2); margin: 0 0 18px; }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1.5px solid; }
+  .legend .sys { background: var(--panel); border-color: var(--fg); } .legend .mdl { background: var(--model-2); border-color: var(--model); } .legend .sto { background: var(--store-2); border-color: var(--store); }
+  .legend .chk { background: var(--accent-2); border-color: var(--accent); }
+  /* svg text and shapes take the page colours so both themes read */
+  svg text { font-family: var(--sans); fill: var(--fg); font-size: 12px; }
+  svg .t { font-weight: 600; font-size: 12.5px; } svg .s { fill: var(--fg-2); font-size: 11px; } svg .m { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+  svg .lab { fill: var(--fg-2); font-size: 10.5px; } svg .hd { font-size: 11px; font-weight: 700; letter-spacing: .08em; fill: var(--muted); }
+  svg .box { fill: var(--panel); stroke: var(--fg); stroke-width: 1.2; } svg .mdl { fill: var(--model-2); stroke: var(--model); stroke-width: 1.4; }
+  svg .sto { fill: var(--store-2); stroke: var(--store); stroke-width: 1.2; } svg .chk { fill: var(--accent-2); stroke: var(--accent); stroke-width: 1.4; }
+  svg .out { fill: var(--panel-2); stroke: var(--fg); stroke-width: 1.2; }
+  svg .band { fill: var(--panel-2); stroke: none; } svg .band-m { fill: var(--model-2); fill-opacity: .45; stroke: none; }
+  svg .e { stroke: var(--fg); stroke-width: 1.3; fill: none; } svg .e.loop { stroke: var(--model); stroke-dasharray: 5 4; }
+  svg .e.data { stroke: var(--store); stroke-dasharray: 2 3; } svg .e.thin { stroke: var(--muted); }
+  svg .sep { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 18px; padding: 0; margin: 0 0 8px; list-style: none; }
+  .steps li { font-size: 13.5px; color: var(--fg-2); padding-left: 28px; position: relative; min-width: 0; }
+  .steps li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+  .steps b { color: var(--fg); } .steps code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>text2answer graph analysis: solution architecture</h1>
+<p class="lede">What happens between a question typed in plain words and a verified result, which component does each step, and where the language model sits. The model never sees the graph: it sees a profile card, writes a typed plan, and the system executes and checks it.</p>
+
+<div class="legend"><span><i class="sys"></i>system component (deterministic code)</span><span><i class="mdl"></i>language-model call</span><span><i class="sto"></i>data held in memory</span><span><i class="chk"></i>check that can send the plan back</span></div>
+
+<figure>
+<svg viewBox="0 0 1290 640" role="img" aria-label="Request flow from question and file through grounding, planning, execution, verification and explanation to the result, with the language model confined to two calls that see only the profile card, the plan and summaries">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--model)"/></marker>
+    <marker id="as" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--store)"/></marker>
+  </defs>
+
+  <!-- stage bands -->
+  <rect class="band" x="150" y="40" width="230" height="470" rx="10"/>
+  <rect class="band" x="420" y="40" width="230" height="470" rx="10"/>
+  <rect class="band" x="740" y="40" width="230" height="470" rx="10"/>
+  <rect class="band" x="1040" y="40" width="230" height="470" rx="10"/>
+  <text class="hd" x="265" y="60" text-anchor="middle">1 · GROUNDING</text>
+  <text class="hd" x="535" y="60" text-anchor="middle">2 · PLANNING</text>
+  <text class="hd" x="855" y="60" text-anchor="middle">3 · EXECUTION + CHECKS</text>
+  <text class="hd" x="1155" y="60" text-anchor="middle">4 · OUTPUT</text>
+
+  <!-- input -->
+  <rect class="out" x="10" y="150" width="120" height="78" rx="8"/>
+  <text class="t" x="70" y="172" text-anchor="middle">Question</text>
+  <text class="s" x="70" y="190" text-anchor="middle">plain words</text>
+  <text class="s" x="70" y="206" text-anchor="middle">+ description (opt.)</text>
+  <rect class="sto" x="10" y="260" width="120" height="60" rx="8"/>
+  <text class="t" x="70" y="284" text-anchor="middle">Edge-list file</text>
+  <text class="s" x="70" y="302" text-anchor="middle">csv / whitespace</text>
+
+  <!-- grounding -->
+  <rect class="box" x="175" y="100" width="180" height="70" rx="8"/>
+  <text class="t" x="265" y="124" text-anchor="middle">Profile card</text>
+  <text class="s" x="265" y="142" text-anchor="middle">statistics + inferred semantics</text>
+  <text class="s" x="265" y="158" text-anchor="middle">with evidence and confidence</text>
+  <rect class="box" x="175" y="250" width="180" height="56" rx="8"/>
+  <text class="t" x="265" y="272" text-anchor="middle">Loader + file facts</text>
+  <text class="s" x="265" y="290" text-anchor="middle">rows, header, reciprocity, weights</text>
+  <rect class="box" x="175" y="330" width="180" height="56" rx="8"/>
+  <text class="t" x="265" y="352" text-anchor="middle">Semantics inference</text>
+  <text class="s" x="265" y="370" text-anchor="middle">directed? weighted? multigraph?</text>
+  <rect class="sto" x="175" y="410" width="180" height="56" rx="8"/>
+  <text class="t" x="265" y="432" text-anchor="middle">Graph in memory</text>
+  <text class="s" x="265" y="450" text-anchor="middle">igraph, cached across questions</text>
+
+  <!-- planning -->
+  <rect class="mdl" x="455" y="100" width="180" height="70" rx="8"/>
+  <text class="t" x="545" y="124" text-anchor="middle">Planner (model call 1)</text>
+  <text class="s" x="545" y="142" text-anchor="middle">card + question + catalogue in,</text>
+  <text class="s" x="545" y="158" text-anchor="middle">interpretation + plan out</text>
+  <rect class="box" x="455" y="200" width="180" height="56" rx="8"/>
+  <text class="t" x="545" y="222" text-anchor="middle">Plan IR</text>
+  <text class="s" x="545" y="240" text-anchor="middle">typed dataflow of catalogue ops</text>
+  <rect class="chk" x="455" y="280" width="180" height="56" rx="8"/>
+  <text class="t" x="545" y="302" text-anchor="middle">Validator</text>
+  <text class="s" x="545" y="320" text-anchor="middle">types, references, preconditions</text>
+  <rect class="box" x="455" y="360" width="180" height="56" rx="8"/>
+  <text class="t" x="545" y="382" text-anchor="middle">Cost model</text>
+  <text class="s" x="545" y="400" text-anchor="middle">estimate; switch to approx tiers</text>
+  <rect class="sto" x="455" y="440" width="180" height="56" rx="8"/>
+  <text class="t" x="545" y="462" text-anchor="middle">Operator catalogue</text>
+  <text class="s" x="545" y="480" text-anchor="middle">40 ops; read by planner + validator</text>
+
+  <!-- execution -->
+  <rect class="box" x="765" y="200" width="180" height="56" rx="8"/>
+  <text class="t" x="855" y="222" text-anchor="middle">Executor</text>
+  <text class="s" x="855" y="240" text-anchor="middle">runs each step on igraph</text>
+  <rect class="chk" x="765" y="280" width="180" height="70" rx="8"/>
+  <text class="t" x="855" y="302" text-anchor="middle">Verifier</text>
+  <text class="s" x="855" y="320" text-anchor="middle">invariants, method agreement,</text>
+  <text class="s" x="855" y="336" text-anchor="middle">question / interpretation / plan</text>
+  <rect class="box" x="765" y="374" width="180" height="56" rx="8"/>
+  <text class="t" x="855" y="396" text-anchor="middle">Answer extraction</text>
+  <text class="s" x="855" y="414" text-anchor="middle">answer step(s), variants</text>
+  <rect class="box" x="765" y="454" width="180" height="42" rx="8"/>
+  <text class="t" x="855" y="480" text-anchor="middle">Graph view sampler</text>
+
+  <!-- output -->
+  <rect class="out" x="1065" y="100" width="180" height="56" rx="8"/>
+  <text class="t" x="1155" y="122" text-anchor="middle">Clarification</text>
+  <text class="s" x="1155" y="140" text-anchor="middle">asked instead of guessed</text>
+  <rect class="mdl" x="1065" y="200" width="180" height="56" rx="8"/>
+  <text class="t" x="1155" y="222" text-anchor="middle">Explainer (model call 2)</text>
+  <text class="s" x="1155" y="240" text-anchor="middle">prose from trace + findings</text>
+  <rect class="out" x="1065" y="290" width="180" height="130" rx="8"/>
+  <text class="t" x="1155" y="312" text-anchor="middle">Result</text>
+  <text class="s" x="1155" y="332" text-anchor="middle">answer + variants</text>
+  <text class="s" x="1155" y="348" text-anchor="middle">interpretation (assumptions)</text>
+  <text class="s" x="1155" y="364" text-anchor="middle">verification findings</text>
+  <text class="s" x="1155" y="380" text-anchor="middle">cost: calls, tokens, time, tiers</text>
+  <text class="s" x="1155" y="396" text-anchor="middle">graph view, answer nodes marked</text>
+
+  <!-- input edges -->
+  <path class="e" marker-end="url(#a)" d="M130 290 L173 280"/>
+  <path class="e" marker-end="url(#a)" d="M130 189 C145 189, 145 80, 160 80 L500 80 L500 98"/>
+  <text class="lab" x="330" y="74" text-anchor="middle">question goes to the planner, not to grounding</text>
+  <!-- grounding chain -->
+  <path class="e" marker-end="url(#a)" d="M265 306 L265 328"/>
+  <path class="e" marker-end="url(#a)" d="M265 386 L265 408"/>
+  <path class="e" marker-end="url(#a)" d="M355 358 L372 358 L372 150 L357 150"/>
+  <path class="e" marker-end="url(#a)" d="M355 120 L453 120"/>
+  <text class="lab" x="404" y="113" text-anchor="middle">card</text>
+  <!-- planning chain -->
+  <path class="e" marker-end="url(#a)" d="M545 170 L545 198"/>
+  <path class="e" marker-end="url(#a)" d="M545 256 L545 278"/>
+  <path class="e" marker-end="url(#a)" d="M545 336 L545 358"/>
+  <path class="e data" marker-end="url(#as)" d="M590 440 L590 418"/>
+  <!-- repair loop (validator back to planner) -->
+  <path class="e loop" marker-end="url(#am)" d="M455 308 L440 308 L440 150 L453 150"/>
+  <text class="lab" x="432" y="232" text-anchor="middle" transform="rotate(-90 432 232)">invalid: repair once</text>
+  <!-- cost model to executor -->
+  <path class="e" marker-end="url(#a)" d="M635 388 C690 388, 690 228, 763 228"/>
+  <text class="lab" x="668" y="300" text-anchor="middle" transform="rotate(-90 668 300)">tiered plan</text>
+  <!-- replan loop (verifier back to planner) -->
+  <path class="e loop" marker-end="url(#am)" d="M765 315 L705 315 L705 80 L590 80 L590 98"/>
+  <text class="lab" x="650" y="74" text-anchor="middle">check failed: replan once</text>
+  <!-- clarification exit -->
+  <path class="e thin" marker-end="url(#a)" d="M635 115 L1063 115"/>
+  <text class="lab" x="850" y="108" text-anchor="middle">ambiguous question: no plan, ask the user</text>
+  <!-- graph store to executor and sampler -->
+  <path class="e data" marker-end="url(#as)" d="M265 466 L265 525 L720 525 L720 246 L763 246"/>
+  <path class="e data" marker-end="url(#as)" d="M720 475 L763 475"/>
+  <text class="lab" x="490" y="541" text-anchor="middle">graph read by the executor and the view sampler; never sent to the model</text>
+  <!-- execution chain -->
+  <path class="e" marker-end="url(#a)" d="M855 256 L855 278"/>
+  <path class="e" marker-end="url(#a)" d="M855 350 L855 372"/>
+  <path class="e" marker-end="url(#a)" d="M855 430 L855 452"/>
+  <!-- to output -->
+  <path class="e" marker-end="url(#a)" d="M945 300 C1000 300, 1000 228, 1063 228"/>
+  <text class="lab" x="1004" y="206" text-anchor="middle">trace +</text>
+  <text class="lab" x="1004" y="219" text-anchor="middle">findings</text>
+  <path class="e" marker-end="url(#a)" d="M1155 256 L1155 288"/>
+  <path class="e" marker-end="url(#a)" d="M945 402 L1063 402"/>
+  <text class="lab" x="1004" y="395" text-anchor="middle">answer</text>
+  <path class="e" marker-end="url(#a)" d="M945 475 C1000 475, 1010 420, 1063 414"/>
+
+  <!-- model boundary note -->
+  <rect class="band-m" x="150" y="565" width="1120" height="60" rx="8"/>
+  <text class="t" x="170" y="588">What the model sees</text>
+  <text class="s" x="170" y="608">the profile card (a few hundred tokens), the question, the operator catalogue, and later a summarised trace with the verifier's findings. It never receives nodes, edges or the file.</text>
+</svg>
+<figcaption><b>Request flow.</b> A question and a file enter on the left. Grounding computes the file facts and infers the semantics, which become a profile card. The planner turns card, question and catalogue into a typed plan; the validator and cost model can send it back once each. The executor runs the plan on the in-memory graph, the verifier checks the result without a reference answer, and the explainer turns trace and findings into prose. The result carries the answer with everything that produced it.</figcaption>
+</figure>
+
+<h2>The same flow as steps</h2>
+<ol class="steps">
+  <li><b>Read the file.</b> Chunked numpy path above 60 MB; row statistics, header roles, reciprocity, weight shape. <code>t2r/graphs.py: read_raw, read_raw_fast</code></li>
+  <li><b>Infer semantics.</b> Directed, weighted and what the weights mean, multigraph, labelled; each with evidence and a confidence; weak evidence becomes a question to ask. <code>infer_semantics</code></li>
+  <li><b>Build the graph and the card.</b> igraph graph kept in a process cache; the card holds cheap statistics plus the inferred semantics. <code>load_graph, profile_card</code></li>
+  <li><b>Plan (model call 1).</b> Interpretation (what the question means on this file), optional clarification, a dataflow of catalogue operators, which step holds the answer. <code>t2r/systems.py: PLANNER_SYSTEM; t2r/ir.py: Plan</code></li>
+  <li><b>Validate.</b> Every reference resolves, every argument has the right type, preconditions such as directed-only hold, node names resolve; one repair round if not. <code>ir.validate</code></li>
+  <li><b>Tier by cost.</b> Estimate work per step; switch expensive steps to approximate tiers and shrink sample sizes until the budget holds. <code>ir.estimate_cost, auto_tier</code></li>
+  <li><b>Execute.</b> Steps run in order on igraph; intermediate values are typed and cached; a trace records time and a summary per step. <code>ir.execute; t2r/ops.py</code></li>
+  <li><b>Verify.</b> Invariants (partition covers the graph, PageRank sums to one, path is a walk), agreement between measures, and consistency between question, interpretation and plan; an error sends the plan back once. <code>t2r/verify.py</code></li>
+  <li><b>Extract and explain (model call 2).</b> The answer step(s) become the answer; other rankings become variants; the explainer writes prose from trace and findings. <code>ir.extract_answer; INTERPRETER_SYSTEM</code></li>
+  <li><b>Present.</b> Answer, interpretation, findings, cost and a sampled neighbourhood with the answer nodes marked. <code>demo/server.py, demo/viz.py, demo/static/</code></li>
+</ol>
+
+<h2>Component stack</h2>
+<figure>
+<svg viewBox="0 0 1200 470" role="img" aria-label="Component stack in five layers: interfaces, entry points, the six compared systems, the core library, and the libraries and model access underneath, with repository file names">
+  <defs><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+  <!-- layer labels -->
+  <text class="hd" x="10" y="48">INTERFACES</text>
+  <text class="hd" x="10" y="140">ENTRY POINTS</text>
+  <text class="hd" x="10" y="232">SYSTEMS</text>
+  <text class="hd" x="10" y="324">CORE</text>
+  <text class="hd" x="10" y="416">UNDERNEATH</text>
+  <line class="sep" x1="130" y1="108" x2="1190" y2="108"/>
+  <line class="sep" x1="130" y1="200" x2="1190" y2="200"/>
+  <line class="sep" x1="130" y1="292" x2="1190" y2="292"/>
+  <line class="sep" x1="130" y1="384" x2="1190" y2="384"/>
+
+  <!-- interfaces -->
+  <rect class="out" x="140" y="20" width="330" height="70" rx="8"/>
+  <text class="t" x="305" y="44" text-anchor="middle">Demo web UI</text>
+  <text class="s" x="305" y="62" text-anchor="middle">steps, profile card, plan diagram, checks, graph view, guided demo</text>
+  <text class="m" x="305" y="80" text-anchor="middle">demo/static/index.html · app.js · style.css</text>
+  <rect class="out" x="500" y="20" width="330" height="70" rx="8"/>
+  <text class="t" x="665" y="44" text-anchor="middle">Benchmark and experiments</text>
+  <text class="s" x="665" y="62" text-anchor="middle">base 60 · hard 27 · scale 16 questions, gold, scorers, fault injection</text>
+  <text class="m" x="665" y="80" text-anchor="middle">bench/make_*.py · score.py · fault_inject.py</text>
+  <rect class="out" x="860" y="20" width="330" height="70" rx="8"/>
+  <text class="t" x="1025" y="44" text-anchor="middle">Static preview</text>
+  <text class="s" x="1025" y="62" text-anchor="middle">single file with the recorded scenes inlined</text>
+  <text class="m" x="1025" y="80" text-anchor="middle">demo/build_static.py → demo/dist/</text>
+
+  <!-- entry points -->
+  <rect class="box" x="140" y="112" width="330" height="70" rx="8"/>
+  <text class="t" x="305" y="136" text-anchor="middle">Demo server</text>
+  <text class="s" x="305" y="154" text-anchor="middle">JSON API, upload, jobs in threads, warm graph cache</text>
+  <text class="m" x="305" y="172" text-anchor="middle">demo/server.py · demo/viz.py · demo/make_scenes.py</text>
+  <rect class="box" x="500" y="112" width="330" height="70" rx="8"/>
+  <text class="t" x="665" y="136" text-anchor="middle">Experiment runner</text>
+  <text class="s" x="665" y="154" text-anchor="middle">one subprocess per (system, question), resumable, scoring</text>
+  <text class="m" x="665" y="172" text-anchor="middle">run_experiment.py · run_one.py</text>
+  <rect class="box" x="860" y="112" width="330" height="70" rx="8"/>
+  <text class="t" x="1025" y="136" text-anchor="middle">Result summaries</text>
+  <text class="s" x="1025" y="154" text-anchor="middle">accuracy by family, plan score, cost per question</text>
+  <text class="m" x="1025" y="172" text-anchor="middle">results*/summary.md · scores.json</text>
+
+  <!-- systems -->
+  <rect class="chk" x="140" y="204" width="420" height="70" rx="8"/>
+  <text class="t" x="350" y="228" text-anchor="middle">Typed plan: full · no_verify · no_interp</text>
+  <text class="s" x="350" y="246" text-anchor="middle">the proposal and its two ablations (figure above)</text>
+  <text class="m" x="350" y="264" text-anchor="middle">t2r/systems.py: run_full</text>
+  <rect class="box" x="590" y="204" width="280" height="70" rx="8"/>
+  <text class="t" x="730" y="228" text-anchor="middle">Tool agent: flat</text>
+  <text class="s" x="730" y="246" text-anchor="middle">model calls one catalogue op per turn, no plan</text>
+  <text class="m" x="730" y="264" text-anchor="middle">run_flat</text>
+  <rect class="box" x="900" y="204" width="290" height="70" rx="8"/>
+  <text class="t" x="1045" y="228" text-anchor="middle">Code generation: codegen · codegen_nofacts</text>
+  <text class="s" x="1045" y="246" text-anchor="middle">model writes a script, run under a memory cap</text>
+  <text class="m" x="1045" y="264" text-anchor="middle">run_codegen</text>
+
+  <!-- core -->
+  <rect class="box" x="140" y="296" width="196" height="70" rx="8"/>
+  <text class="t" x="238" y="320" text-anchor="middle">graphs</text>
+  <text class="s" x="238" y="338" text-anchor="middle">facts, semantics, card, resolve</text>
+  <text class="m" x="238" y="356" text-anchor="middle">t2r/graphs.py</text>
+  <rect class="box" x="354" y="296" width="196" height="70" rx="8"/>
+  <text class="t" x="452" y="320" text-anchor="middle">ops</text>
+  <text class="s" x="452" y="338" text-anchor="middle">40 typed operators, tiers</text>
+  <text class="m" x="452" y="356" text-anchor="middle">t2r/ops.py</text>
+  <rect class="box" x="568" y="296" width="196" height="70" rx="8"/>
+  <text class="t" x="666" y="320" text-anchor="middle">ir</text>
+  <text class="s" x="666" y="338" text-anchor="middle">plan, validate, cost, execute</text>
+  <text class="m" x="666" y="356" text-anchor="middle">t2r/ir.py</text>
+  <rect class="box" x="782" y="296" width="196" height="70" rx="8"/>
+  <text class="t" x="880" y="320" text-anchor="middle">verify</text>
+  <text class="s" x="880" y="338" text-anchor="middle">invariants, consistency</text>
+  <text class="m" x="880" y="356" text-anchor="middle">t2r/verify.py</text>
+  <rect class="mdl" x="996" y="296" width="194" height="70" rx="8"/>
+  <text class="t" x="1093" y="320" text-anchor="middle">llm</text>
+  <text class="s" x="1093" y="338" text-anchor="middle">chat, usage, cost estimate</text>
+  <text class="m" x="1093" y="356" text-anchor="middle">t2r/llm.py</text>
+
+  <!-- underneath -->
+  <rect class="sto" x="140" y="388" width="300" height="62" rx="8"/>
+  <text class="t" x="290" y="412" text-anchor="middle">python-igraph 1.0</text>
+  <text class="s" x="290" y="430" text-anchor="middle">graph storage and algorithms (C core)</text>
+  <rect class="sto" x="460" y="388" width="250" height="62" rx="8"/>
+  <text class="t" x="585" y="412" text-anchor="middle">numpy · pandas · pydantic</text>
+  <text class="s" x="585" y="430" text-anchor="middle">chunked file reads, statistics, plan schema</text>
+  <rect class="mdl" x="730" y="388" width="460" height="62" rx="8"/>
+  <text class="t" x="960" y="412" text-anchor="middle">Model access: claude -p CLI (session login) or Anthropic SDK (API key)</text>
+  <text class="s" x="960" y="430" text-anchor="middle">claude-opus-5-5 by default, claude-haiku-5-5 for the robustness runs; auto-detected</text>
+
+  <!-- a few edges that carry the dependency story -->
+  <path class="e" marker-end="url(#b)" d="M305 90 L305 110"/>
+  <path class="e" marker-end="url(#b)" d="M665 90 L665 110"/>
+  <path class="e" marker-end="url(#b)" d="M305 182 L305 202"/>
+  <path class="e" marker-end="url(#b)" d="M665 182 L665 202"/>
+  <path class="e thin" d="M350 274 L350 294"/><path class="e thin" d="M730 274 L730 294"/><path class="e thin" d="M1045 274 L1045 294"/>
+  <path class="e thin" d="M238 366 L238 386"/><path class="e thin" d="M452 366 L452 386"/><path class="e thin" d="M1093 366 L1093 386"/>
+</svg>
+<figcaption><b>Component stack.</b> Interfaces at the top, the five modules of the core library in the middle, igraph and the model access at the bottom. The three compared system families share the same core: the typed-plan systems use all five modules, the tool agent uses the operators without the plan IR or the verifier, and code generation uses only the file facts and the model client.</figcaption>
+</figure>
+
+<h2>What the two baselines leave out</h2>
+<figure>
+<svg viewBox="0 0 1200 250" role="img" aria-label="Three rows comparing the typed plan, the tool agent and code generation by which stages each has: profile card, typed plan, validator, cost model, executor, verifier">
+  <defs><marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+  <text class="hd" x="10" y="30">TYPED PLAN</text>
+  <text class="hd" x="10" y="110">TOOL AGENT</text>
+  <text class="hd" x="10" y="190">CODE GENERATION</text>
+  <!-- column heads -->
+  <text class="s" x="230" y="14" text-anchor="middle">file facts + card</text>
+  <text class="s" x="410" y="14" text-anchor="middle">model</text>
+  <text class="s" x="590" y="14" text-anchor="middle">typed plan</text>
+  <text class="s" x="770" y="14" text-anchor="middle">validator + cost model</text>
+  <text class="s" x="950" y="14" text-anchor="middle">executor</text>
+  <text class="s" x="1130" y="14" text-anchor="middle">verifier</text>
+  <!-- row 1 -->
+  <rect class="box" x="160" y="24" width="140" height="40" rx="8"/><text x="230" y="49" text-anchor="middle">card</text>
+  <rect class="mdl" x="340" y="24" width="140" height="40" rx="8"/><text x="410" y="49" text-anchor="middle">plan once</text>
+  <rect class="box" x="520" y="24" width="140" height="40" rx="8"/><text x="590" y="49" text-anchor="middle">plan IR</text>
+  <rect class="chk" x="700" y="24" width="140" height="40" rx="8"/><text x="770" y="49" text-anchor="middle">validate, tier</text>
+  <rect class="box" x="880" y="24" width="140" height="40" rx="8"/><text x="950" y="49" text-anchor="middle">run ops</text>
+  <rect class="chk" x="1060" y="24" width="130" height="40" rx="8"/><text x="1125" y="49" text-anchor="middle">check</text>
+  <path class="e" marker-end="url(#c)" d="M300 44 L338 44"/><path class="e" marker-end="url(#c)" d="M480 44 L518 44"/><path class="e" marker-end="url(#c)" d="M660 44 L698 44"/><path class="e" marker-end="url(#c)" d="M840 44 L878 44"/><path class="e" marker-end="url(#c)" d="M1020 44 L1058 44"/>
+  <!-- row 2 -->
+  <rect class="box" x="160" y="104" width="140" height="40" rx="8"/><text x="230" y="129" text-anchor="middle">facts on request</text>
+  <rect class="mdl" x="340" y="104" width="140" height="40" rx="8"/><text x="410" y="129" text-anchor="middle">one op per turn</text>
+  <rect class="box" x="880" y="104" width="140" height="40" rx="8"/><text x="950" y="129" text-anchor="middle">run op</text>
+  <path class="e" marker-end="url(#c)" d="M300 124 L338 124"/>
+  <path class="e" marker-end="url(#c)" d="M480 124 L878 124"/>
+  <path class="e loop" marker-end="url(#c)" d="M950 144 C950 165, 410 165, 410 146"/>
+  <text class="lab" x="680" y="160" text-anchor="middle">result back to the model, up to 12 turns</text>
+  <text class="lab" x="590" y="100" text-anchor="middle">no plan to inspect</text>
+  <text class="lab" x="1125" y="129" text-anchor="middle">no check</text>
+  <!-- row 3 -->
+  <rect class="box" x="160" y="184" width="140" height="40" rx="8"/><text x="230" y="209" text-anchor="middle">facts in prompt</text>
+  <rect class="mdl" x="340" y="184" width="140" height="40" rx="8"/><text x="410" y="209" text-anchor="middle">write a script</text>
+  <rect class="box" x="880" y="184" width="140" height="40" rx="8"/><text x="950" y="209" text-anchor="middle">run script</text>
+  <path class="e" marker-end="url(#c)" d="M300 204 L338 204"/>
+  <path class="e" marker-end="url(#c)" d="M480 204 L878 204"/>
+  <text class="lab" x="680" y="200" text-anchor="middle">the model's own judgment on cost and approximation</text>
+  <path class="e loop" marker-end="url(#c)" d="M950 224 C950 242, 410 242, 410 226"/>
+  <text class="lab" x="680" y="240" text-anchor="middle">on error: one retry with the stderr</text>
+  <text class="lab" x="1125" y="209" text-anchor="middle">no check</text>
+</svg>
+<figcaption><b>Why the comparison is fair and what it measures.</b> All three get the same file facts and the same model. What the baselines lack is the middle and the end of the pipeline: nothing to validate, no cost control other than the model's judgment, and nothing that checks the result against the question. Those are the three places where the experiments found differences: the cost model finishing the 50M-edge betweenness, the verifier flagging 87% of answer-changing plan mutations, and the tool agent fabricating a tool transcript with nothing to stop it.</figcaption>
+</figure>
+</main>
+</body>
+</html>
