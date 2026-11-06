@@ -80,6 +80,22 @@
   "clarification": null
  },
  {
+  "qid": "H1",
+  "family": "interpretation",
+  "dataset": "roads",
+  "system": "codegen_nofacts",
+  "answer_score": 0.0,
+  "plan_score": null,
+  "note": "got {\"length\": 90.07, \"path\": [\"J0\", \"J15\", \"J16\", \"J17\", \"J32\", \"J33\", \"J48\", \"J49\" expected 67.24",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 6975,
+  "cost": 0.0028735,
+  "seconds": 25.181883573532104,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H2",
   "family": "interpretation",
   "dataset": "roads",
@@ -156,6 +172,22 @@
   "tokens": 3823,
   "cost": 0.0011145,
   "seconds": 9.699293375015259,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H2",
+  "family": "interpretation",
+  "dataset": "roads",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "clarified or showed alternative measures",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 9575,
+  "cost": 0.004172,
+  "seconds": 37.56626272201538,
   "error": null,
   "clarification": null
  },
@@ -240,6 +272,22 @@
   "clarification": null
  },
  {
+  "qid": "H3",
+  "family": "metric",
+  "dataset": "roads",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "facts {'n': True, 'm': True}",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 7940,
+  "cost": 0.0033590000000000004,
+  "seconds": 29.23429799079895,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H4",
   "family": "clarification",
   "dataset": "similarity",
@@ -320,6 +368,22 @@
   "clarification": "The weight column appears to be a similarity score (higher = more similar). The primary answer treats raw weights as path cost. If you want similarity treated as closeness, use the inverse-weight variant instead."
  },
  {
+  "qid": "H4",
+  "family": "clarification",
+  "dataset": "similarity",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "clarification accepted",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 8006,
+  "cost": 0.00327044,
+  "seconds": 30.11739993095398,
+  "error": null,
+  "clarification": "No path exists between P0 and P7."
+ },
+ {
   "qid": "H5",
   "family": "metric",
   "dataset": "similarity",
@@ -396,6 +460,22 @@
   "tokens": 3860,
   "cost": 0.0011393,
   "seconds": 10.886685371398926,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H5",
+  "family": "metric",
+  "dataset": "similarity",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 14354,
+  "cost": 0.00644654,
+  "seconds": 55.1173894405365,
   "error": null,
   "clarification": null
  },
@@ -480,6 +560,22 @@
   "clarification": null
  },
  {
+  "qid": "H6",
+  "family": "interpretation",
+  "dataset": "emails",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "facts {'emails': True, 'pairs': True}",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 7631,
+  "cost": 0.00308024,
+  "seconds": 27.050143480300903,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H7",
   "family": "interpretation",
   "dataset": "emails",
@@ -556,6 +652,22 @@
   "tokens": 3465,
   "cost": 0.0009397000000000001,
   "seconds": 7.913335084915161,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H7",
+  "family": "interpretation",
+  "dataset": "emails",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 9425,
+  "cost": 0.00398204,
+  "seconds": 33.95607042312622,
   "error": null,
   "clarification": null
  },
@@ -640,6 +752,22 @@
   "clarification": null
  },
  {
+  "qid": "H8",
+  "family": "interpretation",
+  "dataset": "emails",
+  "system": "codegen_nofacts",
+  "answer_score": 0.0,
+  "plan_score": null,
+  "note": "got \"e186\"",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 6915,
+  "cost": 0.00272764,
+  "seconds": 23.5991690158844,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H9",
   "family": "interpretation",
   "dataset": "emails",
@@ -716,6 +844,22 @@
   "tokens": 3598,
   "cost": 0.001005,
   "seconds": 9.325180053710938,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H9",
+  "family": "interpretation",
+  "dataset": "emails",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 7283,
+  "cost": 0.00290954,
+  "seconds": 26.509725332260132,
   "error": null,
   "clarification": null
  },
@@ -800,6 +944,22 @@
   "clarification": null
  },
  {
+  "qid": "H10",
+  "family": "interpretation",
+  "dataset": "indexed",
+  "system": "codegen_nofacts",
+  "answer_score": 0.5,
+  "plan_score": null,
+  "note": "facts {'n': False, 'm': True}",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 8255,
+  "cost": 0.00339434,
+  "seconds": 27.229268312454224,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H11",
   "family": "interpretation",
   "dataset": "indexed",
@@ -878,6 +1038,22 @@
   "seconds": 14.054572820663452,
   "error": null,
   "clarification": null
+ },
+ {
+  "qid": "H11",
+  "family": "interpretation",
+  "dataset": "indexed",
+  "system": "codegen_nofacts",
+  "answer_score": 0.0,
+  "plan_score": null,
+  "note": "got 0",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 8057,
+  "cost": 0.00329564,
+  "seconds": 28.294950008392334,
+  "error": null,
+  "clarification": "The graph is directed, so 'degree' is ambiguous. Total degree gives one node, out-degree and in-degree give others. Do you want total, out, or in degree?"
  },
  {
   "qid": "H12",
@@ -960,6 +1136,22 @@
   "clarification": null
  },
  {
+  "qid": "H12",
+  "family": "interpretation",
+  "dataset": "purchases",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5212,
+  "cost": 0.00187464,
+  "seconds": 16.772921800613403,
+  "error": null,
+  "clarification": "Could not identify customer/product columns by name; assumed 'col0' = customer and 'col1' = product from column order. Please confirm."
+ },
+ {
   "qid": "H13",
   "family": "interpretation",
   "dataset": "purchases",
@@ -1040,6 +1232,22 @@
   "clarification": null
  },
  {
+  "qid": "H13",
+  "family": "interpretation",
+  "dataset": "purchases",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "pair=True dist=True",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 6677,
+  "cost": 0.00260654,
+  "seconds": 21.631659269332886,
+  "error": null,
+  "clarification": "8 customer pairs tie at 4 shared products; the first in sorted order is given as the answer, the others are listed in variants."
+ },
+ {
   "qid": "H14",
   "family": "metric",
   "dataset": "purchases",
@@ -1116,6 +1324,22 @@
   "tokens": 3093,
   "cost": 0.0007654000000000001,
   "seconds": 7.94066858291626,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H14",
+  "family": "metric",
+  "dataset": "purchases",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 8905,
+  "cost": 0.00372114,
+  "seconds": 32.87535834312439,
   "error": null,
   "clarification": null
  },
@@ -1200,6 +1424,22 @@
   "clarification": null
  },
  {
+  "qid": "H15",
+  "family": "interpretation",
+  "dataset": "purchases",
+  "system": "codegen_nofacts",
+  "answer_score": 0.5,
+  "plan_score": null,
+  "note": "correct only as a variant",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5154,
+  "cost": 0.00184144,
+  "seconds": 20.29664707183838,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H16",
   "family": "interpretation",
   "dataset": "follows",
@@ -1276,6 +1516,22 @@
   "tokens": 3366,
   "cost": 0.0009052000000000001,
   "seconds": 9.033830881118774,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H16",
+  "family": "interpretation",
+  "dataset": "follows",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5408,
+  "cost": 0.00197294,
+  "seconds": 17.513606548309326,
   "error": null,
   "clarification": null
  },
@@ -1360,6 +1616,22 @@
   "clarification": null
  },
  {
+  "qid": "H17",
+  "family": "interpretation",
+  "dataset": "follows",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "facts {'out': True, 'in': True}",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 7089,
+  "cost": 0.00281104,
+  "seconds": 28.037678480148315,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H18",
   "family": "interpretation",
   "dataset": "follows",
@@ -1436,6 +1708,22 @@
   "tokens": 3594,
   "cost": 0.0010156000000000002,
   "seconds": 12.551582336425781,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H18",
+  "family": "interpretation",
+  "dataset": "follows",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 8012,
+  "cost": 0.00327434,
+  "seconds": 28.9778311252594,
   "error": null,
   "clarification": null
  },
@@ -1520,6 +1808,22 @@
   "clarification": null
  },
  {
+  "qid": "H19",
+  "family": "interpretation",
+  "dataset": "follows",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 7596,
+  "cost": 0.00306514,
+  "seconds": 27.422003507614136,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H20",
   "family": "topk",
   "dataset": "follows",
@@ -1596,6 +1900,22 @@
   "tokens": 3731,
   "cost": 0.0010862,
   "seconds": 11.732229471206665,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H20",
+  "family": "topk",
+  "dataset": "follows",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "overlap@5=1.00",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5745,
+  "cost": 0.00214204,
+  "seconds": 19.624088048934937,
   "error": null,
   "clarification": null
  },
@@ -1680,6 +2000,22 @@
   "clarification": null
  },
  {
+  "qid": "H21",
+  "family": "interpretation",
+  "dataset": "trust",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5742,
+  "cost": 0.00213724,
+  "seconds": 17.98627471923828,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H22",
   "family": "interpretation",
   "dataset": "trust",
@@ -1756,6 +2092,22 @@
   "tokens": 4039,
   "cost": 0.0012294,
   "seconds": 12.197887420654297,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H22",
+  "family": "interpretation",
+  "dataset": "trust",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 6689,
+  "cost": 0.00261524,
+  "seconds": 22.834705591201782,
   "error": null,
   "clarification": null
  },
@@ -1840,6 +2192,22 @@
   "clarification": null
  },
  {
+  "qid": "H23",
+  "family": "interpretation",
+  "dataset": "citations",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 7334,
+  "cost": 0.0029371399999999995,
+  "seconds": 27.52361536026001,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H24",
   "family": "interpretation",
   "dataset": "citations",
@@ -1916,6 +2284,22 @@
   "tokens": 3641,
   "cost": 0.0010328,
   "seconds": 11.481611013412476,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H24",
+  "family": "interpretation",
+  "dataset": "citations",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "facts {'cites': True, 'cited_by': True}",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5446,
+  "cost": 0.00199044,
+  "seconds": 17.25141215324402,
   "error": null,
   "clarification": null
  },
@@ -2000,6 +2384,22 @@
   "clarification": null
  },
  {
+  "qid": "H25",
+  "family": "interpretation",
+  "dataset": "citations",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 8928,
+  "cost": 0.00373444,
+  "seconds": 32.1821813583374,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H26",
   "family": "interpretation",
   "dataset": "bothways",
@@ -2080,6 +2480,22 @@
   "clarification": null
  },
  {
+  "qid": "H26",
+  "family": "interpretation",
+  "dataset": "bothways",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 6566,
+  "cost": 0.00255134,
+  "seconds": 25.687022924423218,
+  "error": null,
+  "clarification": null
+ },
+ {
   "qid": "H27",
   "family": "interpretation",
   "dataset": "bothways",
@@ -2156,6 +2572,22 @@
   "tokens": 3315,
   "cost": 0.0008782,
   "seconds": 9.391626358032227,
+  "error": null,
+  "clarification": null
+ },
+ {
+  "qid": "H27",
+  "family": "interpretation",
+  "dataset": "bothways",
+  "system": "codegen_nofacts",
+  "answer_score": 1.0,
+  "plan_score": null,
+  "note": "match",
+  "plan_note": "n/a (opaque code)",
+  "calls": 1,
+  "tokens": 5568,
+  "cost": 0.00205054,
+  "seconds": 18.917312145233154,
   "error": null,
   "clarification": null
  }

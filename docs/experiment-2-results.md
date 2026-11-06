@@ -186,6 +186,6 @@ protocol) around *both* executors, with the typed IR as the default path and cod
 questions the operator catalogue cannot express. The research claim moves from "IR beats codegen" to "verification and
 cost control without ground truth", which is what the data supports, and the benchmark's next version has to target
 what actually failed: contestable approximations, multi-step analyses whose intermediate choices change the answer,
-weaker models, and an ablation of code generation without file facts (untested here; it is the one place the
-interpretation stage could still show an effect).
+weaker models, and an ablation of code generation without file facts (run afterwards as experiment 3: it is where
+the interpretation stage shows its effect).
 

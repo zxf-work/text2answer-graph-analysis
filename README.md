@@ -17,6 +17,7 @@ It started as a branch of the older GraphProfile repository and was moved here t
 | `docs/solution-architecture.md` | the grounding gap, research questions, the typed plan IR and the six-stage architecture |
 | `docs/headline-experiment-results.md` | experiment 1: five systems on 60 questions over real graphs (Opus and Haiku) |
 | `docs/experiment-2-results.md` | experiment 2: hard interpretation set, fault injection, 10M to 50M-edge scale tier, conclusions and decision |
+| `docs/experiment-3-codegen-without-facts.md` | experiment 3: code generation without file facts, the ablation that shows what the interpretation stage is worth |
 | `prototype/` | the working prototype: loaders, operator catalogue, plan IR, verifier, the five compared systems, benchmark generators, scorer, experiment runner |
 
 ## State of the work (November 2026)
@@ -29,11 +30,14 @@ It started as a branch of the older GraphProfile repository and was moved here t
 - Decision: build a shared scaffold (profile card with file facts, cost model, verifier, clarification protocol)
   around both executors, typed IR by default and code generation as the escape hatch. The research claim is
   "verification and cost control without ground truth" rather than "IR beats codegen".
-- Next: an ablation of code generation without file facts; a harder benchmark (contestable approximations,
+- Without the file facts, code generation loses 4 points (Opus) and 11 points (Haiku) on the hard set at twice
+  the cost, making the same semantic errors the interpretation stage prevents: the profile card is the cheapest
+  part of the system with the largest measured effect.
+- Next: a harder benchmark (contestable approximations,
   multi-step analyses, weaker models); real large graphs once SNAP is reachable.
 
 ## Running the prototype
 
 See `prototype/README.md`. Dependencies: python-igraph, networkx, numpy, pandas, pydantic; LLM calls go through
-the `claude -p` headless CLI or the Anthropic SDK. Large synthetic graphs are regenerated with
-`prototype/bench/big/gen_big.py` (not committed).
+the `claude -p` headless CLI or the Anthropic SDK. The benchmark data for the base and hard sets is in the
+repository; the large synthetic graphs are regenerated with `prototype/bench/big/gen_big.py` (not committed).
