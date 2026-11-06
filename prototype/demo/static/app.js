@@ -3,7 +3,7 @@
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const fmt = (n) => typeof n === "number" ? (Number.isInteger(n) ? n.toLocaleString() : (Math.abs(n) < 0.01 && n !== 0 ? n.toExponential(3) : n.toLocaleString(undefined, { maximumFractionDigits: 4 }))) : String(n);
+  const fmt = (n) => typeof n === "number" ? (Number.isInteger(n) ? n.toLocaleString() : (Math.abs(n) < 0.01 && n !== 0 ? n.toExponential(3) : Math.abs(n) >= 1e6 ? n.toExponential(3) : n.toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) >= 1000 ? 1 : 4 }))) : String(n);
   const bytes = (b) => b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b > 1e6 ? (b / 1e6).toFixed(1) + " MB" : (b / 1e3).toFixed(0) + " kB";
   const TYPE_COLORS = { Graph: "var(--t-graph)", NodeMap: "var(--t-nodemap)", NodeSet: "var(--t-nodeset)", Partition: "var(--t-partition)", Scalar: "var(--t-scalar)", Table: "var(--t-table)", Bool: "var(--t-bool)", Path: "var(--t-path)" };
   const typeOf = (r) => (Object.keys(TYPE_COLORS).find((t) => String(r || "").startsWith(t)) || "Scalar");
@@ -66,7 +66,8 @@
     if (c.is_bipartite) html += `<div class="sem-row"><span class="k">shape</span><div><span class="val">bipartite</span><div class="ev">two disjoint node sets</div></div></div>`;
     if (c.columns) html += `<div class="sem-row"><span class="k">columns</span><div><span class="val mono">${esc(c.columns.header ? c.columns.header.join(", ") : c.columns.note)}</span></div></div>`;
     html += `</div>`;
-    if ((s.needs_clarification || []).length) html += `<div class="ask-badge">Would ask: ${esc(s.needs_clarification.join("; "))}</div>`;
+    const ASK = { directed: "is each row one direction of a relation, or an undirected edge?", weighted: "is the extra column a weight?", weight_semantics: "are the weights strengths (more is closer) or distances (more is farther)?", multigraph: "do repeated rows mean repeated interactions?" };
+    if ((s.needs_clarification || []).length) html += `<div class="ask-badge">Would ask before relying on it: ${esc(s.needs_clarification.map((k) => ASK[k] || k).join(" "))}</div>`;
     const sample = (f.sample_rows || []).map((r) => r.join(f.header ? "," : " ")).join("\n");
     html += `<details class="more"><summary>raw file facts</summary><div class="head-sample">${esc(sample)}</div>
       <div class="kv" style="margin-top:8px;font-size:12.5px">
@@ -118,8 +119,8 @@
   function answerHtml(a, kind) {
     if (a === null || a === undefined) return `<div class="big small muted">no answer</div>`;
     if (Array.isArray(a)) {
-      if (a.length && typeof a[0] === "object" && a[0] && "node" in a[0]) return `<div class="list">${a.slice(0, 20).map((x, i) => `<span class="pill"><b>${i + 1}</b>${esc(x.node)}<span class="v">${fmt(x.value)}</span></span>`).join("")}</div>`;
-      if (a.every((x) => typeof x !== "object")) return `<div class="list">${a.slice(0, 30).map((x, i) => `<span class="pill"><b>${i + 1}</b>${esc(x)}</span>`).join("")}${a.length > 30 ? `<span class="pill">+${a.length - 30} more</span>` : ""}</div>`;
+      if (a.length && typeof a[0] === "object" && a[0] && "node" in a[0]) return `<div class="list">${a.slice(0, 20).map((x, i) => `<span class="pill"><b>${i + 1}.</b>${esc(x.node)}<span class="v">${fmt(x.value)}</span></span>`).join("")}</div>`;
+      if (a.every((x) => typeof x !== "object")) return `<div class="list">${a.slice(0, 30).map((x, i) => `<span class="pill"><b>${i + 1}.</b>${esc(x)}</span>`).join("")}${a.length > 30 ? `<span class="pill">+${a.length - 30} more</span>` : ""}</div>`;
       return `<pre class="code">${esc(JSON.stringify(a, null, 1).slice(0, 2000))}</pre>`;
     }
     if (typeof a === "object") {
@@ -143,9 +144,10 @@
     else el.innerHTML = head + answerHtml(r.answer, r.plan?.answer?.kind);
     const cl = $("#clarification");
     if (r.clarification) { cl.classList.remove("hidden"); cl.innerHTML = `<b>The system asks:</b> ${esc(r.clarification)}`; } else cl.classList.add("hidden");
-    $("#explanation").innerHTML = r.explanation ? esc(r.explanation).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") : "";
+    const ex = (r.explanation || "").trim(); const isJson = ex.startsWith("{") && ex.endsWith("}");
+    $("#explanation").innerHTML = ex && !isJson ? esc(ex).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") : (isJson ? `<span class="muted">The agent returned its answer object with no explanation.</span>` : "");
     const vs = r.variants || [];
-    $("#variants").innerHTML = vs.length ? `<div class="muted" style="font-size:12.5px">Also computed, under other readings of the question:</div>` + vs.map((v) => `<div class="variant"><b>${esc(v.label || "variant")}</b>: ${esc(JSON.stringify(v.answer).slice(0, 300))}</div>`).join("") : "";
+    $("#variants").innerHTML = vs.length ? `<div class="muted" style="font-size:12.5px">Also computed, under other readings of the question:</div>` + vs.map((v) => `<div class="variant"><b>${esc(v.label || "variant")}</b>${answerHtml(v.answer)}</div>`).join("") : "";
   }
 
   function renderInterp(r) {
@@ -200,7 +202,7 @@
     const t = Object.fromEntries(trace.map((s) => [s.step, s]));
     const argStr = (n) => Object.entries(n.args || {}).filter(([k]) => k !== "graph" || n.args.graph !== "G").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" ");
     const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
-    let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="plan dataflow">`;
+    let svg = `<svg viewBox="0 0 ${width} ${height}" style="max-width:${Math.max(width, 320)}px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="plan dataflow">`;
     svg += `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>`;
     for (const e of edges) {
       const a = pos[e.from], b = pos[e.to]; if (!a || !b) continue;

@@ -63,3 +63,18 @@ Set `ANTHROPIC_API_KEY` to use the SDK backend; inside a Claude Code session the
 - Ground truth is igraph, cross-checked against NetworkX on a subset; community questions use tolerances because partitions are seed-dependent.
 - The verifier covers a dozen invariants, not a general theory.
 - No caching across questions, no MCP surface, no visualisation.
+
+
+## Demo web UI
+
+```bash
+python3 demo/server.py --port 8765          # then open http://127.0.0.1:8765
+python3 demo/make_scenes.py                 # re-record the guided-demo scenes (live model calls)
+python3 demo/build_static.py                # single-file preview with the scenes inlined: demo/dist/index.html
+```
+
+The page walks through four steps: pick a graph file (shipped sets, or drop your own edge list), read the profile
+card the system computed from it, ask in plain words, and inspect the plan, the verifier's checks, the answer and
+its cost. The executor switcher runs the same question through the typed-plan system, the tool-calling agent or
+code generation. "Guided demo" replays recorded scenes without a model call. Loaded graphs stay in memory between
+questions (`T2R_GRAPH_CACHE=1`, set by the server).

@@ -20,11 +20,11 @@ const { chromium } = require('playwright');
     await page.screenshot({ path: `${out}/02_guided_demo.png` });
     await page.click(`.scene >> nth=${idx || 0}`);
     await page.waitForSelector('#result:not(.hidden) .big, #result:not(.hidden) .pill, #result:not(.hidden) .clarify');
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
     await page.screenshot({ path: `${out}/03_result.png`, fullPage: true });
     const n = await page.evaluate(() => document.querySelectorAll('.scene').length);
     for (let i = 1; i < n; i++) {
-      await page.click('#btn-scenes'); await page.click(`.scene >> nth=${i}`); await page.waitForTimeout(500);
+      await page.click('#btn-scenes'); await page.click(`.scene >> nth=${i}`); await page.waitForTimeout(700); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
       await page.screenshot({ path: `${out}/scene_${i + 1}.png`, fullPage: true });
     }
   }
