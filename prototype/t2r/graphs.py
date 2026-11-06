@@ -574,11 +574,11 @@ def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGrap
 
 
 def _graph_from_edges(n: int, edges, directed: bool) -> "ig.Graph":
-    """Build the igraph graph from an (m, 2) int32/int64 array in 10M-edge slices (measured: 10M edges in 5 s at 0.7 GB;
-    one-shot construction from a stacked int64 array transiently needed three times the final graph size)."""
+    """Build the igraph graph from an (m, 2) integer array with one add_edges call. Measured on 50M edges: 31 s at a
+    3.3 GB peak; inserting in 10M slices took 60 s because igraph rebuilds its index after every call, and the Graph
+    constructor given the array peaked at three times the final size."""
     g = ig.Graph(n=n, directed=directed)
-    for i in range(0, len(edges), 10_000_000):
-        g.add_edges(edges[i:i + 10_000_000])
+    g.add_edges(edges)
     return g
 
 

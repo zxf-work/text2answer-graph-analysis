@@ -161,8 +161,11 @@ Measured on this machine (one process, cold):
 | graph | parse from text | restore from binary cache | resident |
 |---|---|---|---|
 | trust, 1.8K edges | 0.0 s | 0.0 s | 0 |
-| 10M edges, 2M nodes | 34 s | 9 s | 0 |
-| 50M edges, 10M nodes | 331 s | see `experiment-2` notes; measured below once the cache exists | 0 |
+| 10M edges, 2M nodes | 34 s | 10 s | 0 |
+| 50M edges, 10M nodes | 331 s | 34 s (0.3 s to read the arrays, 31 s for igraph to index 50M edges, 2 s for labels) | 0 |
+
+The binary cache holds the deduplicated int32 edge array (400 MB for 50M edges), so a restore is bounded by igraph
+building its index, not by parsing; a resident process pays even that only once.
 
 The demo server (`demo/server.py`) is the resident process: `--preload name,...` loads graphs at start, a dataset
 picked in the UI loads in a background thread while the page shows elapsed time and where the graph is coming from
