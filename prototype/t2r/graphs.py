@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import time
 from dataclasses import dataclass, field, asdict
 from difflib import get_close_matches
 from typing import Any, Optional
@@ -375,6 +376,12 @@ class LoadedGraph:
     index: dict[str, int]                   # label -> index
     lower_index: dict[str, int]
     strict: bool = False                    # exact-match-only node resolution (ablation)
+    load_info: dict = field(default_factory=dict)  # {"source": "file"|"disk-cache"|"memory", "seconds": float}
+    _cache_key: Optional[str] = None            # set while a parse is in progress so the builders can write the disk cache
+
+    def __post_init__(self):
+        if self._cache_key is None and _PENDING_KEY:
+            self._cache_key = _PENDING_KEY[-1]
 
     def resolve(self, name: Any, k: int = 3) -> dict[str, Any]:
         """Resolve a user-supplied node reference to a vertex index.
@@ -444,8 +451,10 @@ def _load_graph_uncached(name: str, path: str, description: str = "", override: 
     g.vs["name"] = labels
     if sem.weighted:
         g.es["weight"] = wlist
-    return LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index,
-                       lower_index={l.lower(): i for l, i in index.items()})
+    lg = LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index,
+                     lower_index={l.lower(): i for l, i in index.items()})
+    _disk_cache_put(lg, np.array(elist, dtype=np.int64).reshape(-1, 2), np.array(wlist, dtype=float) if sem.weighted else None, np.array(labels, dtype=str), contiguous=False)
+    return lg
 
 
 class _RangeIndex:
@@ -478,16 +487,37 @@ class _RangeIndex:
 _GRAPH_CACHE: dict = {}
 
 
+def _load_or_restore(name: str, path: str, description: str, override: Optional[dict]) -> LoadedGraph:
+    """Disk cache first, then a full parse that writes the disk cache. Records where the graph came from and how long it took."""
+    t0 = time.time()
+    lg = _disk_cache_get(name, path, override)
+    if lg is not None:
+        lg.load_info = {"source": "disk-cache", "seconds": round(time.time() - t0, 1)}
+        return lg
+    key = _cache_key(path, override) if _disk_cache_enabled() else None
+    _PENDING_KEY.append(key)
+    try:
+        lg = _load_graph_uncached(name, path, description, override)
+    finally:
+        _PENDING_KEY.pop()
+    lg.load_info = {"source": "file", "seconds": round(time.time() - t0, 1)}
+    return lg
+
+
+_PENDING_KEY: list = []
+
+
 def load_graph(name: str, path: str, description: str = "", override: Optional[dict] = None) -> LoadedGraph:
-    """Load a graph. With T2R_GRAPH_CACHE=1 (the demo server) loaded graphs stay in memory and are shared across questions."""
+    """Load a graph: process memory (T2R_GRAPH_CACHE=1, the demo server), else the binary disk cache, else parse the file."""
     if os.environ.get("T2R_GRAPH_CACHE") != "1":
-        return _load_graph_uncached(name, path, description, override)
+        return _load_or_restore(name, path, description, override)
     key = (os.path.abspath(path), os.path.getmtime(path), json.dumps(override, sort_keys=True) if override else "")
     lg = _GRAPH_CACHE.get(key)
     if lg is None:
-        lg = _load_graph_uncached(name, path, description, override)
+        lg = _load_or_restore(name, path, description, override)
         _GRAPH_CACHE[key] = lg
-    return dataclasses.replace(lg, strict=False)
+        return dataclasses.replace(lg, strict=False)
+    return dataclasses.replace(lg, strict=False, load_info={"source": "memory", "seconds": 0.0})
 
 def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGraph:
     u, v, w = arrays
@@ -527,11 +557,7 @@ def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGrap
     dt = np.int32 if N < 2**31 else np.int64
     edges = np.stack([a.astype(dt, copy=False), b.astype(dt, copy=False)], axis=1)
     del a, b
-    # add edges in slices: one-shot construction from a 50M-row array transiently needs ~3x the final graph size
-    g = ig.Graph(n=N, directed=sem.directed)
-    for i in range(0, len(edges), 2_000_000):
-        g.add_edges(edges[i:i + 2_000_000])
-    del edges
+    g = _graph_from_edges(N, edges, sem.directed)
     if contiguous:
         labels = np.arange(N).astype(str).tolist()
         index: Any = _RangeIndex(N)
@@ -541,7 +567,102 @@ def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGrap
     g.vs["name"] = labels
     if sem.weighted and ww is not None:
         g.es["weight"] = ww.tolist()
-    return LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index, lower_index=index)
+    lg = LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index, lower_index=index)
+    _disk_cache_put(lg, edges, ww if sem.weighted else None, None if contiguous else ids, contiguous=contiguous)
+    del edges
+    return lg
+
+
+def _graph_from_edges(n: int, edges, directed: bool) -> "ig.Graph":
+    """Build the igraph graph from an (m, 2) int32/int64 array in 10M-edge slices (measured: 10M edges in 5 s at 0.7 GB;
+    one-shot construction from a stacked int64 array transiently needed three times the final graph size)."""
+    g = ig.Graph(n=n, directed=directed)
+    for i in range(0, len(edges), 10_000_000):
+        g.add_edges(edges[i:i + 10_000_000])
+    return g
+
+
+# --------------------------------------------------------------------------- binary cache on disk
+# The text parse, id statistics and deduplication are the slow part of a load (5.5 minutes for 50M edges). The
+# first load writes the built edge array, weights, labels, facts and semantics to T2R_CACHE_DIR; later loads in
+# any process rebuild the igraph graph from that in seconds (10M edges) to under a minute (50M edges).
+CACHE_FORMAT = 1
+
+
+def _cache_dir() -> str:
+    d = os.environ.get("T2R_CACHE_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache", "graphs")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _disk_cache_enabled() -> bool:
+    return os.environ.get("T2R_DISK_CACHE", "1") != "0"
+
+
+def _cache_key(path: str, override: Optional[dict]) -> str:
+    st = os.stat(path)
+    h = hashlib.sha1(f"{os.path.abspath(path)}|{st.st_size}|{int(st.st_mtime)}|{json.dumps(override or {}, sort_keys=True)}|{CACHE_FORMAT}".encode()).hexdigest()
+    return h[:20]
+
+
+def _disk_cache_put(lg: "LoadedGraph", edges, weights, ids, contiguous: bool) -> None:
+    if not _disk_cache_enabled() or getattr(lg, "_cache_key", None) is None:
+        return
+    try:
+        base = os.path.join(_cache_dir(), lg._cache_key)
+        arrays = {"edges": np.ascontiguousarray(edges)}
+        if weights is not None:
+            arrays["weights"] = np.asarray(weights, dtype=float)
+        if ids is not None:
+            arrays["ids"] = np.asarray(ids)
+        np.savez(base + ".npz.tmp.npz", **arrays)
+        os.replace(base + ".npz.tmp.npz", base + ".npz")
+        meta = {"format": CACHE_FORMAT, "name": lg.name, "n": lg.g.vcount(), "directed": lg.g.is_directed(), "contiguous": contiguous,
+                "facts": asdict(lg.facts), "semantics": asdict(lg.semantics), "path": os.path.abspath(lg.facts.path)}
+        with open(base + ".json.tmp", "w") as f:
+            json.dump(meta, f)
+        os.replace(base + ".json.tmp", base + ".json")
+    except Exception:  # noqa: BLE001  (a cache write failure must never fail a load)
+        pass
+
+
+def _disk_cache_get(name: str, path: str, override: Optional[dict]) -> Optional["LoadedGraph"]:
+    if not _disk_cache_enabled():
+        return None
+    base = os.path.join(_cache_dir(), _cache_key(path, override))
+    if not (os.path.exists(base + ".npz") and os.path.exists(base + ".json")):
+        return None
+    try:
+        meta = json.load(open(base + ".json"))
+        if meta.get("format") != CACHE_FORMAT:
+            return None
+        z = np.load(base + ".npz")
+        edges = z["edges"]
+        n = int(meta["n"])
+        g = _graph_from_edges(n, edges, bool(meta["directed"]))
+        facts = RawFacts(**meta["facts"])
+        sem = Semantics(**meta["semantics"])
+        if meta.get("contiguous"):
+            labels = np.arange(n).astype(str).tolist()
+            index: Any = _RangeIndex(n)
+            lower = index
+        else:
+            labels = z["ids"].astype(str).tolist()
+            index = {lab: i for i, lab in enumerate(labels)}
+            lower = index if facts.ids_numeric else {l.lower(): i for l, i in index.items()}
+        g.vs["name"] = labels
+        if "weights" in z.files and sem.weighted:
+            g.es["weight"] = z["weights"].tolist()
+        return LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index, lower_index=lower)
+    except Exception:  # noqa: BLE001  (a damaged cache entry is ignored, the file is parsed again)
+        return None
+
+
+def cache_status(path: str, override: Optional[dict] = None) -> dict:
+    """Whether a binary cache entry exists for this file (for the UI)."""
+    base = os.path.join(_cache_dir(), _cache_key(path, override))
+    ok = os.path.exists(base + ".npz") and os.path.exists(base + ".json")
+    return {"cached": ok, "bytes": os.path.getsize(base + ".npz") if ok else 0}
 
 
 # --------------------------------------------------------------------------- profile card

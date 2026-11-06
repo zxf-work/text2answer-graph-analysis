@@ -24,7 +24,9 @@
     state.datasets.sort((a, b) => order[a.tier] - order[b.tier] || a.name.localeCompare(b.name));
     for (const d of state.datasets) {
       const b = document.createElement("button"); b.className = "ds"; b.dataset.path = d.path;
-      b.innerHTML = `<span class="n">${esc(d.name)}</span><span class="tier">${esc(d.tier)}</span><span class="f">${esc(d.file)} <span class="sz">· ${bytes(d.bytes)}</span></span>`;
+      const st = d.state === "ready" ? "ready" : d.state === "loading" ? "loading" : d.cached ? "cached" : "cold";
+      const stTitle = { ready: "resident in memory", loading: "loading", cached: "binary cache on disk: loads in seconds", cold: "not loaded yet: first load parses the file" }[st];
+      b.innerHTML = `<span class="n"><i class="dot ${st}" title="${stTitle}"></i>${esc(d.name)}</span><span class="tier">${esc(d.tier)}</span><span class="f">${esc(d.file)} <span class="sz">· ${bytes(d.bytes)}</span></span>`;
       b.title = d.head.join("\n");
       b.onclick = () => pickDataset(d);
       list.appendChild(b);
@@ -44,7 +46,20 @@
     try {
       let card;
       if (state.static) card = d.card;
-      else card = await (await fetch(`/api/profile?path=${encodeURIComponent(d.path)}&name=${encodeURIComponent(d.name)}&description=${encodeURIComponent(d.description || "")}`)).json();
+      else {
+        // the server loads in the background; poll until the graph is resident, showing elapsed time and where it comes from
+        const url = `/api/profile?path=${encodeURIComponent(d.path)}&name=${encodeURIComponent(d.name)}&description=${encodeURIComponent(d.description || "")}`;
+        for (;;) {
+          const r = await (await fetch(url)).json();
+          if (state.ds !== d) return;
+          if (r.state === "ready") { card = r.card; if (r.load?.source && card) card.load_info = { source: r.load.source, seconds: r.load.load_seconds ?? r.load.seconds }; break; }
+          if (r.state === "error") throw new Error(r.error || "load failed");
+          const src = d.cached ? "restoring from the binary cache" : "parsing the file (first load; a binary cache is written for next time)";
+          $("#profile").innerHTML = `<div class="loading"><span class="spin"></span>${src} · ${r.load?.seconds ?? 0} s</div>`;
+          await new Promise((res) => setTimeout(res, 1000));
+        }
+        await loadDatasets(); $$(".ds").forEach((b) => b.classList.toggle("active", b.dataset.path === d.path));
+      }
       if (card.error) throw new Error(card.error);
       state.card = card; renderProfile(card);
       if (!state.replay) { drawViz(card.viz, { highlights: false }); $("#top-grid").classList.add("solo"); }
@@ -80,6 +95,11 @@
         ${f.row_index_column ? `<span class="k">row index</span><span class="v">first column is a running row number (ignored)</span>` : ""}
         <span class="k">ids</span><span class="v">${f.ids_numeric ? "integers" : "string labels"} · e.g. ${esc((c.sample_node_ids || []).slice(0, 4).join(", "))}</span>
       </div></details>`;
+    const li = c.load_info || {};
+    if (li.source) {
+      const how = li.source === "memory" ? "resident in memory: questions on this graph skip loading" : li.source === "disk-cache" ? `restored from the binary cache in ${li.seconds} s; now resident` : `parsed from the file in ${li.seconds} s; binary cache written, next load takes seconds`;
+      html += `<div class="resident">${esc(how)}</div>`;
+    }
     el.innerHTML = html;
   }
 

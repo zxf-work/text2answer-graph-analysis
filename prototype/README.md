@@ -78,3 +78,12 @@ card the system computed from it, ask in plain words, and inspect the plan, the 
 its cost. The executor switcher runs the same question through the typed-plan system, the tool-calling agent or
 code generation. "Guided demo" replays recorded scenes without a model call. Loaded graphs stay in memory between
 questions (`T2R_GRAPH_CACHE=1`, set by the server).
+
+### Loading and caches
+
+- `T2R_GRAPH_CACHE=1` keeps loaded graphs in process memory (the demo server sets it).
+- The first parse of a file writes a binary cache (edge array, weights, ids, facts, semantics) to
+  `prototype/.cache/graphs/` (`T2R_CACHE_DIR` to move it, `T2R_DISK_CACHE=0` to disable). Later loads in any
+  process restore from it: 10M edges in about 9 s instead of 34 s.
+- `python3 demo/server.py --preload trust,roads` (or `--preload all`) loads graphs at start; the UI shows each
+  graph's state (cold, cached on disk, loading, resident) and loads in the background when one is picked.

@@ -143,3 +143,41 @@ The order follows the research questions, so each milestone produces evidence, n
 4. Verifier; measure the fraction of injected planner errors caught (RQ3).
 5. Cost model and tiering on the 1M and 50M edge tiers (RQ4).
 6. MCP surface, profile report, code-generation fallback, exploratory multi-agent layer.
+
+
+## Application model: resident graphs
+
+A user does not ask one question; they open a graph and ask many. Loading has to happen once, not per question,
+and the first load has to be the only slow one. The prototype now works in three layers:
+
+| layer | what it holds | first question on a graph | every later question |
+|---|---|---|---|
+| process memory | the built igraph graph, labels, facts, semantics; the profile card; operator results keyed by (file, op, args) | load once | nothing to load; repeated operators (PageRank, components, betweenness samples) come back from the result cache |
+| binary cache on disk (`prototype/.cache/graphs/`, `T2R_CACHE_DIR`) | the deduplicated edge array (int32), weights, ids, facts and semantics, written on the first parse | restore: rebuild the graph from arrays | - |
+| the file | the edge list as the user gave it | parse: chunked read, id statistics, deduplication, build | - |
+
+Measured on this machine (one process, cold):
+
+| graph | parse from text | restore from binary cache | resident |
+|---|---|---|---|
+| trust, 1.8K edges | 0.0 s | 0.0 s | 0 |
+| 10M edges, 2M nodes | 34 s | 9 s | 0 |
+| 50M edges, 10M nodes | 331 s | see `experiment-2` notes; measured below once the cache exists | 0 |
+
+The demo server (`demo/server.py`) is the resident process: `--preload name,...` loads graphs at start, a dataset
+picked in the UI loads in a background thread while the page shows elapsed time and where the graph is coming from
+(file, binary cache, or already in memory), and every question on a loaded graph skips loading entirely. The state
+of each graph is visible in the dataset list (cold, cached on disk, loading, resident).
+
+What this means for the application scenario:
+
+- **Registering a graph is the slow step, once.** A product should do it when the user adds the file (upload,
+  connect, schedule), not when they ask the first question; the binary cache makes a restart or a second machine a
+  matter of seconds rather than minutes.
+- **Questions are then bounded by the algorithm, not by I/O.** On the resident 50M-edge graph a degree or
+  component question is seconds; a sampled betweenness is minutes, which is the cost model's territory.
+- **Warm-up is cheap to add.** Degree, components, PageRank and core numbers take seconds on 50M edges and answer a
+  large share of questions; computing them right after load and seeding the result cache turns those questions
+  into lookups. Not done yet; the result cache and the operator keys are in place for it.
+- **Multi-user.** One resident process per graph (or per machine, with several graphs) serves many users; the
+  model calls are the only per-question cost that does not shrink.

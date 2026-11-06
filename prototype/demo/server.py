@@ -30,7 +30,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 os.environ["T2R_GRAPH_CACHE"] = "1"
 
-from t2r.graphs import load_graph, profile_card  # noqa: E402
+from t2r.graphs import cache_status, load_graph, profile_card  # noqa: E402
 from t2r.ir import _ref_of  # noqa: E402
 from t2r.llm import LLM  # noqa: E402
 from t2r.ops import CATALOGUE  # noqa: E402
@@ -43,6 +43,13 @@ SCENES = os.path.join(HERE, "scenes")
 UPLOADS = os.path.join(HERE, "uploads")
 JOBS: dict[str, dict] = {}
 DEFAULT_MODEL = "claude-opus-5-5"
+# Resident graphs: a graph is loaded once per server process (memory cache in t2r.graphs), restored from the binary
+# disk cache when one exists, and every later question on it skips loading entirely. LOADS tracks the state per file
+# so the UI can show "loading" without blocking; RESULT_CACHE memoises operator results across questions.
+LOADS: dict[str, dict] = {}
+CARDS: dict[str, dict] = {}
+RESULT_CACHE: dict = {}
+LOCK = threading.Lock()
 
 EXAMPLES = {
     "trust": ["Who is the most trusted person?", "Who trusts the most people?", "Who has the strongest tie to the most-trusting person?", "How many people are there, and how many trust relations?"],
@@ -83,19 +90,56 @@ def _datasets() -> list[dict]:
                 continue
             with open(path, "r", errors="replace") as f:
                 head = [next(f, "").rstrip("\n") for _ in range(4)]
+            st = LOADS.get(os.path.abspath(path), {})
             out.append({"name": name, "path": path, "file": os.path.basename(path), "tier": tier, "bytes": os.path.getsize(path),
-                        "description": d.get("description") or "", "head": head, "examples": EXAMPLES.get(name, [])})
+                        "description": d.get("description") or "", "head": head, "examples": EXAMPLES.get(name, []),
+                        "state": st.get("state", "not loaded"), "cached": cache_status(path)["cached"]})
     for fn in sorted(os.listdir(UPLOADS)) if os.path.isdir(UPLOADS) else []:
         path = os.path.join(UPLOADS, fn)
         with open(path, "r", errors="replace") as f:
             head = [next(f, "").rstrip("\n") for _ in range(4)]
-        out.append({"name": os.path.splitext(fn)[0], "path": path, "file": fn, "tier": "upload", "bytes": os.path.getsize(path), "description": "", "head": head, "examples": []})
+        st = LOADS.get(os.path.abspath(path), {})
+        out.append({"name": os.path.splitext(fn)[0], "path": path, "file": fn, "tier": "upload", "bytes": os.path.getsize(path), "description": "", "head": head, "examples": [],
+                    "state": st.get("state", "not loaded"), "cached": cache_status(path)["cached"]})
     return out
+
+
+def _load_key(path: str, description: str) -> str:
+    return os.path.abspath(path)
+
+
+def ensure_loaded(path: str, name: str, description: str) -> dict:
+    """Start loading in the background if needed; return the load state {state, seconds, source, error}."""
+    key = _load_key(path, description)
+    with LOCK:
+        st = LOADS.get(key)
+        if st and st["state"] in ("loading", "ready"):
+            if st["state"] == "loading":
+                st["seconds"] = round(time.time() - st["started"], 1)
+            return st
+        st = {"state": "loading", "started": time.time(), "seconds": 0.0, "name": name}
+        LOADS[key] = st
+
+    def work():
+        try:
+            lg = load_graph(name, path, description or "")
+            card = _profile(path, name, description)
+            with LOCK:
+                CARDS[key] = card
+                st.update({"state": "ready", "seconds": round(time.time() - st["started"], 1), "source": lg.load_info.get("source"),
+                           "load_seconds": lg.load_info.get("seconds"), "n": lg.g.vcount(), "m": lg.g.ecount()})
+        except Exception as e:  # noqa: BLE001
+            with LOCK:
+                st.update({"state": "error", "error": f"{type(e).__name__}: {e}", "seconds": round(time.time() - st["started"], 1)})
+    threading.Thread(target=work, daemon=True).start()
+    return st
 
 
 def _profile(path: str, name: str, description: str) -> dict:
     lg = load_graph(name, path, description or "")
     card = profile_card(lg, with_inference=True)
+    card["load_info"] = lg.load_info
+    card["binary_cache"] = cache_status(path)
     f = lg.facts
     card["facts"] = {"rows": f.n_rows, "header": f.header, "n_columns": f.n_columns, "sample_rows": f.sample_rows[:4],
                      "reciprocity_of_rows": round(f.reciprocity, 3), "distinct_pairs_directed": f.n_rows_dedup_directed,
@@ -152,7 +196,7 @@ def _run_job(job: dict) -> None:
                 card = _profile(req["path"], req["name"], req.get("description") or "")
             except Exception as e:  # noqa: BLE001
                 card = {"error": f"{type(e).__name__}: {e}"}
-        res = SYSTEMS[req["system"]](req.get("qid") or "demo", req["path"], req["name"], req.get("description") or None, req["question"], llm=llm)
+        res = SYSTEMS[req["system"]](req.get("qid") or "demo", req["path"], req["name"], req.get("description") or None, req["question"], llm=llm, cache=RESULT_CACHE)
         d = asdict(res)
         d["card"] = card
         d["plan_graph"] = _plan_graph(d.get("plan")) if isinstance(d.get("plan"), dict) else None
@@ -202,7 +246,16 @@ class Handler(SimpleHTTPRequestHandler):
             if u.path == "/api/datasets":
                 return self._json(_datasets())
             if u.path == "/api/profile":
-                return self._json(_profile(q["path"], q.get("name") or os.path.basename(q["path"]), q.get("description", "")))
+                st = ensure_loaded(q["path"], q.get("name") or os.path.basename(q["path"]), q.get("description", ""))
+                if st["state"] == "ready":
+                    card = CARDS.get(_load_key(q["path"], "")) or _profile(q["path"], q.get("name") or os.path.basename(q["path"]), q.get("description", ""))
+                    return self._json({"state": "ready", "load": st, "card": card})
+                return self._json({"state": st["state"], "load": st, "error": st.get("error")})
+            if u.path == "/api/load":
+                return self._json(ensure_loaded(q["path"], q.get("name") or os.path.basename(q["path"]), q.get("description", "")))
+            if u.path == "/api/status":
+                return self._json({"graphs": [{"path": k, **{kk: vv for kk, vv in v.items() if kk != "started"}} for k, v in LOADS.items()],
+                                   "cached_results": len(RESULT_CACHE)})
             if u.path.startswith("/api/job/"):
                 job = JOBS.get(u.path.rsplit("/", 1)[1])
                 return self._json(job or {"status": "unknown"}, 200 if job else 404)
@@ -252,8 +305,15 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--model", default=os.environ.get("T2R_MODEL", DEFAULT_MODEL))
+    ap.add_argument("--preload", default=os.environ.get("T2R_PRELOAD", ""), help="comma-separated dataset names to load at start (or 'all')")
     a = ap.parse_args()
     globals()["DEFAULT_MODEL"] = a.model
+    if a.preload:
+        want = None if a.preload == "all" else {x.strip() for x in a.preload.split(",") if x.strip()}
+        for d in _datasets():
+            if want is None or d["name"] in want:
+                ensure_loaded(d["path"], d["name"], d.get("description") or "")
+                print("preloading", d["name"], flush=True)
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     print(f"text2answer demo on http://{a.host}:{a.port}  (model {a.model})", flush=True)
     srv.serve_forever()
