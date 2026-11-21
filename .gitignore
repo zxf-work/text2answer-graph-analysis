@@ -9,3 +9,5 @@ prototype/demo/uploads/
 prototype/demo/dist/
 prototype/demo/*.log
 prototype/.cache/
+logs/
+prototype/runs/*/*/*/raw/

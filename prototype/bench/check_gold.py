@@ -1,9 +1,10 @@
 """Cross-check a subset of igraph ground truth against NetworkX."""
-import json, networkx as nx, time
+import os, json, networkx as nx, time
 Q = {q["id"]: q for q in json.load(open("bench/questions.json"))}
-fb = nx.read_edgelist("/home/user/GraphProfile/Graph Data/facebook_combined.txt", nodetype=str)
-en = nx.read_edgelist("/home/user/GraphProfile/Graph Data/enron.txt", nodetype=str)
-ep = nx.read_edgelist("/home/user/GraphProfile/Graph Data/epinions.txt", nodetype=str, create_using=nx.DiGraph)
+DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+fb = nx.read_edgelist(os.path.join(DATA, "facebook_combined.txt"), nodetype=str)
+en = nx.read_edgelist(os.path.join(DATA, "enron.txt"), nodetype=str)
+ep = nx.read_edgelist(os.path.join(DATA, "epinions.txt"), nodetype=str, create_using=nx.DiGraph)
 lm = nx.les_miserables_graph()
 def rep(qid, nxv):
     g = Q[qid]["checker"]; print(qid, "gold", g.get("value", g.get("facts", g.get("length"))), "| nx", nxv)
