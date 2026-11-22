@@ -1,0 +1,26 @@
+{
+ "variant": "full",
+ "model": "claude-haiku-5-5",
+ "turns": 82,
+ "sessions": 14,
+ "answer_accuracy": 0.9878,
+ "follow_up_accuracy": 0.9787,
+ "follow_up_turns": 47,
+ "ambiguous_turns": 9,
+ "ambiguous_handled": 9,
+ "ambiguous_correct": 9,
+ "silent_other_reading": 0,
+ "needless_questions": 0,
+ "errors": 1,
+ "share_steps_reused": 0.2577,
+ "execute_seconds": 3.18,
+ "seconds_saved": 1.82,
+ "wall_seconds": 313.4,
+ "llm_calls": 82,
+ "tokens_in": 668279,
+ "tokens_out": 69525,
+ "cost_usd": 0.1016,
+ "wrong_turns": [
+  "pokec_trenciansky/attributes t4 (drill)"
+ ]
+}

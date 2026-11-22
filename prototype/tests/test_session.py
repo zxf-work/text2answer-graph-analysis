@@ -186,3 +186,77 @@ def test_selection_of_a_count_is_the_set_that_was_counted(path):
     s.ask("top 3", llm); s.ask("how many in eng", llm); s.ask("anything", llm)
     sel = json.loads(llm.seen[2].split("SESSION STATE:\n")[1].split("\n\nGraph file")[0])["current_selection"]
     assert sel["from_turn"] == 2 and sel["op"] == "filter_by_attribute" and sel["count"] == 4
+
+
+# ------------------------------------------------------------------------------------- changes during a session
+def _bump(p):
+    """Make sure the modification time moves even on a coarse clock."""
+    st = os.stat(p)
+    os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns + 2_000_000_000))
+
+
+def test_edge_file_changed_between_turns_is_recomputed_and_reported(path):
+    s = Session(path)
+    llm = Scripted([T1, T1, T1])
+    t1 = s.ask("top 3", llm)
+    with open(path, "a") as f:
+        f.write("".join(f"{n},{EDGES[0][0]}\n" for n in list(DEPT)[:6]))     # new links change the ranking input
+    _bump(path)
+    t2 = s.ask("top 3 again", llm)
+    assert t2["steps_reused"] == 0 and any(f["check"] == "data_changed" for f in t2["reuse_findings"])
+    assert s.data_changes[0]["changed"] == ["edge file"] and s.data_changes[0]["edges"][1] > s.data_changes[0]["edges"][0]
+    assert [r["value"] for r in t2["answer"]] != [r["value"] for r in t1["answer"]]
+    t3 = s.ask("and again", llm)                                              # nothing changed since: reuse is valid again
+    assert t3["outcome"] == "exact reuse" and not any(f["check"] == "data_changed" for f in t3["reuse_findings"])
+
+
+def test_node_table_changed_between_turns(path):
+    s = Session(path)
+    q = P([ENG, ("n", "set_size", {"nodes": "eng"})], "n")
+    llm = Scripted([q, q])
+    n1 = s.ask("how many in eng", llm)["answer"]
+    t = path.replace(".csv", ".nodes.csv")
+    rows = open(t).read().splitlines()
+    i = next(k for k, r in enumerate(rows) if r.split(",")[1] == "eng")
+    rows[i] = rows[i].replace(",eng,", ",ops,")
+    open(t, "w").write("\n".join(rows) + "\n"); _bump(t)
+    t2 = s.ask("how many in eng", llm)
+    assert t2["answer"] == n1 - 1 and t2["steps_reused"] == 0 and s.data_changes[0]["changed"] == ["node table"]
+
+
+def test_reading_change_holds_until_changed_back(path):
+    und = {**T1, "interpretation": {"directed": False, "measure": "pagerank"}}
+    s = Session(path)
+    llm = Scripted([T1, und, und, T1])
+    a = s.ask("top 3", llm)
+    b = s.ask("treat links as mutual from now on: top 3", llm)
+    assert b["steps_reused"] == 0 and s.semantics["directed"] is False
+    c = s.ask("top 3 again", llm)
+    assert c["outcome"] == "exact reuse" and c["answer"] == b["answer"]
+    d = s.ask("back to directed: top 3", llm)                                 # the first result is valid again
+    assert d["outcome"] == "exact reuse" and d["answer"] == a["answer"] and d["trace"][0]["from_turn"] == 1
+
+
+def test_standing_setting_is_written_into_later_plans(path):
+    s = Session(path)
+    set9 = {**P([("pr", "pagerank", {"damping": 0.5}), TOP(3)], "top"), "set_standing": {"pagerank.damping": 0.5}}
+    llm = Scripted([T1, set9, T2, P([("pr", "pagerank", {"damping": 0.85}), TOP(3)], "top")])
+    a = s.ask("top 3", llm)
+    b = s.ask("use damping 0.5 from now on: top 3", llm)
+    assert s.standing == {"pagerank.damping": 0.5} and b["steps_reused"] == 0
+    c = s.ask("which dept are they in", llm)                                  # the planner forgot the setting: the engine writes it in
+    assert c["plan"]["steps"][0]["args"] == {"damping": 0.5} and [t["cached"] for t in c["trace"]] == [True, True, False]
+    assert any(f["check"] == "standing_setting_applied" for f in c["reuse_findings"])
+    d = s.ask("top 3", llm)                                                   # an explicit other value is kept, and flagged
+    assert any(f["check"] == "standing_setting_overridden" for f in d["reuse_findings"]) and d["answer"] == a["answer"]
+    assert "standing_settings" in json.loads(llm.seen[-1].split("SESSION STATE:\n")[1].split("\n\nGraph file")[0])
+
+
+def test_remove_nodes_leaves_the_base_graph_alone(path):
+    s = Session(path)
+    cut = P([PR, ("top", "top_k", {"map": "pr", "k": 2}), ("g", "remove_nodes", {"nodes": "top"}), ("n", "node_count", {"graph": "g"})], "n")
+    whole = P([("n", "node_count", {})], "n")
+    llm = Scripted([whole, cut, whole])
+    n = s.ask("how many nodes", llm)["answer"]
+    assert s.ask("without the top 2: how many nodes", llm)["answer"] == n - 2
+    assert s.ask("on the full network: how many nodes", llm)["answer"] == n

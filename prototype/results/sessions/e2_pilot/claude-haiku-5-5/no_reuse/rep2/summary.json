@@ -3,8 +3,8 @@
  "model": "claude-haiku-5-5",
  "turns": 82,
  "sessions": 14,
- "answer_accuracy": 0.939,
- "follow_up_accuracy": 0.9149,
+ "answer_accuracy": 0.9512,
+ "follow_up_accuracy": 0.9362,
  "follow_up_turns": 47,
  "ambiguous_turns": 9,
  "ambiguous_handled": 9,
@@ -22,9 +22,9 @@
  "cost_usd": 0.1027,
  "wrong_turns": [
   "pokec_bratislavsky/attributes t4 (drill)",
-  "pokec_trenciansky/attributes t4 (drill)",
   "pokec_trenciansky/attributes t5 (new)",
   "pokec_trenciansky/attributes t6 (drill)",
   "pokec_trnavsky/attributes t4 (drill)"
- ]
+ ],
+ "rescored": true
 }

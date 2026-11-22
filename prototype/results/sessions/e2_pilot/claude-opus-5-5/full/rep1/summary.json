@@ -20,5 +20,6 @@
  "tokens_in": 668995,
  "tokens_out": 49635,
  "cost_usd": 3.6687,
- "wrong_turns": []
+ "wrong_turns": [],
+ "rescored": true
 }

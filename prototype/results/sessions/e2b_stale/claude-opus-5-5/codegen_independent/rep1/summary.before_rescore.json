@@ -1,0 +1,69 @@
+{
+ "variant": "codegen_independent",
+ "model": "claude-opus-5-5",
+ "sessions": 22,
+ "turns": 122,
+ "answer_accuracy": 0.959,
+ "trap_turns": 47,
+ "trap_correct": 45,
+ "trap_stale": 0,
+ "trap_other_wrong": 2,
+ "void_trap_turns": 3,
+ "by_class": {
+  "R1": {
+   "turns": 10,
+   "correct": 10,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R2": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R3": {
+   "turns": 9,
+   "correct": 9,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R4": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R5": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R6": {
+   "turns": 10,
+   "correct": 8,
+   "stale": 0,
+   "other_wrong": 2
+  }
+ },
+ "valid_turns": 22,
+ "valid_correct": 21,
+ "valid_execute_seconds": 33.68,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 191.29,
+ "wall_seconds": 918.8,
+ "errors": 0,
+ "llm_calls": 123,
+ "tokens_in": 450683,
+ "tokens_out": 84490,
+ "cost_usd": 3.4925,
+ "stale_turns": [],
+ "wrong_turns": [
+  "pokec_trenciansky/cut t1 (new)",
+  "pokec_trenciansky/cut t2 (new)",
+  "pokec_trenciansky/cut t3 (R6)",
+  "pokec_trenciansky/cut t4 (R6)",
+  "pokec_trenciansky/cut t5 (valid)"
+ ]
+}

@@ -108,6 +108,39 @@ def sessions(spec):
 
 
 # ------------------------------------------------------------------------------------------------------ scoring
+def alternative_golds(turn, lg, path=None):
+    """Other answers that are also correct, because the question does not settle a convention the gold plan had to pick:
+    - PageRank on a weighted graph may use the weights (the operator catalogue has no weighted PageRank);
+    - a count or mean over a node attribute may be taken over the node table, which also lists users with no links,
+      rather than over the nodes of the graph;
+    - the degeneracy of a directed graph may be taken on the undirected simple graph (the textbook definition)
+      rather than on in-degree plus out-degree."""
+    g = lg.g
+    steps = next(iter(turn["gold"].values())).steps
+    ops = [s.op for s in steps]
+    if turn["expect"] == "ranking" and ops == ["pagerank", "top_k"] and "weight" in g.es.attributes():
+        pr = g.pagerank(weights="weight", directed=g.is_directed())
+        order = sorted(range(g.vcount()), key=lambda i: (-pr[i], lg.labels[i]))[:int(steps[-1].args["k"])]
+        return [{"nodes": [lg.labels[i] for i in order], "values": [pr[i] for i in order]}]
+    if ops == ["max_core"] and g.is_directed():
+        core = g.as_undirected(mode="collapse").simplify().coreness()
+        k = max(core)
+        return [k if turn["field"] == "k" else sum(c == k for c in core)]
+    from t2r.graphs import sidecar_node_table
+    table = sidecar_node_table(path) if path else None
+    if table:
+        import pandas as pd
+        df = pd.read_csv(table, sep="\t", dtype=str)
+        if ops == ["filter_by_attribute", "set_size"]:
+            return [int((df[steps[0].args["attribute"]] == str(steps[0].args["value"])).sum())]
+        if ops == ["group_by_attribute"] and turn.get("field") == "count":
+            return [[int(v) for v in df.groupby(steps[0].args["attribute"]).size()]]
+        if ops == ["attribute_map", "group_by_attribute"] and turn.get("field") == "mean":
+            v = pd.to_numeric(df[steps[0].args["attribute"]], errors="coerce")
+            return [[float(x) for x in v.groupby(df[steps[1].args["attribute"]]).mean()]]
+    return []
+
+
 def gold_value(expect, val, turn):
     f = turn.get("field")
     if expect in ("ranking", "node"):
@@ -124,12 +157,12 @@ def gold_value(expect, val, turn):
     raise ValueError(expect)
 
 
-def _close(a, b):
+def _close(a, b, tol=1e-6):
     try:
         a, b = float(a), float(b)
     except (TypeError, ValueError):
         return False
-    return abs(a - b) <= 1e-6 * max(1.0, abs(a), abs(b))
+    return abs(a - b) <= tol * max(1.0, abs(a), abs(b))
 
 
 def _walk(x):
@@ -145,6 +178,8 @@ def _walk(x):
 def _rank_lists(ans):
     """Every ordered list of nodes found in the answer, with values when given."""
     for x in _walk(ans):
+        if isinstance(x, dict) and len(x) >= 2 and all(isinstance(v, (str, int, float)) for v in x.values()):
+            yield [str(k) for k in x], None   # {node: something} in rank order
         if isinstance(x, list) and x:
             if all(isinstance(r, dict) and "node" in r for r in x):
                 yield [str(r["node"]) for r in x], [r.get("value") for r in x]
@@ -170,23 +205,38 @@ def matches(expect, gold, ans) -> bool:
                 uniq = [i for i, v in enumerate(gold["values"]) if sum(_close(v, w) for w in gold["values"]) == 1 and i < k - 1]
                 if all(nodes[i] == gold["nodes"][i] for i in uniq):
                     return True
+        if expect == "node":  # a bare node id, as free-form systems give it
+            flat = ans.get("answer", ans) if isinstance(ans, dict) and "node" not in ans else ans
+            if isinstance(flat, (str, int)) and not isinstance(flat, bool) and str(flat) == gold["nodes"][0]:
+                return True
         return False
     if expect == "scalar":
         return any(_close(x, gold) for x in _walk(ans) if isinstance(x, (int, float, str)) and not isinstance(x, bool))
     if expect == "numbers":
         nums = [x for x in _walk(ans) if isinstance(x, (int, float)) and not isinstance(x, bool)]
-        return all(any(_close(x, g) for x in nums) for g in gold)
+        return all(any(_close(x, g, 1e-4) for x in nums) for g in gold)   # answers may be rounded to a few decimals
     if expect == "map":
         got = {}
         for x in _walk(ans):
             if isinstance(x, dict) and "node" in x and "value" in x:
                 got.setdefault(str(x["node"]), set()).add(str(x["value"]))
+            elif isinstance(x, dict):  # {node: value}, or a row with the node id under any key
+                vals = {str(v) for v in x.values() if isinstance(v, (str, int, float))}
+                for k, v in x.items():
+                    if isinstance(v, (str, int, float)):
+                        got.setdefault(str(k), set()).add(str(v))
+                        got.setdefault(str(v), set()).update(vals)
         return all(str(v) in got.get(n, ()) for n, v in gold.items())
     if expect == "groups":
+        want = [str(g) for g in gold]
         for x in _walk(ans):
+            if isinstance(x, dict) and len(x) >= len(gold) and list(map(str, x))[:len(gold)] == want:  # {group: total} in order
+                return True
             if isinstance(x, list) and len(x) >= len(gold):
-                names = [str(r.get("value")) if isinstance(r, dict) else str(r) for r in x[:len(gold)]]
-                if names == [str(g) for g in gold]:
+                head = x[:len(gold)]
+                if [str(r.get("value")) if isinstance(r, dict) else str(r) for r in head] == want:
                     return True
+                if all(isinstance(r, (dict, list)) for r in head) and all(w in {str(v) for v in (r.values() if isinstance(r, dict) else r)} for r, w in zip(head, want)):
+                    return True  # rows naming the group under any key, or [group, total] pairs
         return False
     return False

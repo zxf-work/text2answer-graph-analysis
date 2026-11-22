@@ -77,7 +77,7 @@ Read from `t2r/ir.py`, `t2r/ops.py`, `t2r/systems.py`, `demo/server.py` on 2026-
 | Session state, follow-up references ("them", "instead") | **built 2026-11-22** (`t2r/session.py`): the planner sees the profile card and a compact state record (accepted semantics, earlier plans with result sizes, current selection, chosen reading), never the chat history or raw values |
 | Plan patches | **first version built**: the planner returns a complete plan that copies earlier steps and labels its intent and patch type; unchanged steps are reused through their lineage keys. The engine does not yet derive the patch type itself |
 | Reuse decision, reuse checks | **first version built**: operators marked scope-sensitive; scope-ambiguity rule with the second contract produced by a mechanical plan rewrite (both directions); a chosen reading is carried to later turns; a claimed "explicit" reading must quote the question; changed semantics reported; outcome per turn is exact reuse, partial reuse, recompute or clarify. **Not built:** the truncated-list rule (unneeded so far, since rankings are always re-taken from the full score map) |
-| Self-reviewing or stateful code-generation baselines | **absent** |
+| Stateful and independent code-generation session agents | built Nov 22 (3.8); self-reviewing variant for single questions absent |
 | Code-generation fallback inside the scaffold | decided in experiment 2; implementation not confirmed |
 
 ### 3.3 Cluster setup and first run (done 2026-11-21)
@@ -197,8 +197,93 @@ reading. Second repetition (after the selection fix), one run each:
 - Defects found and fixed, each with a test: "among them" after a count resolved to an older ranking (the session
   record now tracks the set a count was taken over); approximate closeness ran one search per node; the cost model
   failed when `k` was a reference to an earlier step.
-- Missing: the two code-generation systems of the E2 design, repetitions, and a second annotator for the gold
-  readings.
+- Missing: repetitions and a second annotator for the gold readings. The code-generation systems are in 3.8.
+
+### 3.8 E2 pilot: code-generation agents on the same sessions (2026-11-22)
+
+`bench/sessions/run_codegen_sessions.py`, `rescore.py`. Two agents, both given the conversation so far (questions,
+their own code, printed output), the file facts and the head of the node table, with one repair attempt:
+**stateful** runs each turn as a cell in one Python process per session, so earlier variables stay available;
+**independent** runs each turn as a complete script in a new process. One run each.
+
+| system | model | answers correct | follow-ups correct | ambiguous turns: asked / correct | execution time | cost |
+|---|---|---|---|---|---|---|
+| GraphAudit full | Opus | 100% | 100% | 6 of 6 asked / 9 of 9 | 2.9 s | $3.67 |
+| code generation, stateful | Opus | 100% | 100% | 0 of 6 asked / 9 of 9 | 17.5 s | $1.64 |
+| code generation, independent | Opus | 100% | 100% | 0 of 6 asked / 9 of 9 | 96.5 s | $2.20 |
+| GraphAudit full | Haiku | 98.8% | 97.9% | 6 of 6 asked / 9 of 9 | 3.2 s | $0.10 |
+| code generation, stateful | Haiku | 98.8% | 100% | 0 of 6 asked / 9 of 9 | 65.3 s | $0.06 |
+| code generation, independent | Haiku | 95.1% | 91.5% | 1 of 6 asked / 7 of 9 | 125.6 s | $0.08 |
+
+(Three of the nine ambiguous turns repeat a choice the user already made, so six are the ones where asking is
+expected.)
+
+- **This workload does not separate GraphAudit from a code-generation agent on accuracy.** With Opus all three are
+  at 100%; with Haiku the stateful agent equals GraphAudit.
+- **The agents never ask, and still pick the annotated reading.** The wording of our ambiguous turns ("within
+  district X", "among them") leads the model to the reading we annotated as the user's. So "silent other reading" is
+  0 for them, and the 6 silent wrong readings of our own "without the scope rule" variant are a weakness of our
+  planner prompt, not evidence against code generation. What GraphAudit adds on these turns is that the reading is
+  shown and chosen, not that the answer is more often right.
+- **A notebook agent reuses too.** The stateful agent's follow-up turns cost 2.0 s of execution in total with Opus
+  (35.8 s with Haiku) against 59 s for the independent one. Reuse by keeping variables works when the model
+  chooses the right variable; E1 is where wrong reuse is tested, and it has no code-generation counterpart yet.
+- GraphAudit executes faster (about 3 s against 17 to 126 s), but all of these are small next to model time.
+- **Scoring was widened after the first look, for every system** (earlier runs rescored; the summaries before
+  rescoring are kept as `summary.before_rescore.json`). The first scoring gave the agents 80 to 85% because the gold
+  plans fixed conventions the questions do not settle. Now also accepted: PageRank using the weights on the trust
+  graph; counts and means over the node table (which lists about 10k users per region who have no links) instead of
+  over graph nodes; degeneracy on the undirected simple graph (36 on Trnava) instead of on in- plus out-degree (58);
+  means rounded to four decimals; free-form answer shapes. GraphAudit's numbers moved only for "without reuse"
+  (93.9% to 95.1%).
+- **Three of those conventions are GraphAudit's own unstated choices** and should be surfaced or changed: it drops
+  users with no links from attribute counts without saying so; its degeneracy on a directed graph is not the textbook
+  one; it has no weighted PageRank.
+- **Consequence for the paper:** the claim cannot be "more accurate than code generation on follow-ups". The
+  supportable claims are (a) wrong reuse is excluded by construction (E1), (b) the reading and what is reused are
+  shown and auditable, (c) execution cost on large graphs (E4, not yet run). A fair test of (a) against a notebook
+  agent needs sessions where reusing a variable is wrong: the graph reading changes, the file or node table changes
+  between turns, a seed or approximation changes. That is the next experiment to design.
+
+### 3.9 E2b: sessions where reusing an earlier result is wrong (2026-11-22)
+
+Design in section 5 (E2b). `bench/sessions/workload_stale.py`, `run_stale.py`; summaries in
+`prototype/results/sessions/e2b_stale/`. 22 sessions, 122 turns: 47 trap turns (3 more were void because the stale
+and the correct answer coincide) and 22 valid-reuse turns. Each session runs on its own copy of the files; events
+rewrite the copy between turns. One run each.
+
+| system | model | trap turns correct | stale answers | otherwise wrong | valid-reuse correct | execution | cost |
+|---|---|---|---|---|---|---|---|
+| GraphAudit | Opus | 47 / 47 | 0 | 0 | 22 / 22 | 7.9 s | $5.86 |
+| GraphAudit | Haiku | 47 / 47 | 0 | 0 | 22 / 22 | 7.9 s | $0.16 |
+| stateful agent | Opus | 42 / 47 | **5** | 0 | 22 / 22 | 49.9 s | $2.38 |
+| stateful agent | Haiku | 45 / 47 | **2** | 0 | 22 / 22 | 104.6 s | $0.10 |
+| stateful agent, warned | Opus | 47 / 47 | 0 | 0 | 22 / 22 | 103.9 s | $3.06 |
+| stateful agent, warned | Haiku | 46 / 47 | 0 | 1 | 22 / 22 | 157.5 s | $0.11 |
+| independent agent | Opus | 46 / 47 | 0 | 1 | 22 / 22 | 191.3 s | $3.49 |
+| independent agent | Haiku | 47 / 47 | 0 | 0 | 21 / 22 | 212.2 s | $0.12 |
+
+Stale answers by class (stateful agent, not warned): R1 reading changed 0/10; R2 data changed, announced 0/6;
+**R3 data changed, not announced: Opus 5/9, Haiku 2/9**; R4 name reused 0/6; R5 upstream parameter 0/6; R6 graph cut
+0/10.
+
+- **Only the unannounced data change separates the systems.** On the five classes where the user says what changed,
+  no agent gave a stale answer. The decision rule of the design applies: reuse is a supporting row, not the title.
+- **The stronger model is the one that goes stale.** Opus keeps the graph in memory and reuses it; Haiku re-reads
+  the file in most cells and so is rarely caught.
+- **One sentence of warning removes the stale answers**, at about twice the execution time (Opus 50 s to 104 s),
+  because the warned agent reloads. The independent agent pays about four times.
+- **GraphAudit**: no stale answer, 90% of steps reused on the valid-reuse turns, 8 s of execution in total, and each
+  change is reported in the turn (`data_changed`, `semantics_changed`). It costs about twice the stateful agent in
+  model calls (the profile card and catalogue are sent every turn).
+- Limits: one run; templated sessions over three regions of one dataset plus two small graphs; execution times are
+  all small at this graph size; the R3 events are large (6000 new links to two users), chosen so the correct
+  answer visibly changes.
+- Scoring: answers that count users without links (from the node table) as nodes and as single-node components are
+  accepted for every system; all eight runs were rescored (`summary.before_rescore.json` kept).
+- Not built: the randomness class (R7) and the two sessions on full Pokec that would show the price of reloading.
+- Infrastructure: the first two attempts died on the home-directory quota (the per-copy graph caches); caches of
+  throwaway copies now go to node scratch and the project lives under `/project/xzhang12` (200 GB limit).
 
 ## 4. Where things run
 
@@ -298,6 +383,80 @@ answer changes, how often the checks flag it, and the flag rate on valid reuses.
   precision; share of work reused; execution, planning and wall time; input, output and billed tokens with prompt
   caching on for every system; clarification turns.
 
+### E2b. Sessions where reusing an earlier result is wrong (designed 2026-11-22; built and run the same day, results in 3.9)
+
+Why: the E2 pilot (3.8) does not separate GraphAudit from a notebook-style code-generation agent, because nothing
+in those sessions punishes keeping a variable. These sessions do. Each has turns where an earlier result looks
+reusable but is not (**trap turns**) and turns where it is (**valid-reuse turns**), so both stale answers and
+needless recomputation are measured.
+
+**Six trap classes.** Each is something that happens in ordinary analysis sessions, and each matches an ingredient
+of the lineage key tested in E1.
+
+| class | what happens in the session | what goes stale | key ingredient |
+|---|---|---|---|
+| R1 reading changed | "Treat friendships as mutual from now on" / "ignore the trust strengths" / "count repeated emails once", then a follow-up or "again" | every measure computed under the old reading | graph reading |
+| R2 data changed, announced | "I appended this week's friendships to the file" (the harness rewrites the file), then "who is top now?" | the graph in memory and everything derived | content hash |
+| R3 data changed, unannounced | the harness rewrites the edge file or node table between turns; the user only asks the next question | same | content hash, node table |
+| R4 name shadowing | a ranking for one group, then the same request for another group, then "the first group's top 10 again" or "the overall top 10 again" | a variable or step name that now holds the other group's result | input lineage |
+| R5 upstream change | "use damping 0.9 from now on" or "that estimate used 100 samples, use 1000", then a question about a result derived from the old one (which districts, how many are male) | the derived result | input lineage |
+| R6 base altered | "remove the 5 best-connected users: how many components now?", then "on the full network, ..." | the base graph, if it was edited in place | input lineage |
+
+One more, scored as consistency and not as a trap: **R7 randomness**. "How many communities?" then "how large is
+the biggest?" must describe the same partition. An agent that recomputes with another seed gives two answers that
+cannot both hold.
+
+**Session shape.** 6 to 8 turns: two or three ordinary turns to build state, one event, one or two trap turns, one
+valid-reuse turn (for R1: "back to directed: the top 10 again", where the first result is valid again), one
+unrelated turn. About 14 sessions and 100 turns over the three Pokec regions, trust, emails and roads; about 30 trap
+turns and 20 valid-reuse turns. Two sessions run on full Pokec (1.6M nodes, 30M edges) so that reloading has a
+visible price.
+
+**Scoring.** Gold is the gold plan run on the graph as it is at that turn (file version and reading). For each
+trap turn the stale answer is also computed, as for the two scope readings, so every answer is one of: correct,
+**stale** (equals what the outdated state gives), or otherwise wrong. Reported per class: stale rate, correct rate;
+on valid-reuse turns: correct rate, execution time, and whether work was redone. Trap turns where the stale and the
+correct answer happen to coincide are dropped before any system is run.
+
+**Systems.**
+
+| system | note |
+|---|---|
+| GraphAudit full | as in E2 |
+| code generation, stateful | prompt reworded to be neutral: the sentence "do not reload the file if the graph is already in memory" is removed |
+| code generation, stateful, warned | adds one sentence: the file may change between turns and earlier variables may be out of date; check before reusing |
+| code generation, independent | recomputes everything: cannot be stale except through the conversation text; the cost ceiling |
+
+The warned agent is the strong competitor. If it stays correct by reloading and recomputing every turn, the result
+is a price (execution time, largest on full Pokec), not an error rate, and that is what gets reported.
+
+**Fairness rules, fixed before any run.**
+- Sessions, wording and gold are written and frozen first; no rewording after seeing a system's answers. A pilot
+  on one session per class checks only that the harness works.
+- R3 is reported separately from the rest and described for what it is: no agent is told anything changed.
+- Stale-answer counts are reported for GraphAudit too, with every failure listed.
+- Three repetitions; Opus and Haiku.
+
+**What GraphAudit needed first** (all built on 2026-11-22 with tests; the reading change already worked through the plan's interpretation):
+- The session keeps the loaded graph and does not look at the file again, so R2 and R3 would be served stale
+  today. It needs a cheap per-turn check (size and modification time, then the hash) that drops the loaded graph.
+- A reading change stated in words has to reach the load override; today the override is set only by the
+  accept-semantics call. The planner needs a way to return it.
+- R6 needs "all nodes except these" as a set (set_difference against the node set) feeding `induced_subgraph`;
+  to confirm the planner finds it.
+- R5 needs damping and sample count as planner-visible arguments (they are) and "from now on" kept in the session
+  state as a standing setting (it is not).
+
+**What the outcome decides** (by Dec 13, with the title decision):
+- Stateful agents give stale answers on announced classes (R1, R2, R4 to R6) and GraphAudit does not: reuse goes in
+  the title, with this table.
+- Only R3 separates them, or only the unwarned agent fails: the claim is the guarantee and the audit record (E1 plus
+  the demo), and this table is one supporting row.
+- Nothing separates them: drop the comparison, keep E1, and make the paper about the auditable contract.
+
+Estimated effort: 2 days for the GraphAudit prerequisites, 2 days for workload and harness, about $40 of model
+calls for three repetitions.
+
 ### E3. Silent failures on single questions, against a fair code-generation ladder
 
 - Ladder: bare code generation (exists as `codegen_nofacts`); grounded (exists as `codegen`); grounded with
@@ -365,9 +524,9 @@ against the server.
 | Intent classes and four plan-patch types | first version Nov 22; engine-side derivation of the patch type open | Dec 8 |
 | Reuse checks and the three-outcome decision | first version Nov 22; reference ambiguity ("again") open | Dec 8 |
 | Self-reviewing code-generation baseline; silent-failure column in the scorer | 2 days | Dec 3 |
-| Stateful code-generation agent baseline | 3 days | Dec 8 |
+| Stateful code-generation agent baseline | built Nov 22, pilot in 3.8 | Dec 8 |
 | Reuse fault-injection harness (E1) | done Nov 22, first run in 3.6 | Dec 10 |
-| Session workload, annotated (E2) | first version Nov 22 (14 sessions, 82 turns), pilot in 3.7; code-generation systems missing | Dec 10 |
+| Session workload, annotated (E2) | first version Nov 22 (14 sessions, 82 turns), pilot in 3.7; code-generation agents in 3.8; needs sessions where reuse is wrong | Dec 10 |
 | UI: session view (timeline, reused-versus-executed plan, savings, two-contract chooser, audit record, plan editing) | built Nov 22; replay checked in the browser, live endpoints checked by script | Dec 20 |
 | Hybrid fallback: confirm or build | 2 days | Dec 13 |
 | Audit record export | 1 day | if time allows |

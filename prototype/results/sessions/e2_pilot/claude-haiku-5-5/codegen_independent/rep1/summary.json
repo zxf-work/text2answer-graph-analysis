@@ -1,0 +1,33 @@
+{
+ "variant": "codegen_independent",
+ "model": "claude-haiku-5-5",
+ "turns": 82,
+ "sessions": 14,
+ "answer_accuracy": 0.9512,
+ "follow_up_accuracy": 0.9149,
+ "follow_up_turns": 47,
+ "ambiguous_turns": 9,
+ "ambiguous_handled": 3,
+ "ambiguous_correct": 7,
+ "silent_other_reading": 0,
+ "needless_questions": 0,
+ "errors": 0,
+ "share_steps_reused": 0.0,
+ "execute_seconds": 125.57,
+ "seconds_saved": 0,
+ "wall_seconds": 456.3,
+ "llm_calls": 90,
+ "tokens_in": 338228,
+ "tokens_out": 87584,
+ "cost_usd": 0.0776,
+ "wrong_turns": [
+  "pokec_trenciansky/influence t3 (param)",
+  "pokec_trnavsky/influence t3 (param)",
+  "pokec_trnavsky/influence t4 (scope)",
+  "pokec_trnavsky/influence t5 (scope)"
+ ],
+ "repaired_turns": 7,
+ "restarted_turns": 0,
+ "follow_up_execute_seconds": 68.57,
+ "rescored": true
+}

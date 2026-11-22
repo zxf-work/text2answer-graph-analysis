@@ -595,6 +595,13 @@ def induced_subgraph(ctx, nodes, graph="G"):
     return g.induced_subgraph(idx)
 
 
+@op("remove_nodes", "The graph without the nodes of a NodeSet (and without their edges). The input graph is not changed.", {"graph": "Graph", "nodes": "NodeSet"}, "Graph", "O(n+m)")
+def remove_nodes(ctx, nodes, graph="G"):
+    g = _graph(ctx, graph)
+    drop = {_vid(ctx, g, x) for x in _nodeset(ctx, nodes)}
+    return g.induced_subgraph([i for i in range(g.vcount()) if i not in drop])
+
+
 @op("top_k", "Top-k entries of a NodeMap by value (descending). Returns ordered list of {node, value}.",
     {"map": "NodeMap", "k": "int", "ascending": "bool"}, "Table", "O(n log n)")
 def top_k(ctx, map, k=10, ascending=False):

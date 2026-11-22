@@ -1,0 +1,30 @@
+{
+ "variant": "codegen_stateful",
+ "model": "claude-haiku-5-5",
+ "turns": 82,
+ "sessions": 14,
+ "answer_accuracy": 0.9878,
+ "follow_up_accuracy": 1.0,
+ "follow_up_turns": 47,
+ "ambiguous_turns": 9,
+ "ambiguous_handled": 3,
+ "ambiguous_correct": 9,
+ "silent_other_reading": 0,
+ "needless_questions": 0,
+ "errors": 0,
+ "share_steps_reused": 0.0,
+ "execute_seconds": 65.33,
+ "seconds_saved": 0,
+ "wall_seconds": 331.3,
+ "llm_calls": 86,
+ "tokens_in": 298162,
+ "tokens_out": 65434,
+ "cost_usd": 0.0625,
+ "wrong_turns": [
+  "pokec_trenciansky/attributes t2 (new)"
+ ],
+ "repaired_turns": 4,
+ "restarted_turns": 0,
+ "follow_up_execute_seconds": 35.75,
+ "rescored": true
+}

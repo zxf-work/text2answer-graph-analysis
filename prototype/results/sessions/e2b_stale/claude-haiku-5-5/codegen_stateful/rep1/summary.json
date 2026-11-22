@@ -1,0 +1,69 @@
+{
+ "variant": "codegen_stateful",
+ "model": "claude-haiku-5-5",
+ "sessions": 22,
+ "turns": 122,
+ "answer_accuracy": 0.9672,
+ "trap_turns": 47,
+ "trap_correct": 45,
+ "trap_stale": 2,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 3,
+ "by_class": {
+  "R1": {
+   "turns": 10,
+   "correct": 10,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R2": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R3": {
+   "turns": 9,
+   "correct": 7,
+   "stale": 2,
+   "other_wrong": 0
+  },
+  "R4": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R5": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R6": {
+   "turns": 10,
+   "correct": 10,
+   "stale": 0,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 22,
+ "valid_correct": 22,
+ "valid_execute_seconds": 7.61,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 104.58,
+ "wall_seconds": 572.7,
+ "errors": 2,
+ "llm_calls": 136,
+ "tokens_in": 454801,
+ "tokens_out": 115827,
+ "cost_usd": 0.1034,
+ "stale_turns": [
+  "pokec_trenciansky/silent t3 (R3)",
+  "pokec_trenciansky/silent t4 (R3)"
+ ],
+ "wrong_turns": [
+  "follows/reading t1 (new)",
+  "follows/cut t1 (new)"
+ ]
+}

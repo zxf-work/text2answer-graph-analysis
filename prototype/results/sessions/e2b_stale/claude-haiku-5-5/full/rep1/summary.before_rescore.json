@@ -1,0 +1,63 @@
+{
+ "variant": "full",
+ "model": "claude-haiku-5-5",
+ "sessions": 22,
+ "turns": 122,
+ "answer_accuracy": 1.0,
+ "trap_turns": 47,
+ "trap_correct": 47,
+ "trap_stale": 0,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 3,
+ "by_class": {
+  "R1": {
+   "turns": 10,
+   "correct": 10,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R2": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R3": {
+   "turns": 9,
+   "correct": 9,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R4": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R5": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  },
+  "R6": {
+   "turns": 10,
+   "correct": 10,
+   "stale": 0,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 22,
+ "valid_correct": 22,
+ "valid_execute_seconds": 0.51,
+ "valid_share_steps_reused": 0.9,
+ "execute_seconds": 7.85,
+ "wall_seconds": 563.6,
+ "errors": 0,
+ "llm_calls": 122,
+ "tokens_in": 1055554,
+ "tokens_out": 100163,
+ "cost_usd": 0.1556,
+ "stale_turns": [],
+ "wrong_turns": []
+}

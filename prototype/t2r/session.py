@@ -23,7 +23,7 @@ from typing import Any, Optional
 import igraph as ig
 from pydantic import Field
 
-from .graphs import LoadedGraph, load_graph, profile_card
+from .graphs import LoadedGraph, load_graph, profile_card, sidecar_node_table
 from .ir import Plan, Step, auto_tier, estimate_cost, execute, extract_answer, plan_keys, step_inputs, step_key, validate, _ref_of
 from .llm import LLM, parse_json
 from .ops import CATALOGUE, catalogue_text
@@ -38,6 +38,7 @@ class TurnPlan(Plan):
     patch: Optional[dict[str, Any]] = None       # {"type": parameter|scope|measure|extend, "what": "..."}
     references: dict[str, Any] = Field(default_factory=dict)   # "them" -> "the 10 users of turn 1"
     scope_reading: Optional[dict[str, Any]] = None             # {"reading": "A"|"B", "explicit": bool, "quote": "..."}
+    set_standing: Optional[dict[str, Any]] = None              # {"pagerank.damping": 0.9}: a setting the user wants from now on
 
 
 SESSION_RULES = """
@@ -45,7 +46,7 @@ SESSION MODE
 This is turn {turn} of an analysis session on one graph. SESSION STATE (below) lists the semantics already accepted, the earlier turns with their plans and result sizes, the current selection, and any reading the user has chosen. You do not see earlier answers in full and you do not need them.
 
 S1. Always return a complete, self-contained plan. To build on an earlier turn, copy its steps unchanged (same op, same args) and add or change only what the new request needs. The engine recognises unchanged steps and reuses their stored results, so copying costs nothing. Never type node ids from an earlier answer into the plan when a step produces them.
-S2. Keep the accepted semantics (directed, weighted, use_weights) unless the user asks to change them.
+S2. Keep the accepted semantics (directed, weighted, use_weights) unless the user asks to change them. When the user asks to read the graph differently ("treat links as mutual", "ignore direction", "ignore the weights", "back to directed"), set interpretation.directed / interpretation.weighted to the new reading: the engine loads the graph that way, the new reading becomes the accepted one for later turns, and nothing computed under another reading is reused. Do not emulate a reading change with operators.
 S3. Resolve references ("they", "those", "among them", "instead", "the same for ...") against SESSION STATE and record each one in "references", e.g. {{"them": "the 10 users returned in turn 1"}}. A pronoun normally refers to current_selection: the nodes of the most recent answer, or, when that answer was a count or a statistic, the node set it was taken over. Obtain those nodes by copying the step named in produced_by_step (and the steps it depends on) from that turn's plan; first_nodes is only a sample.
 S4. Add these fields to the plan JSON:
     "intent": "new" | "patch" | "drill_down" | "ambiguous",
@@ -60,6 +61,8 @@ S5. Restricting a centrality, degree or community measure to a group of nodes ha
     B: compute the measure on the subgraph induced by the group (induced_subgraph, then the measure on it).
     Plan exactly one reading, the one you judge more plausible (never compute the other reading as a variant or as a second answer part: the engine derives it), and add "scope_reading": {{"reading": "A" | "B", "explicit": true | false, "quote": "<the exact words of the question that settle the reading, or empty>"}}.
     Wording such as "within X", "in X", "among X" does not settle it. It is explicit only when the user says which links count or which computation to use (e.g. "using the overall ranking", "counting only links inside the group"). If SESSION STATE records a chosen scope reading, follow it unless the question says otherwise. The engine shows the user both contracts when the reading is not settled: do not set "clarification" for this.
+S6. Standing settings. When the user fixes an operator argument for the rest of the session ("from now on use damping 0.9", "use 1000 samples for estimates from now on"), add "set_standing": {{"<op>.<arg>": <value>, ...}} (e.g. {{"pagerank.damping": 0.9}}; null as the value removes a setting). SESSION STATE lists the standing settings in force: write them into every matching step, including steps copied from earlier turns, unless this question says otherwise.
+S7. If SESSION STATE reports a data change, the file or the node table is not what earlier turns saw. Plan as usual (copy steps as in S1): the engine recomputes whatever depends on the changed data.
 """
 
 SCOPE_NOTE = {
@@ -234,8 +237,63 @@ class Session:
         self._lgs: dict[str, LoadedGraph] = {}
         self._ov: dict[str, bool] = {}            # load override in force (the accepted reading)
         self._ov_of: dict[int, dict] = {}
+        self.standing: dict[str, Any] = {}        # "op.arg" -> value, set by the user for the rest of the session
+        self.data_changes: list[dict[str, Any]] = []
+        self._sig = self._signature()
         self.lg = self._load(None)
         self.card = profile_card(self.lg, with_inference=True)
+
+    # ------------------------------------------------------------------ the data under the session
+    def _signature(self) -> tuple:
+        """Size and modification time of the edge file and the node table: a cheap test for a change between turns."""
+        out = []
+        for p in (self.path, sidecar_node_table(self.path)):
+            if p and os.path.exists(p):
+                st = os.stat(p)
+                out.append((p, st.st_size, st.st_mtime_ns))
+        return tuple(out)
+
+    def _refresh(self) -> None:
+        """Called at the start of every turn. If a file changed, drop the loaded graphs and profile again. Stored results
+        need no clearing: their keys carry the content hashes, so results of the old data can no longer be matched."""
+        sig = self._signature()
+        if sig == self._sig:
+            return
+        old = (self.lg.facts.sha1, (self.lg.g["node_table"]["sha1"] if "node_table" in self.lg.g.attributes() else None), self.lg.g.vcount(), self.lg.g.ecount())
+        self._sig = sig
+        self._lgs.clear(); self._ov_of.clear()
+        self.lg = self._load(self._ov)
+        self.card = profile_card(self.lg, with_inference=True)
+        new = (self.lg.facts.sha1, (self.lg.g["node_table"]["sha1"] if "node_table" in self.lg.g.attributes() else None), self.lg.g.vcount(), self.lg.g.ecount())
+        if new[:2] != old[:2]:
+            what = [w for w, a, b in (("edge file", old[0], new[0]), ("node table", old[1], new[1])) if a != b]
+            self.data_changes.append({"before_turn": len(self.turns) + 1, "changed": what, "nodes": [old[2], new[2]], "edges": [old[3], new[3]]})
+
+    def _standing(self, plan: "TurnPlan") -> list[dict]:
+        """Record settings the plan declares, then write the settings in force into every matching step (rule-based)."""
+        findings = []
+        for k, v in (plan.set_standing or {}).items():
+            op, _, arg = str(k).partition(".")
+            if op not in CATALOGUE or arg not in CATALOGUE[op].params:
+                findings.append({"check": "standing_setting", "ok": False, "severity": "warn", "detail": f"unknown setting {k!r} ignored"})
+            elif v is None:
+                self.standing.pop(k, None)
+            else:
+                self.standing[k] = v
+                findings.append({"check": "standing_setting", "ok": True, "severity": "info", "detail": f"{k} = {v} from this turn on"})
+        declared = set(plan.set_standing or {})
+        for st in plan.steps:
+            for k, v in self.standing.items():
+                op, _, arg = k.partition(".")
+                if st.op != op:
+                    continue
+                if arg not in st.args:
+                    st.args[arg] = v
+                    findings.append({"check": "standing_setting_applied", "ok": True, "severity": "info", "detail": f"step {st.id}: {arg} = {v} (standing setting)"})
+                elif st.args[arg] != v and k not in declared:
+                    findings.append({"check": "standing_setting_overridden", "ok": False, "severity": "warn",
+                                     "detail": f"step {st.id} uses {arg} = {st.args[arg]} although the standing setting is {v}"})
+        return findings
 
     # ------------------------------------------------------------------ graph under a given reading
     def _load(self, override: Optional[dict]) -> LoadedGraph:
@@ -276,6 +334,7 @@ class Session:
                           "answer": t["plan"].get("answer"), "scope_reading": (t["plan"].get("scope_reading") or {}).get("reading")})
         sel = next((t for t in reversed(done) if t.get("selection_info")), None)
         return {"turn": len(self.turns) + 1, "graph": self.name, "accepted_semantics": self.semantics,
+                "standing_settings": self.standing, "data_changes": self.data_changes[-3:],
                 "chosen_scope_reading": self.scope_choice,
                 "current_selection": None if sel is None else {"from_turn": sel["turn"], "produced_by_step": sel["selection_info"]["step"], "op": sel["selection_info"]["op"],
                                                                "args": sel["selection_info"]["args"], "count": sel["selection_info"]["count"], "first_nodes": sel["selection_info"]["nodes"]},
@@ -379,6 +438,7 @@ class Session:
         c0, i0, o0, u0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd
         turn: dict[str, Any] = {"turn": len(self.turns) + 1, "question": question, "outcome": "error"}
         try:
+            self._refresh()
             plan, problems = self._plan(question, llm, self.lg)
             turn.update(self.submit(plan, question, problems=problems, _turn=turn))
             if explain:
@@ -411,7 +471,9 @@ class Session:
             plan = TurnPlan.model_validate(plan)
         turn = _turn if _turn is not None else {"turn": len(self.turns) + 1, "question": question}
         if turn not in self.turns:
+            self._refresh()
             self.turns.append(turn)
+        std_findings = self._standing(plan)
         lg, sem_findings = self._graph_for(plan)
         problems = validate(plan, lg, self.budget_ops) if problems is None else problems
         turn.update({"intent": plan.intent, "based_on": plan.based_on, "patch": plan.patch, "references": plan.references,
@@ -425,7 +487,10 @@ class Session:
             return turn
         turn["tier_notes"] = auto_tier(plan, lg, self.budget_ops)
         checks, pat = self.reuse_checks(plan, question)
-        turn["reuse_findings"] = sem_findings + checks
+        data = [{"check": "data_changed", "ok": False, "severity": "warn",
+                 "detail": f"the {' and '.join(c['changed'])} changed before this turn; results of the earlier data are not reused"}
+                for c in self.data_changes if c["before_turn"] == turn["turn"]]
+        turn["reuse_findings"] = data + std_findings + sem_findings + checks
         if pat is not None and pat.get("apply_choice"):          # the user already chose a reading: rewrite to it, say so
             alt, _ = force_reading(plan, self.scope_choice["reading"])
             if not validate(alt, lg, self.budget_ops):
@@ -490,6 +555,7 @@ class Session:
                 "execute_seconds": tot("execute_seconds"), "seconds_saved": tot("seconds_saved"), "llm_calls": tot("llm_calls"),
                 "tokens_in": tot("tokens_in"), "tokens_out": tot("tokens_out"), "cost_usd": tot("cost_usd"), "stored_results": len(self.store),
                 "accepted_semantics": self.semantics, "scope_choice": self.scope_choice, "reuse": self.reuse,
+                "standing_settings": self.standing, "data_changes": self.data_changes,
                 "outcomes": {o: sum(t.get("outcome") == o for t in self.turns) for o in ("exact reuse", "partial reuse", "recompute", "clarify", "error")}}
 
     def _accept(self, turn: dict, result: dict, lg: LoadedGraph) -> None:

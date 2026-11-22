@@ -37,5 +37,6 @@
   "pokec_trnavsky/influence t3 (param)",
   "pokec_trnavsky/influence t5 (scope)",
   "pokec_trnavsky/degree t4 (scope)"
- ]
+ ],
+ "rescored": true
 }

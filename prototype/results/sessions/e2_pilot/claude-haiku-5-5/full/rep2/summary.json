@@ -22,5 +22,6 @@
  "cost_usd": 0.1016,
  "wrong_turns": [
   "pokec_trenciansky/attributes t4 (drill)"
- ]
+ ],
+ "rescored": true
 }

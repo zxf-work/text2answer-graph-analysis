@@ -27,5 +27,6 @@
   "pokec_trenciansky/influence t5 (scope)",
   "pokec_trnavsky/influence t4 (scope)",
   "pokec_trnavsky/influence t5 (scope)"
- ]
+ ],
+ "rescored": true
 }

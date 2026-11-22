@@ -21,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, ROOT); sys.path.insert(0, HERE)
 os.environ["T2R_GRAPH_CACHE"] = "1"
 from reuse_fault import run as run_plan  # noqa: E402
-from workload import gold_value, matches, sessions  # noqa: E402
+from workload import alternative_golds, gold_value, matches, sessions  # noqa: E402
 from t2r.graphs import load_graph, profile_card  # noqa: E402
 from t2r.ir import validate  # noqa: E402
 from t2r.llm import LLM  # noqa: E402
@@ -46,6 +46,27 @@ def specs(attributed):
         a = profile_card(lg)["node_attributes"]["attributes"]["district"]
         out.append({"name": lg.name, "path": p, "directed": True, "weighted": False, "attr": "district", "values": [t["value"] for t in a["top_values"][:3]], "description": DESC["pokec"]})
     return out
+
+
+def summarise(rows, llm, variant, model, out):
+    n = len(rows) or 1
+    amb = [r for r in rows if r["ambiguous"]]; fol = [r for r in rows if r["kind"] != "new"]
+    steps = sum(r["steps_reused"] + r["steps_executed"] for r in rows) or 1
+    S = {"variant": variant, "model": model, "turns": len(rows), "sessions": len({r["session"] for r in rows}),
+         "answer_accuracy": round(sum(r["correct"] for r in rows) / n, 4),
+         "follow_up_accuracy": round(sum(r["correct"] for r in fol) / (len(fol) or 1), 4), "follow_up_turns": len(fol),
+         "ambiguous_turns": len(amb), "ambiguous_handled": sum(r["decision_ok"] for r in amb), "ambiguous_correct": sum(r["correct"] for r in amb),
+         "silent_other_reading": sum(r["other_reading"] and not r["asked"] for r in amb),
+         "needless_questions": sum(r["asked"] for r in rows if not r["ambiguous"]),
+         "errors": sum(bool(r["error"]) for r in rows),
+         "share_steps_reused": round(sum(r["steps_reused"] for r in rows) / steps, 4),
+         "execute_seconds": round(sum(r["execute_seconds"] for r in rows), 2), "seconds_saved": round(sum(r["seconds_saved"] for r in rows), 2),
+         "wall_seconds": round(sum(r["wall_seconds"] for r in rows), 1), "llm_calls": llm.usage.calls, "tokens_in": llm.usage.input_tokens,
+         "tokens_out": llm.usage.output_tokens, "cost_usd": round(llm.usage.cost_usd, 4),
+         "wrong_turns": [f"{r['session']} t{r['turn']} ({r['kind']})" for r in rows if not r["correct"]]}
+    json.dump(S, open(os.path.join(out, "summary.json"), "w"), indent=1)
+    print(json.dumps(S, indent=1))
+    return S
 
 
 def main():
@@ -83,7 +104,7 @@ def main():
                     idx = next((k for k, c in enumerate(r["contracts"]) if c["reading"] == t.get("user", "B")), 0)
                     r = s.choose(idx)
                 wall = time.time() - t0
-                ok = matches(t["expect"], want, r.get("answer"))
+                ok = any(matches(t["expect"], w, r.get("answer")) for w in [want] + alternative_golds(t, gold_lg, spec["path"]))
                 other = [k for k in golds if ambiguous and k != t["user"]]
                 row = {"session": sess["id"], "graph": spec["name"], "turn": i, "q": t["q"], "kind": t["kind"], "expect": t["expect"], "variant": a.variant, "model": a.model,
                        "ambiguous": ambiguous, "carried": bool(t.get("carried")), "asked": asked, "asked_contracts": asked_contracts,
@@ -99,24 +120,7 @@ def main():
                 log.write(json.dumps({**row, "answer": r.get("answer"), "gold": want, "plan": r.get("plan"), "clarification": r.get("clarification")}, default=str) + "\n"); log.flush()
                 print(f"{sess['id']:<28} t{i} {t['kind']:<8} {'OK ' if ok else 'BAD'} {r.get('outcome'):<14} reused {row['steps_reused']}/{row['steps_reused'] + row['steps_executed']}"
                       f"{' asked' if asked else ''}{' OTHER-READING' if row['other_reading'] else ''} {r.get('error') or ''}"[:230], flush=True)
-    # ------------------------------------------------------------------------------------------------ summary
-    n = len(rows) or 1
-    amb = [r for r in rows if r["ambiguous"]]; fol = [r for r in rows if r["kind"] != "new"]
-    steps = sum(r["steps_reused"] + r["steps_executed"] for r in rows) or 1
-    S = {"variant": a.variant, "model": a.model, "turns": len(rows), "sessions": len({r["session"] for r in rows}),
-         "answer_accuracy": round(sum(r["correct"] for r in rows) / n, 4),
-         "follow_up_accuracy": round(sum(r["correct"] for r in fol) / (len(fol) or 1), 4), "follow_up_turns": len(fol),
-         "ambiguous_turns": len(amb), "ambiguous_handled": sum(r["decision_ok"] for r in amb), "ambiguous_correct": sum(r["correct"] for r in amb),
-         "silent_other_reading": sum(r["other_reading"] and not r["asked"] for r in amb),
-         "needless_questions": sum(r["asked"] for r in rows if not r["ambiguous"]),
-         "errors": sum(bool(r["error"]) for r in rows),
-         "share_steps_reused": round(sum(r["steps_reused"] for r in rows) / steps, 4),
-         "execute_seconds": round(sum(r["execute_seconds"] for r in rows), 2), "seconds_saved": round(sum(r["seconds_saved"] for r in rows), 2),
-         "wall_seconds": round(sum(r["wall_seconds"] for r in rows), 1), "llm_calls": llm.usage.calls, "tokens_in": llm.usage.input_tokens,
-         "tokens_out": llm.usage.output_tokens, "cost_usd": round(llm.usage.cost_usd, 4),
-         "wrong_turns": [f"{r['session']} t{r['turn']} ({r['kind']})" for r in rows if not r["correct"]]}
-    json.dump(S, open(os.path.join(a.out, "summary.json"), "w"), indent=1)
-    print(json.dumps(S, indent=1))
+    summarise(rows, llm, a.variant, a.model, a.out)
 
 
 if __name__ == "__main__":
