@@ -34,6 +34,6 @@ head = re.search(r"<head>(.*?)</head>", html, re.S).group(1)
 body = re.search(r"<body>(.*?)</body>", html, re.S).group(1)
 head = re.sub(r"<meta[^>]*>", "", head)
 head = re.sub(r"<title>.*?</title>", "", head, flags=re.S)
-art = '<title>text2answer graph analysis</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n' + head.strip() + "\n" + body
+art = '<title>GraphAudit</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n' + head.strip() + "\n" + body
 open(os.path.join(HERE, "dist", "artifact.html"), "w").write(art)
 print("wrote", os.path.join(HERE, "dist", "artifact.html"), len(art) // 1024, "kB")

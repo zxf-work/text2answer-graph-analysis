@@ -541,7 +541,7 @@ def attach_node_table(lg: "LoadedGraph", path: str) -> dict:
                 if v == v:
                     column[p_] = float(v)
             vals = np.array([v for v in column if v is not None], dtype=float)
-            summary[col] = {"type": "numeric", "coverage": round(len(vals) / n, 4), "n_distinct": int(len(np.unique(vals))) if len(vals) else 0,
+            summary[col] = {"type": "numeric", "coverage": round(len(vals) / max(n, 1), 4), "n_distinct": int(len(np.unique(vals))) if len(vals) else 0,
                             "min": float(vals.min()) if len(vals) else None, "median": float(np.median(vals)) if len(vals) else None,
                             "max": float(vals.max()) if len(vals) else None}
             values[col] = None
@@ -550,7 +550,7 @@ def attach_node_table(lg: "LoadedGraph", path: str) -> dict:
                 if pr:
                     column[p_] = v.strip()
             counts = Counter(v for v in column if v is not None)
-            summary[col] = {"type": "categorical", "coverage": round(sum(counts.values()) / n, 4), "n_distinct": len(counts),
+            summary[col] = {"type": "categorical", "coverage": round(sum(counts.values()) / max(n, 1), 4), "n_distinct": len(counts),
                             "top_values": [{"value": v, "count": c} for v, c in counts.most_common(8)]}
             values[col] = set(counts) if len(counts) <= 20000 else None
         g.vs[ATTR_PREFIX + col] = column

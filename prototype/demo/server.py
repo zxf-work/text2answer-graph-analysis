@@ -1,4 +1,4 @@
-"""Demo web server for text2answer graph analysis.
+"""Demo web server for GraphAudit (text2answer graph analysis).
 
 Standard library only. Serves the single-page UI in demo/static and a small JSON API:
   GET  /api/datasets           shipped graphs, uploads and example questions
@@ -320,7 +320,7 @@ def main():
                 ensure_loaded(d["path"], d["name"], d.get("description") or "")
                 print("preloading", d["name"], flush=True)
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
-    print(f"text2answer demo on http://{a.host}:{a.port}  (model {a.model})", flush=True)
+    print(f"GraphAudit demo on http://{a.host}:{a.port}  (model {a.model})", flush=True)
     srv.serve_forever()
 
 

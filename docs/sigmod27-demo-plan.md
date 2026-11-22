@@ -29,11 +29,11 @@ Seven weeks from today. Internal target: submit Saturday January 9.
 
 ## 2. Name, claim and what we do not claim
 
-**Working name: GraphAudit.** Candidate title: *GraphAudit: Verifiable Conversational Graph Analytics with
+**Name: GraphAudit** (decided 2026-11-22). Candidate title: *GraphAudit: Verifiable Conversational Graph Analytics with
 Computation Reuse*. One collision found so far: "GraphAudit: Privacy Auditing for Massive Graph Mining", a 2014
 NC State technical report (TR-2014-10) on taint tracking in vertex-centric graph processing. It is a different
-problem and an unpublished report, but it is the same name in the graph-systems area; decide whether that is
-acceptable before the title is fixed. Fallback from the comments: GraphCompass.
+problem and an unpublished report, and the collision was accepted. The fallback from the comments, GraphCompass,
+is taken by a 2024 *Bioinformatics* paper with a PyPI package, so it is not an option.
 
 **Central claim.** GraphAudit turns natural-language graph questions into grounded, inspectable, budget-aware
 computations, checks detectable semantic inconsistencies without ground-truth answers, and, across a session of
@@ -146,6 +146,59 @@ Opus; one run each, so this shows the mechanism, not a rate).
   (Haiku) or restricted two measures (Opus), and the first rewrite changed only one of them, so the answer shown did
   not match the contract chosen. A contract now covers every restricted measure the answer depends on.
 - Turn 7 shows a second kind of ambiguity the rules do not cover: which earlier result "again" refers to.
+
+### 3.6 E1: reuse fault injection (2026-11-22, job 304356, no model calls)
+
+`bench/sessions/reuse_fault.py`; report in `prototype/results/sessions/e1_reuse_fault/`. Nine graphs: trust,
+follows, citations, roads, facebook, epinions and three regional subgraphs of Pokec with real profile attributes
+(122k to 176k users). 246 fault scenarios and 201 valid-reuse scenarios, each run under seven cache-key schemes.
+
+| key scheme | wrong value served (of 246 faults) | final answer changed | valid steps reused (of 390) |
+|---|---|---|---|
+| full lineage key | 0 | 0 | 390 |
+| without input lineage (arguments as written) | 117 | 105, plus 36 wrong answers on valid scenarios | 318 |
+| without graph reading | 32 | 32 | 390 |
+| without content hash (dataset name as root) | 48 | 44 | 390 |
+| without node table in the root | 12 | 12 | 390 |
+| without seed | 27 | 26 | 390 |
+| the prototype's original cache | 71 | 70 | 237 |
+
+- Every ingredient of the key is needed: removing any one admits a class of wrong reuse, and each removed
+  ingredient admits exactly the classes it is there for.
+- The full key gives up no valid reuse in these scenarios, including plans with renamed or reordered steps and
+  defaults written out.
+- Scope readings: over 60 group restrictions (4 measures, 5 districts, 3 graphs) the two readings gave a different
+  top-10 set in all 60, sharing 3.7 of 10 nodes on average (PageRank 5.5, degree 5.6, core number 3.0, approximate
+  closeness 0.5). The rule identified the reading of both plans in 60 of 60 and flagged none of 387 plans without a
+  group restriction.
+- Limits: the scenarios are generated from templates, so the counts show coverage of fault classes, not rates in
+  real use. The "short list extended" fault is modelled as a stale derived result, the only form it can take here.
+
+### 3.7 E2 pilot: session workload (2026-11-22)
+
+`bench/sessions/workload.py`, `run_sessions.py`; summaries in `prototype/results/sessions/e2_pilot/`. 14 sessions,
+82 turns, 9 of them ambiguous scope turns; a simulated user answers a two-contract question with the annotated
+reading. Second repetition (after the selection fix), one run each:
+
+| system | model | answers correct | follow-ups correct | ambiguous turns handled | silent other reading | cost |
+|---|---|---|---|---|---|---|
+| full | Opus | 100% | 100% | 9/9 | 0 | $3.67 |
+| full | Haiku | 98.8% | 97.9% | 9/9 | 0 | $0.10 |
+| without the scope rule | Haiku | 92.7% | 87.2% | 0/9 | 6 | $0.10 |
+| without reuse | Haiku | 93.9% | 91.5% | 9/9 | 0 | $0.10 |
+| without session context | Haiku | 80.5% | 66.0% | 3/9 | 0 | $0.10 |
+
+- The scope rule removes the silent wrong readings (6 of 9 without it, in both repetitions).
+- Session context is what makes follow-ups answerable.
+- Reuse covered 26 to 28% of steps but saved under 3 s per run: these graphs are small and planning (about 4 s a
+  turn) dominates. The time argument has to be made on the large graphs (E4), not here.
+- The lower accuracy "without reuse" is not an effect of reuse: three of its five misses are a cost-model crash
+  (fixed, below) and the rest model variance. One repetition cannot separate variants this close.
+- Defects found and fixed, each with a test: "among them" after a count resolved to an older ranking (the session
+  record now tracks the set a count was taken over); approximate closeness ran one search per node; the cost model
+  failed when `k` was a reference to an earlier step.
+- Missing: the two code-generation systems of the E2 design, repetitions, and a second annotator for the gold
+  readings.
 
 ## 4. Where things run
 
@@ -313,9 +366,9 @@ against the server.
 | Reuse checks and the three-outcome decision | first version Nov 22; reference ambiguity ("again") open | Dec 8 |
 | Self-reviewing code-generation baseline; silent-failure column in the scorer | 2 days | Dec 3 |
 | Stateful code-generation agent baseline | 3 days | Dec 8 |
-| Reuse fault-injection harness (E1) | 2 days | Dec 10 |
-| Session workload, annotated (E2) | 4 days | Dec 10 |
-| UI: session timeline, reused-versus-executed colouring on the plan, measured savings, two-contract chooser, Audit button, plan mutation controls | 8 days | Dec 20 |
+| Reuse fault-injection harness (E1) | done Nov 22, first run in 3.6 | Dec 10 |
+| Session workload, annotated (E2) | first version Nov 22 (14 sessions, 82 turns), pilot in 3.7; code-generation systems missing | Dec 10 |
+| UI: session view (timeline, reused-versus-executed plan, savings, two-contract chooser, audit record, plan editing) | built Nov 22; replay checked in the browser, live endpoints checked by script | Dec 20 |
 | Hybrid fallback: confirm or build | 2 days | Dec 13 |
 | Audit record export | 1 day | if time allows |
 
@@ -366,7 +419,7 @@ changed scope makes a matching-looking result the wrong one, decided by rules ov
 
 ## 11. Open decisions
 
-1. Adopt GraphAudit despite the 2014 technical report of the same name, or use another name.
+1. ~~Name~~ Decided 2026-11-22: GraphAudit. GraphCompass was checked and is taken (Bioinformatics 2024, PyPI package). Related system to cite and position against: GraphSeek (arXiv 2602.11052).
 2. Confirm Pokec with its profile table as the session graph.
 3. Author list, with a CMT account and ORCID for each.
 4. Whether reviewers get a public demo URL or only the video; where the video is hosted.

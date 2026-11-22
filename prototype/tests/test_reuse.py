@@ -157,3 +157,22 @@ def test_validator_checks_attributes_against_the_table(files, with_table):
            plan(("x", "attribute_map", {"attribute": "dept"}))]
     msgs = [validate(p, lg) for p in bad]
     assert all(msgs) and "available" in msgs[0][0] and "no value" in msgs[1][0] and "categorical" in msgs[2][0]
+
+
+def test_omitted_defaults_do_not_change_the_key(files):
+    lg = load_graph("org", files[0], "", override={"directed": True})
+    cache = {}
+    execute(plan(("s1", "pagerank", {}), ("s2", "top_k", {"map": "s1", "k": 3})), lg, cache=cache)
+    _, t = execute(plan(("a", "pagerank", {"graph": "G", "damping": 0.85}), ("b", "top_k", {"map": "a", "k": 3, "ascending": False})), lg, cache=cache)
+    assert [x["cached"] for x in t] == [True, True]
+    _, t = execute(plan(("a", "pagerank", {"damping": 0.5}), ("b", "top_k", {"map": "a", "k": 3})), lg, cache=cache)
+    assert [x["cached"] for x in t] == [False, False]
+
+
+def test_cost_model_accepts_a_reference_as_k(files):
+    """Seen in the session workload: k_core with k taken from max_core ("s1.k") made the cost estimate fail."""
+    lg = load_graph("org", files[0], "", override={"directed": False})
+    p = plan(("s1", "max_core", {}), ("s2", "k_core", {"k": "s1.k"}), ("s3", "node_count", {"graph": "s2"}))
+    assert validate(p, lg) == []
+    ctx, _ = execute(p, lg)
+    assert ctx.values["s3"] == ctx.values["s1"]["size"]

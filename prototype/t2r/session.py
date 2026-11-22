@@ -46,7 +46,7 @@ This is turn {turn} of an analysis session on one graph. SESSION STATE (below) l
 
 S1. Always return a complete, self-contained plan. To build on an earlier turn, copy its steps unchanged (same op, same args) and add or change only what the new request needs. The engine recognises unchanged steps and reuses their stored results, so copying costs nothing. Never type node ids from an earlier answer into the plan when a step produces them.
 S2. Keep the accepted semantics (directed, weighted, use_weights) unless the user asks to change them.
-S3. Resolve references ("they", "those", "instead", "the same for ...") against SESSION STATE and record each one in "references", e.g. {{"them": "the 10 users returned in turn 1"}}.
+S3. Resolve references ("they", "those", "among them", "instead", "the same for ...") against SESSION STATE and record each one in "references", e.g. {{"them": "the 10 users returned in turn 1"}}. A pronoun normally refers to current_selection: the nodes of the most recent answer, or, when that answer was a count or a statistic, the node set it was taken over. Obtain those nodes by copying the step named in produced_by_step (and the steps it depends on) from that turn's plan; first_nodes is only a sample.
 S4. Add these fields to the plan JSON:
     "intent": "new" | "patch" | "drill_down" | "ambiguous",
     "based_on": <turn number> | null,
@@ -274,10 +274,11 @@ class Session:
                           "steps": [{"id": s["id"], "op": s["op"], "args": s["args"], "returns": CATALOGUE[s["op"]].returns, "size": sizes.get(s["id"])}
                                     for s in t["plan"]["steps"]],
                           "answer": t["plan"].get("answer"), "scope_reading": (t["plan"].get("scope_reading") or {}).get("reading")})
-        sel = next((t for t in reversed(done) if t.get("selection")), None)
+        sel = next((t for t in reversed(done) if t.get("selection_info")), None)
         return {"turn": len(self.turns) + 1, "graph": self.name, "accepted_semantics": self.semantics,
                 "chosen_scope_reading": self.scope_choice,
-                "current_selection": None if sel is None else {"from_turn": sel["turn"], "count": len(sel["selection"]), "nodes": sel["selection"][:20]},
+                "current_selection": None if sel is None else {"from_turn": sel["turn"], "produced_by_step": sel["selection_info"]["step"], "op": sel["selection_info"]["op"],
+                                                               "args": sel["selection_info"]["args"], "count": sel["selection_info"]["count"], "first_nodes": sel["selection_info"]["nodes"]},
                 "earlier_turns_omitted": max(0, len(done) - max_turns), "turns": turns, "clarifications": self.clarifications[-5:]}
 
     # ------------------------------------------------------------------ reuse preview and decision
@@ -340,11 +341,20 @@ class Session:
         lineage = answer_lineage(plan)
         readings = sorted({p["reading"] for p in scope_patterns(plan) if p["step"] in lineage})
         ans_step = plan.answer.step if plan.answer and plan.answer.step else None
+        # the current selection: the nodes of the answer, or, for an answer that is a count or a statistic, the node set it was taken over
+        sel, sel_step = (_nodes_of(ctx.values.get(ans_step)) if ans_step else None), ans_step
+        if sel is None:
+            for st in reversed(plan.steps):
+                if st.id in lineage and CATALOGUE[st.op].returns == "NodeSet" and isinstance(ctx.values.get(st.id), list):
+                    sel, sel_step = list(ctx.values[st.id]), st.id
+                    break
+        by = {s.id: s for s in plan.steps}
+        sel_info = None if sel is None else {"step": sel_step, "op": by[sel_step].op, "args": by[sel_step].args, "count": len(sel), "nodes": sel[:20]}
         return {"plan": plan.model_dump(), "trace": trace, "findings": findings, "answer": _jsonable(extract_answer(plan, ctx)),
                 "outcome": outcome, "steps_reused": reused, "steps_executed": len(trace) - reused, "execute_seconds": round(dt, 3),
                 "seconds_saved": round(sum(t.get("seconds_saved", 0) for t in trace), 3),
                 "sizes": {t["step"]: _size(ctx.values[t["step"]]) for t in trace},
-                "selection": _nodes_of(ctx.values.get(ans_step)) if ans_step else None,
+                "selection": None if sel is None else sel[:200], "selection_info": sel_info,
                 "reading": readings[0] if len(readings) == 1 else None,
                 "keys": {s: k[:12] for s, k in ctx.keys.items()}}
 

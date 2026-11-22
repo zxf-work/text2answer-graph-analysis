@@ -1,4 +1,4 @@
-/* text2answer graph analysis: demo front end (no framework). */
+/* GraphAudit: demo front end (no framework). */
 (() => {
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];

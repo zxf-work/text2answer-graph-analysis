@@ -1,0 +1,65 @@
+{
+ "full lineage key": {
+  "faults": 246,
+  "admitted": 0,
+  "harmful": 0,
+  "crashed": 0,
+  "valid_reused": 390,
+  "valid_reusable": 390,
+  "valid_harmful": 0
+ },
+ "without input lineage": {
+  "faults": 246,
+  "admitted": 117,
+  "harmful": 105,
+  "crashed": 0,
+  "valid_reused": 318,
+  "valid_reusable": 390,
+  "valid_harmful": 36
+ },
+ "without graph reading": {
+  "faults": 246,
+  "admitted": 32,
+  "harmful": 32,
+  "crashed": 0,
+  "valid_reused": 390,
+  "valid_reusable": 390,
+  "valid_harmful": 0
+ },
+ "without content hash": {
+  "faults": 246,
+  "admitted": 48,
+  "harmful": 44,
+  "crashed": 0,
+  "valid_reused": 390,
+  "valid_reusable": 390,
+  "valid_harmful": 0
+ },
+ "without node table": {
+  "faults": 246,
+  "admitted": 12,
+  "harmful": 12,
+  "crashed": 0,
+  "valid_reused": 390,
+  "valid_reusable": 390,
+  "valid_harmful": 0
+ },
+ "without seed": {
+  "faults": 246,
+  "admitted": 27,
+  "harmful": 26,
+  "crashed": 0,
+  "valid_reused": 390,
+  "valid_reusable": 390,
+  "valid_harmful": 0
+ },
+ "original cache": {
+  "faults": 246,
+  "admitted": 71,
+  "harmful": 70,
+  "crashed": 0,
+  "valid_reused": 237,
+  "valid_reusable": 390,
+  "valid_harmful": 0
+ }
+}

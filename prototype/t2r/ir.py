@@ -75,13 +75,19 @@ def estimate_cost(op: str, args: dict[str, Any], n: int, m: int) -> float:
     spec = CATALOGUE[op]
     c = spec.cost
     tier = args.get("tier", "exact")
-    k = float(args.get("k", 500) or 500)
+
+    def num(v, default):                      # an argument may be a reference to an earlier step's field ("s1.k"): unknown until run time
+        try:
+            return float(v) if v is not None else default
+        except (TypeError, ValueError):
+            return default
+    k = num(args.get("k"), 500) or 500
     if c == "O(1)":
         return 1
     if c in ("O(n)", "O(m)", "O(n+m)", "O(deg)", "O(n log n)"):
         return n + m
     if c == "O(k*m)":
-        return float(args.get("k", 2)) * m
+        return num(args.get("k"), 2) * m
     if c == "O(m^1.5)":
         return m ** 1.5
     if c == "O(k(n+m))":
@@ -209,6 +215,8 @@ def auto_tier(plan: Plan, lg: LoadedGraph, budget_ops: float = 2e9) -> list[str]
                 st.args["tier"] = "approx"
                 notes.append(f"{st.id}: {st.op} switched to approximate tier (graph too large for exact within budget)")
         if st.op in CATALOGUE and st.args.get("tier") == "approx":
+            if not isinstance(st.args.get("k", 500), (int, float)):
+                continue
             k = int(st.args.get("k", 500) or 500)
             while k > 50 and estimate_cost(st.op, {**st.args, "k": k}, n, m) > budget_ops:
                 k //= 2
@@ -253,11 +261,25 @@ def step_key(st: Step, keys: dict[str, str], seed: int) -> str:
     Two steps share a key only if they apply the same operator with the same parameters to the same inputs, traced
     back to the same graph under the same reading. PageRank on an induced subgraph therefore never collides with
     PageRank on the whole graph, and a changed interpretation changes every key downstream."""
-    args = dict(st.args)
-    spec = CATALOGUE.get(st.op)
-    if spec is not None and "graph" in spec.params and "graph" not in args:
-        args["graph"] = "G"
-    return _h([st.op, {k: _canon(v, keys) for k, v in sorted(args.items())}, seed])
+    return _h([st.op, {k: _canon(v, keys) for k, v in sorted(full_args(st).items())}, seed])
+
+
+_DEFAULTS: dict[str, dict[str, Any]] = {}
+
+
+def full_args(st: Step) -> dict[str, Any]:
+    """Arguments with every omitted parameter filled in from the operator's own default, so that a plan that writes
+    damping=0.85 and one that leaves it out get the same key. The omitted graph is the root graph G."""
+    if st.op not in _DEFAULTS:
+        import inspect
+        spec = CATALOGUE.get(st.op)
+        d = {}
+        if spec is not None:
+            for name, p in inspect.signature(spec.fn).parameters.items():
+                if name != "ctx" and p.default is not inspect.Parameter.empty and isinstance(p.default, (str, int, float, bool, type(None))):
+                    d[name] = p.default
+        _DEFAULTS[st.op] = d
+    return {**_DEFAULTS[st.op], **st.args}
 
 
 def plan_keys(plan: Plan, lg: LoadedGraph, seed: int = 1) -> dict[str, str]:

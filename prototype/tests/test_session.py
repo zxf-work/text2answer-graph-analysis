@@ -70,7 +70,7 @@ def test_planner_sees_state_not_history(path):
     st = json.loads(llm.seen[1].split("SESSION STATE:\n")[1].split("\n\nGraph file")[0])
     assert st["turn"] == 2 and st["accepted_semantics"]["directed"] is True
     assert st["turns"][0]["steps"][0] == {"id": "pr", "op": "pagerank", "args": {}, "returns": "NodeMap", "size": 12}
-    assert st["current_selection"]["count"] == 3 and "value" not in json.dumps(st["turns"])
+    assert st["current_selection"]["count"] == 3 and st["current_selection"]["produced_by_step"] == "top" and "value" not in json.dumps(st["turns"])
 
 
 @pytest.mark.parametrize("planned,other", [(T4A, "B"), (T4B, "A")])
@@ -176,3 +176,13 @@ def test_every_restricted_measure_follows_the_chosen_reading(path):
     assert {p["reading"] for p in scope_patterns(TurnPlan.model_validate(done["plan"]))} == {"B"}
     want = execute(TurnPlan.model_validate(T4B), s._load({"directed": True}))[0].values["top"]
     assert [r["node"] for r in done["answer"]["by_pagerank"]] == [r["node"] for r in want]
+
+
+def test_selection_of_a_count_is_the_set_that_was_counted(path):
+    """Seen in the session pilot: after "how many users are in X", "among them" was resolved to an older ranking."""
+    count = P([ENG, ("n", "set_size", {"nodes": "eng"})], "n")
+    s = Session(path)
+    llm = Scripted([T1, count, T1])
+    s.ask("top 3", llm); s.ask("how many in eng", llm); s.ask("anything", llm)
+    sel = json.loads(llm.seen[2].split("SESSION STATE:\n")[1].split("\n\nGraph file")[0])["current_selection"]
+    assert sel["from_turn"] == 2 and sel["op"] == "filter_by_attribute" and sel["count"] == 4

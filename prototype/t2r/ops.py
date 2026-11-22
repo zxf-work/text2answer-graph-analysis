@@ -435,10 +435,11 @@ def closeness(ctx, graph="G", tier="exact", k=500):
         return _nodemap(ctx, g.harmonic_centrality(mode="out"), g)
     rng = random.Random(ctx.seed)
     targets = rng.sample(range(g.vcount()), min(int(k), g.vcount()))
-    d = np.array(g.distances(source=None, target=targets, mode="out"))
+    # distance from every node to each sampled target = distance from the target along reversed edges: k searches, not n
+    d = np.array(g.distances(source=targets, target=None, mode="in"), dtype=float)
     with np.errstate(divide="ignore"):
         h = np.where(d > 0, 1.0 / d, 0.0)
-    return _nodemap(ctx, (h.sum(axis=1) * (g.vcount() - 1) / len(targets)).tolist(), g)
+    return _nodemap(ctx, (h.sum(axis=0) * (g.vcount() - 1) / len(targets)).tolist(), g)
 
 
 @op("eigenvector_centrality", "Eigenvector centrality as NodeMap.", {"graph": "Graph"}, "NodeMap", "O(k(n+m))")
