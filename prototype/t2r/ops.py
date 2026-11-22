@@ -7,6 +7,7 @@ Scalar, Table, Bool.
 """
 from __future__ import annotations
 
+import heapq
 import math
 import random
 from dataclasses import dataclass, field
@@ -68,12 +69,19 @@ class Ctx:
         return self.lg.labels[idx]
 
 
+def _pos(ctx: Ctx, g: ig.Graph) -> dict:
+    """label -> vertex index in graph g, built once per graph per plan."""
+    cache = ctx.__dict__.setdefault("_pos_cache", {})
+    if id(g) not in cache:
+        cache[id(g)] = (g, {name: i for i, name in enumerate(g.vs["name"])})   # keep g alive so id() stays unique
+    return cache[id(g)][1]
+
+
 def _vid(ctx: Ctx, g: ig.Graph, ref: Any) -> int:
     """Vertex index of a node reference *in graph g* (which may be a subgraph with its own indexing)."""
     if g is ctx.lg.g:
         return ctx.node(ref)
-    label = ctx.label(ctx.node(ref))
-    idx = g.vs.find(name=label).index if label in set(g.vs["name"]) else None
+    idx = _pos(ctx, g).get(ctx.label(ctx.node(ref)))
     if idx is None:
         raise ValueError(f"node '{ref}' is not in this subgraph")
     return idx
@@ -481,6 +489,101 @@ def block_of(ctx, partition, node):
     return [names[i] for i, x in enumerate(mem) if x == c]
 
 
+# --------------------------------------------------------------------------- node attributes
+ATTR_PREFIX = "a:"
+
+
+def _attr(g: ig.Graph, attribute: Any) -> list:
+    name = ATTR_PREFIX + str(attribute)
+    if name not in g.vs.attributes():
+        raise ValueError(f"no node attribute '{attribute}'; available: {[a[len(ATTR_PREFIX):] for a in g.vs.attributes() if a.startswith(ATTR_PREFIX)]}")
+    return g.vs[name]
+
+
+def _index_of(ctx: Ctx, g: ig.Graph, label: str) -> Optional[int]:
+    if g is ctx.lg.g:
+        try:
+            return ctx.lg.index[label]
+        except KeyError:
+            return None
+    return _pos(ctx, g).get(label)
+
+
+_CMP = {"==": lambda a, b: a == b, "!=": lambda a, b: a != b, ">": lambda a, b: a > b, ">=": lambda a, b: a >= b,
+        "<": lambda a, b: a < b, "<=": lambda a, b: a <= b, "in": lambda a, b: a in b}
+
+
+@op("attribute_of", "Join with the node table: the value of a node attribute for each node of a NodeSet, in the same order. Returns list of {node, value}.",
+    {"nodes": "NodeSet", "attribute": "str", "graph": "Graph"}, "Table", "O(n)")
+def attribute_of(ctx, nodes, attribute, graph="G"):
+    g = _graph(ctx, graph)
+    vals = _attr(g, attribute)
+    out = []
+    for lab in _nodeset(ctx, nodes):
+        i = _index_of(ctx, g, lab)
+        out.append({"node": lab, "value": vals[i] if i is not None else None})
+    return out
+
+
+@op("filter_by_attribute", "Nodes (of the graph, or of a NodeSet) whose node attribute satisfies op in {==,!=,>,>=,<,<=,in} value. Nodes with a missing value never match.",
+    {"attribute": "str", "op": "str", "value": "str or number or list", "nodes": "NodeSet or null", "graph": "Graph"}, "NodeSet", "O(n)")
+def filter_by_attribute(ctx, attribute, value, op="==", nodes=None, graph="G"):
+    g = _graph(ctx, graph)
+    vals = _attr(g, attribute)
+    numeric = g["node_table"]["attributes"][str(attribute)]["type"] == "numeric"
+    conv = (lambda x: float(x)) if numeric else (lambda x: str(x))
+    target = [conv(x) for x in value] if isinstance(value, list) else conv(value)
+    if isinstance(target, list) and op in ("==", "in"):
+        op, target = "in", set(target)
+    f = _CMP[op]
+    names = g.vs["name"]
+    if nodes is None:
+        return [names[i] for i, v in enumerate(vals) if v is not None and f(v, target)]
+    out = []
+    for lab in _nodeset(ctx, nodes):
+        i = _index_of(ctx, g, lab)
+        if i is not None and vals[i] is not None and f(vals[i], target):
+            out.append(lab)
+    return out
+
+
+@op("group_by_attribute", "Group nodes (of the graph, or of a NodeSet) by a node attribute. Returns list of {value, count} sorted by count; with values (a NodeMap), also {agg} = sum|mean|max|min of those values per group, sorted by it.",
+    {"attribute": "str", "nodes": "NodeSet or null", "values": "NodeMap or null", "agg": "str: sum|mean|max|min", "graph": "Graph"}, "Table", "O(n)")
+def group_by_attribute(ctx, attribute, nodes=None, values=None, agg="mean", graph="G"):
+    g = _graph(ctx, graph)
+    vals = _attr(g, attribute)
+    m = (ctx.values[values] if isinstance(values, str) else values) if values is not None else None
+    names = g.vs["name"]
+    if nodes is None:
+        members = enumerate(names)
+    else:
+        members = ((_index_of(ctx, g, lab), lab) for lab in _nodeset(ctx, nodes))
+    groups: dict[Any, list] = {}
+    for i, lab in members:
+        if i is None or vals[i] is None:
+            continue
+        groups.setdefault(vals[i], []).append(m.get(lab) if m is not None else None)
+    rows = []
+    for v, xs in groups.items():
+        row = {"value": v, "count": len(xs)}
+        if m is not None:
+            ys = [x for x in xs if x is not None]
+            if ys:
+                row[agg] = {"sum": sum(ys), "mean": sum(ys) / len(ys), "max": max(ys), "min": min(ys)}[agg]
+        rows.append(row)
+    rows.sort(key=lambda r: (r.get(agg, float("-inf")) if m is not None else r["count"], r["count"]), reverse=True)
+    return rows
+
+
+@op("attribute_map", "A numeric node attribute as a NodeMap (nodes with a missing value are left out), usable with top_k, filter_nodes, map_stats.",
+    {"attribute": "str", "graph": "Graph"}, "NodeMap", "O(n)")
+def attribute_map(ctx, attribute, graph="G"):
+    g = _graph(ctx, graph)
+    vals = _attr(g, attribute)
+    names = g.vs["name"]
+    return {names[i]: float(v) for i, v in enumerate(vals) if v is not None}
+
+
 # --------------------------------------------------------------------------- set / map algebra
 @op("induced_subgraph", "Subgraph induced by a NodeSet.", {"graph": "Graph", "nodes": "NodeSet"}, "Graph", "O(n+m)")
 def induced_subgraph(ctx, nodes, graph="G"):
@@ -494,7 +597,8 @@ def induced_subgraph(ctx, nodes, graph="G"):
     {"map": "NodeMap", "k": "int", "ascending": "bool"}, "Table", "O(n log n)")
 def top_k(ctx, map, k=10, ascending=False):
     m = ctx.values[map] if isinstance(map, str) else map
-    items = sorted(m.items(), key=lambda kv: kv[1], reverse=not ascending)[: int(k)]
+    pick = heapq.nsmallest if ascending else heapq.nlargest      # same result and tie order as a full sort, without sorting every node
+    items = pick(int(k), m.items(), key=lambda kv: kv[1])
     return [{"node": n, "value": v} for n, v in items]
 
 

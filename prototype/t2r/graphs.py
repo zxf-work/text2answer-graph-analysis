@@ -11,6 +11,7 @@ import json
 import os
 import re
 import time
+from collections import Counter
 from dataclasses import dataclass, field, asdict
 from difflib import get_close_matches
 from typing import Any, Optional
@@ -484,6 +485,80 @@ class _RangeIndex:
 
 
 
+# --------------------------------------------------------------------------- node attribute table
+NODE_TABLE_SUFFIXES = (".nodes.csv", ".nodes.tsv", ".nodes.txt")
+ATTR_PREFIX = "a:"          # vertex attributes holding node-table columns; subgraphs inherit them from igraph
+
+
+def sidecar_node_table(edge_path: str) -> Optional[str]:
+    """A node table lives next to the edge file as <stem>.nodes.csv|tsv|txt (stem = edge file name without extension)."""
+    stem = os.path.splitext(edge_path)[0]
+    for suf in NODE_TABLE_SUFFIXES:
+        if os.path.exists(stem + suf):
+            return stem + suf
+    return None
+
+
+def attach_node_table(lg: "LoadedGraph", path: str) -> dict:
+    """Read a node table (first column = node id, header row required) and attach its columns as vertex attributes.
+
+    Each column is typed numeric (at least 95% of its non-empty values parse as numbers) or categorical. Rows whose id
+    is not a node of the graph are counted and skipped; nodes without a row have a missing value (None).
+    Returns the table summary, also stored on the graph as g["node_table"]."""
+    import pandas as pd
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    sha = h.hexdigest()[:12]
+    g = lg.g
+    if "node_table" in g.attributes() and g["node_table"]["sha1"] == sha:
+        return g["node_table"]
+    with open(path, "r", errors="replace") as f:
+        first = f.readline()
+    sep = "\t" if "\t" in first else ("," if "," in first else r"\s+")
+    df = pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False, engine="python" if sep == r"\s+" else "c")
+    idcol = df.columns[0]
+    n = g.vcount()
+    pos = np.full(len(df), -1, dtype=np.int64)
+    for r, lab in enumerate(df[idcol].tolist()):
+        try:
+            pos[r] = lg.index[lab.strip()]
+        except KeyError:
+            pass
+    ok = pos >= 0
+    summary: dict[str, Any] = {}
+    values: dict[str, Any] = {}
+    for col in df.columns[1:]:
+        raw = df[col].to_numpy()[ok]
+        present = np.array([x.strip() not in ("", "null", "NULL", "None", "NA", "nan") for x in raw], dtype=bool)
+        num = pd.to_numeric(pd.Series(raw[present]), errors="coerce")
+        numeric = bool(present.any()) and float(num.notna().mean()) >= 0.95
+        column: list = [None] * n
+        if numeric:
+            full = pd.to_numeric(pd.Series(raw), errors="coerce").to_numpy()
+            for p_, v in zip(pos[ok].tolist(), full.tolist()):
+                if v == v:
+                    column[p_] = float(v)
+            vals = np.array([v for v in column if v is not None], dtype=float)
+            summary[col] = {"type": "numeric", "coverage": round(len(vals) / n, 4), "n_distinct": int(len(np.unique(vals))) if len(vals) else 0,
+                            "min": float(vals.min()) if len(vals) else None, "median": float(np.median(vals)) if len(vals) else None,
+                            "max": float(vals.max()) if len(vals) else None}
+            values[col] = None
+        else:
+            for p_, v, pr in zip(pos[ok].tolist(), raw.tolist(), present.tolist()):
+                if pr:
+                    column[p_] = v.strip()
+            counts = Counter(v for v in column if v is not None)
+            summary[col] = {"type": "categorical", "coverage": round(sum(counts.values()) / n, 4), "n_distinct": len(counts),
+                            "top_values": [{"value": v, "count": c} for v, c in counts.most_common(8)]}
+            values[col] = set(counts) if len(counts) <= 20000 else None
+        g.vs[ATTR_PREFIX + col] = column
+    g["node_table"] = {"file": os.path.basename(path), "sha1": sha, "id_column": idcol, "rows": int(len(df)), "rows_matched": int(ok.sum()),
+                       "nodes_without_row": int(n - len(set(pos[ok].tolist()))), "attributes": summary, "values": values}
+    return g["node_table"]
+
+
 _GRAPH_CACHE: dict = {}
 
 
@@ -508,7 +583,17 @@ _PENDING_KEY: list = []
 
 
 def load_graph(name: str, path: str, description: str = "", override: Optional[dict] = None) -> LoadedGraph:
-    """Load a graph: process memory (T2R_GRAPH_CACHE=1, the demo server), else the binary disk cache, else parse the file."""
+    """Load a graph: process memory (T2R_GRAPH_CACHE=1, the demo server), else the binary disk cache, else parse the file.
+
+    A node table next to the edge file (see sidecar_node_table) is attached to every load."""
+    lg = _load_graph_any(name, path, description, override)
+    table = sidecar_node_table(path)
+    if table is not None:
+        attach_node_table(lg, table)
+    return lg
+
+
+def _load_graph_any(name: str, path: str, description: str = "", override: Optional[dict] = None) -> LoadedGraph:
     if os.environ.get("T2R_GRAPH_CACHE") != "1":
         return _load_or_restore(name, path, description, override)
     key = (os.path.abspath(path), os.path.getmtime(path), json.dumps(override, sort_keys=True) if override else "")
@@ -518,6 +603,7 @@ def load_graph(name: str, path: str, description: str = "", override: Optional[d
         _GRAPH_CACHE[key] = lg
         return dataclasses.replace(lg, strict=False)
     return dataclasses.replace(lg, strict=False, load_info={"source": "memory", "seconds": 0.0})
+
 
 def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGraph:
     u, v, w = arrays
@@ -697,6 +783,9 @@ def profile_card(lg: LoadedGraph, with_inference: bool = True) -> dict[str, Any]
         card["columns"] = {"header": lg.facts.header, "source_col": lg.facts.columns_used[0], "target_col": lg.facts.columns_used[1], "weight_col": lg.facts.columns_used[2]}
     elif lg.facts.row_index_column:
         card["columns"] = {"note": "first column is a row index; edges read from columns 1 and 2"}
+    if "node_table" in g.attributes():
+        t = g["node_table"]
+        card["node_attributes"] = {"file": t["file"], "rows_matched": t["rows_matched"], "nodes_without_row": t["nodes_without_row"], "attributes": t["attributes"]}
     if with_inference:
         s = lg.semantics
         card["semantics"] = {

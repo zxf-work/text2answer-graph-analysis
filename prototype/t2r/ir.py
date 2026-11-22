@@ -1,6 +1,8 @@
 """Graph Analysis IR: a typed dataflow plan, its validator, cost model and executor."""
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import time
 from typing import Any, Optional
@@ -152,6 +154,24 @@ def validate(plan: Plan, lg: LoadedGraph, budget_ops: float = 2e9) -> list[str]:
                 r = lg.resolve(v)
                 if r["matched"] is None:
                     problems.append(f"step {st.id}: node '{v}' not found (candidates {r['candidates']})")
+        if "attribute" in spec.params:
+            table = lg.g["node_table"] if "node_table" in lg.g.attributes() else None
+            a = st.args.get("attribute")
+            if table is None:
+                problems.append(f"step {st.id}: {st.op} needs node attributes but this graph has no node table")
+            elif a not in table["attributes"]:
+                problems.append(f"step {st.id}: no node attribute '{a}' (available: {list(table['attributes'])})")
+            else:
+                info = table["attributes"][a]
+                if st.op == "attribute_map" and info["type"] != "numeric":
+                    problems.append(f"step {st.id}: attribute '{a}' is categorical; attribute_map needs a numeric attribute")
+                v = st.args.get("value")
+                known = table["values"].get(a)
+                if st.op == "filter_by_attribute" and info["type"] == "categorical" and known is not None and _ref_of(v) is None:
+                    for x in (v if isinstance(v, list) else [v]):
+                        if str(x) not in known:
+                            close = [k for k in known if str(x).lower() in k.lower()][:5]
+                            problems.append(f"step {st.id}: attribute '{a}' has no value '{x}'" + (f" (did you mean {close}?)" if close else ""))
         if spec.directed_only and not lg.g.is_directed():
             problems.append(f"step {st.id}: {st.op} requires a directed graph but the graph is undirected")
         if st.op == "components" and st.args.get("mode") == "strong" and not lg.g.is_directed():
@@ -198,23 +218,75 @@ def auto_tier(plan: Plan, lg: LoadedGraph, budget_ops: float = 2e9) -> list[str]
     return notes
 
 
+# lineage keys: content-addressed identity of every value a plan computes ----------------------------------------
+def _h(obj: Any) -> str:
+    return hashlib.sha1(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def graph_key(lg: LoadedGraph) -> str:
+    """Identity of the root graph *as loaded*: file content plus everything about the reading that changes results."""
+    g = lg.g
+    nt = g["node_table"]["sha1"] if "node_table" in g.attributes() else None
+    return _h(["graph", lg.facts.sha1, g.is_directed(), "weight" in g.es.attributes(), lg.semantics.multigraph,
+               lg.semantics.weight_semantics, bool(lg.strict), nt])
+
+
+def _canon(v: Any, keys: dict[str, str]) -> Any:
+    """Canonical form of an argument: references to earlier values are replaced by those values' keys."""
+    if isinstance(v, str) and v in keys:
+        return {"$": keys[v]}
+    r = _ref_of(v)
+    if r is not None and r[0] in keys:
+        return {"$": keys[r[0]], "field": r[1], "index": r[2]}
+    if isinstance(v, list):
+        return [_canon(x, keys) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _canon(x, keys) for k, x in sorted(v.items(), key=lambda kv: str(kv[0]))}
+    if isinstance(v, float) and v.is_integer():
+        return int(v)
+    return v
+
+
+def step_key(st: Step, keys: dict[str, str], seed: int) -> str:
+    """key(step) = hash(operator, canonical parameters, seed, keys of all inputs).
+
+    Two steps share a key only if they apply the same operator with the same parameters to the same inputs, traced
+    back to the same graph under the same reading. PageRank on an induced subgraph therefore never collides with
+    PageRank on the whole graph, and a changed interpretation changes every key downstream."""
+    args = dict(st.args)
+    spec = CATALOGUE.get(st.op)
+    if spec is not None and "graph" in spec.params and "graph" not in args:
+        args["graph"] = "G"
+    return _h([st.op, {k: _canon(v, keys) for k, v in sorted(args.items())}, seed])
+
+
 def execute(plan: Plan, lg: LoadedGraph, seed: int = 1, cache: Optional[dict] = None) -> tuple[Ctx, list[dict[str, Any]]]:
+    """Run a plan. With a cache, any step whose lineage key is present is reused instead of executed."""
     ctx = Ctx(lg, seed=seed)
+    keys: dict[str, str] = {"G": graph_key(lg)}
     trace = []
     for st in plan.steps:
         spec = CATALOGUE[st.op]
-        key = (lg.facts.sha1, st.op, repr(sorted(st.args.items())))
+        key = step_key(st, keys, seed)
+        keys[st.id] = key
         t0 = time.time()
-        args = {k: ([resolve_ref(ctx, x) for x in v] if isinstance(v, list) else resolve_ref(ctx, v)) for k, v in st.args.items()}
-        cached = cache is not None and key in cache and all(not (isinstance(v, str) and v in ctx.values and v != "G") for v in st.args.values()) and args == st.args
-        if cached:
-            val = cache[key]
+        hit = cache.get(key) if cache is not None else None
+        if hit is not None:
+            val, summary = hit["val"], hit["summary"]
         else:
+            args = {k: ([resolve_ref(ctx, x) for x in v] if isinstance(v, list) else resolve_ref(ctx, v)) for k, v in st.args.items()}
             val = spec.fn(ctx, **args)
-            if cache is not None and not cached and all(not (isinstance(v, str) and v in ctx.values and v != "G") for v in st.args.values()):
-                cache[key] = val
+            dt = time.time() - t0
+            summary = summarise(val)
+            if cache is not None:
+                cache[key] = {"val": val, "seconds": dt, "op": st.op, "summary": summary}
         ctx.values[st.id] = val
-        trace.append({"step": st.id, "op": st.op, "args": st.args, "seconds": round(time.time() - t0, 3), "cached": cached, "summary": summarise(val)})
+        row = {"step": st.id, "op": st.op, "args": st.args, "seconds": round(time.time() - t0, 3), "cached": hit is not None,
+               "key": key[:12], "summary": summary}
+        if hit is not None:
+            row["seconds_saved"] = round(hit["seconds"], 3)
+        trace.append(row)
+    ctx.keys = keys
     return ctx, trace
 
 

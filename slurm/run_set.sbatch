@@ -24,6 +24,6 @@ cd "$T2A_REPO/prototype"
 export T2R_MODEL="$MODEL" T2R_QUESTIONS="$Q" T2R_DATASETS="$D"
 export T2R_RESULTS="runs/$SET/$MODEL/seed$SEED"
 mkdir -p "$T2R_RESULTS"
-{ echo "commit=$(git -C "$T2A_REPO" rev-parse HEAD)"; echo "model=$MODEL set=$SET seed=$SEED job=${SLURM_JOB_ID:-}"; date -u +started=%FT%TZ; } > "$T2R_RESULTS/run_meta.txt"
+{ echo "commit=$(git -C "$T2A_REPO" rev-parse HEAD 2>/dev/null || cat "$T2A_REPO/.git/$(sed "s/^ref: //" "$T2A_REPO/.git/HEAD")")"; echo "model=$MODEL set=$SET seed=$SEED job=${SLURM_JOB_ID:-}"; date -u +started=%FT%TZ; } > "$T2R_RESULTS/run_meta.txt"
 "$PY" run_experiment.py --workers "${WORKERS:-3}" --qids all ${SYSTEMS:+--systems "$SYSTEMS"}
 date -u +finished=%FT%TZ >> "$T2R_RESULTS/run_meta.txt"
