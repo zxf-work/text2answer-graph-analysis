@@ -74,8 +74,9 @@ Read from `t2r/ir.py`, `t2r/ops.py`, `t2r/systems.py`, `demo/server.py` on 2026-
 | Full score vectors kept | yes: `pagerank` returns a NodeMap and `top_k` is a separate operator, so "top 10, now top 20" is an exact reuse by construction |
 | Scope operators | `induced_subgraph`, `restrict_map`, `filter_nodes`, `k_core`, `largest_component` exist |
 | Node attributes | **built 2026-11-21**: a node table next to the edge file is attached on load and profiled; operators `attribute_of`, `filter_by_attribute`, `group_by_attribute`, `attribute_map`; the validator checks attribute names and category values |
-| Session state, follow-up references ("them", "instead") | **absent**: every question is planned independently |
-| Plan patches, reuse decision, reuse checks | **absent** |
+| Session state, follow-up references ("them", "instead") | **built 2026-11-22** (`t2r/session.py`): the planner sees the profile card and a compact state record (accepted semantics, earlier plans with result sizes, current selection, chosen reading), never the chat history or raw values |
+| Plan patches | **first version built**: the planner returns a complete plan that copies earlier steps and labels its intent and patch type; unchanged steps are reused through their lineage keys. The engine does not yet derive the patch type itself |
+| Reuse decision, reuse checks | **first version built**: operators marked scope-sensitive; scope-ambiguity rule with the second contract produced by a mechanical plan rewrite (both directions); a chosen reading is carried to later turns; a claimed "explicit" reading must quote the question; changed semantics reported; outcome per turn is exact reuse, partial reuse, recompute or clarify. **Not built:** the truncated-list rule (unneeded so far, since rankings are always re-taken from the full score map) |
 | Self-reviewing or stateful code-generation baselines | **absent** |
 | Code-generation fallback inside the scaffold | decided in experiment 2; implementation not confirmed |
 
@@ -122,6 +123,29 @@ real data. One run, one region (the largest); not yet a measurement. The plans w
 does not yet produce follow-up plans, and no reuse rule beyond the keys exists.
 
 Unit tests: `prototype/tests/test_reuse.py`, 10 tests, passing on itiger.
+
+### 3.5 Live session on Pokec, model-planned (2026-11-22)
+
+Seven turns on Pokec with the model planning every turn (`bench/big/session_live.py`, jobs 304309 Haiku and 304310
+Opus; one run each, so this shows the mechanism, not a rate).
+
+| turn | request | Haiku | Opus |
+|---|---|---|---|
+| 1 | top 10 by PageRank | recompute, 3.8 s | recompute, 3.8 s |
+| 2 | region of each of them | partial reuse (PageRank and top-k reused) | same |
+| 3 | top 20 instead | partial reuse (PageRank reused) | same |
+| 4 | most influential within region X | rule raises two contracts; "user" picks B; subgraph PageRank executed, 0.3 s | same |
+| 5 | and within region Y | reading B carried over, stated | same |
+| 6 | regions by total PageRank | partial reuse | partial reuse |
+| 7 | "show the top 20 again" | read as top 20 within region Y | read as turn 3, exact reuse |
+
+- Cost for the session: $0.010 (Haiku), $0.36 (Opus); about 60k input tokens either way, most of it the operator
+  catalogue repeated each turn.
+- Planning takes 3 to 12 s per turn and dominates; execution after turn 1 is under 1.3 s.
+- Two defects found by these runs and fixed, both kept as tests: the planner computed both readings in one plan
+  (Haiku) or restricted two measures (Opus), and the first rewrite changed only one of them, so the answer shown did
+  not match the contract chosen. A contract now covers every restricted measure the answer depends on.
+- Turn 7 shows a second kind of ambiguity the rules do not cover: which earlier result "again" refers to.
 
 ## 4. Where things run
 
@@ -284,9 +308,9 @@ against the server.
 | Test whether the current cache can return a result from another interpretation | hours | Nov 24 |
 | Node attribute table: loader, profile card section, three operators; Pokec profiles on the cluster | 3 days | Nov 29 |
 | Lineage keys and caching of derived steps | 2 days | Nov 29 |
-| Session state and compact planner context | 3 days | Dec 3 |
-| Intent classes and four plan-patch types | 4 days | Dec 8 |
-| Reuse checks and the three-outcome decision | 3 days | Dec 8 |
+| Session state and compact planner context | done Nov 22 | Dec 3 |
+| Intent classes and four plan-patch types | first version Nov 22; engine-side derivation of the patch type open | Dec 8 |
+| Reuse checks and the three-outcome decision | first version Nov 22; reference ambiguity ("again") open | Dec 8 |
 | Self-reviewing code-generation baseline; silent-failure column in the scorer | 2 days | Dec 3 |
 | Stateful code-generation agent baseline | 3 days | Dec 8 |
 | Reuse fault-injection harness (E1) | 2 days | Dec 10 |

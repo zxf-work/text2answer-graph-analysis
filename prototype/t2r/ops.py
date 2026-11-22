@@ -30,6 +30,7 @@ class OpSpec:
     preconditions: list[str] = field(default_factory=list)
     directed_only: bool = False
     fn: Optional[Callable] = None
+    scope_sensitive: bool = False          # the value at a node depends on which nodes and edges are in the graph
 
 
 CATALOGUE: dict[str, OpSpec] = {}
@@ -699,6 +700,14 @@ def is_finite(ctx, value):
         return math.isfinite(float(v))
     except (TypeError, ValueError):
         return False
+
+
+# Scope-sensitive operators: computed on a subgraph they give different values than computed on the whole graph and
+# then restricted to the subgraph's nodes. Session reuse must never substitute one for the other without saying so.
+SCOPE_SENSITIVE = ("pagerank", "betweenness", "closeness", "eigenvector_centrality", "degree", "strength", "core_number",
+                   "local_clustering", "communities", "components")
+for _name in SCOPE_SENSITIVE:
+    CATALOGUE[_name].scope_sensitive = True
 
 
 def catalogue_text(include_tiers: bool = True) -> str:

@@ -260,6 +260,33 @@ def step_key(st: Step, keys: dict[str, str], seed: int) -> str:
     return _h([st.op, {k: _canon(v, keys) for k, v in sorted(args.items())}, seed])
 
 
+def plan_keys(plan: Plan, lg: LoadedGraph, seed: int = 1) -> dict[str, str]:
+    """Lineage key of every step, without executing anything (used to preview what a plan would reuse)."""
+    keys: dict[str, str] = {"G": graph_key(lg)}
+    for st in plan.steps:
+        keys[st.id] = step_key(st, keys, seed)
+    return keys
+
+
+def step_inputs(st: Step, ids: set[str]) -> list[str]:
+    """Ids of the earlier steps a step reads."""
+    out: list[str] = []
+
+    def walk(v: Any) -> None:
+        if isinstance(v, str) and v in ids:
+            out.append(v)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        else:
+            r = _ref_of(v)
+            if r is not None and r[0] in ids:
+                out.append(r[0])
+    for v in st.args.values():
+        walk(v)
+    return out
+
+
 def execute(plan: Plan, lg: LoadedGraph, seed: int = 1, cache: Optional[dict] = None) -> tuple[Ctx, list[dict[str, Any]]]:
     """Run a plan. With a cache, any step whose lineage key is present is reused instead of executed."""
     ctx = Ctx(lg, seed=seed)
