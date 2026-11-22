@@ -37,6 +37,7 @@ from t2r.ops import CATALOGUE  # noqa: E402
 from t2r.systems import SYSTEMS  # noqa: E402
 sys.path.insert(0, HERE)
 from viz import make_viz  # noqa: E402
+import session_api  # noqa: E402
 
 STATIC = os.path.join(HERE, "static")
 SCENES = os.path.join(HERE, "scenes")
@@ -265,6 +266,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json([{"name": s.name, "doc": s.doc, "params": s.params, "returns": s.returns, "cost": s.cost, "tiers": s.tiers} for s in CATALOGUE.values()])
             if u.path == "/api/stages":
                 return self._json(STAGES)
+            if u.path.startswith("/api/session/"):
+                return self._json(session_api.handle_get(u.path, q) or {"error": "not found"})
             if u.path == "/":
                 self.path = "/index.html"
             return super().do_GET()
@@ -289,6 +292,8 @@ class Handler(SimpleHTTPRequestHandler):
                 JOBS[jid] = job
                 threading.Thread(target=_run_job, args=(job,), daemon=True).start()
                 return self._json({"job": jid, "stages": job["stages"]})
+            if u.path.startswith("/api/session/"):
+                return self._json(session_api.handle_post(u.path, json.loads(body or b"{}"), JOBS, DEFAULT_MODEL))
             if u.path == "/api/upload":
                 fn = os.path.basename(self.headers.get("X-Filename") or f"upload_{int(time.time())}.txt")
                 os.makedirs(UPLOADS, exist_ok=True)

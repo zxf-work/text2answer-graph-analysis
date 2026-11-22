@@ -322,19 +322,30 @@ class Session:
         return findings, pat
 
     # ------------------------------------------------------------------ running one plan
-    def _run(self, plan: TurnPlan, lg: LoadedGraph, question: str) -> dict[str, Any]:
+    def _run(self, plan: TurnPlan, lg: LoadedGraph, question: str, turn_no: Optional[int] = None) -> dict[str, Any]:
         t0 = time.time()
         ctx, trace = execute(plan, lg, seed=self.seed, cache=self.store if self.reuse else None)
         dt = time.time() - t0
         findings = verify(plan, ctx, question=question)       # a reused result is verified like a fresh one
         reused = sum(t["cached"] for t in trace)
         outcome = "exact reuse" if reused == len(trace) and trace else ("partial reuse" if reused else "recompute")
+        turn_no = turn_no or len(self.turns)                   # the turn being run is already in the list
+        for t in trace:                                        # where each reused result was first computed
+            entry = self.store.get(ctx.keys[t["step"]]) if self.reuse else None
+            if entry is not None:
+                if t["cached"]:
+                    t["from_turn"] = entry.get("turn")
+                else:
+                    entry["turn"] = turn_no
+        lineage = answer_lineage(plan)
+        readings = sorted({p["reading"] for p in scope_patterns(plan) if p["step"] in lineage})
         ans_step = plan.answer.step if plan.answer and plan.answer.step else None
         return {"plan": plan.model_dump(), "trace": trace, "findings": findings, "answer": _jsonable(extract_answer(plan, ctx)),
                 "outcome": outcome, "steps_reused": reused, "steps_executed": len(trace) - reused, "execute_seconds": round(dt, 3),
                 "seconds_saved": round(sum(t.get("seconds_saved", 0) for t in trace), 3),
                 "sizes": {t["step"]: _size(ctx.values[t["step"]]) for t in trace},
                 "selection": _nodes_of(ctx.values.get(ans_step)) if ans_step else None,
+                "reading": readings[0] if len(readings) == 1 else None,
                 "keys": {s: k[:12] for s, k in ctx.keys.items()}}
 
     def _plan(self, question: str, llm: LLM, lg_hint: LoadedGraph) -> tuple[TurnPlan, list[str]]:
@@ -360,16 +371,28 @@ class Session:
         try:
             plan, problems = self._plan(question, llm, self.lg)
             turn.update(self.submit(plan, question, problems=problems, _turn=turn))
-            if explain and turn.get("trace"):
-                tr = json.dumps(turn["trace"], default=str)[:6000]
-                turn["explanation"] = llm.chat(INTERPRETER_SYSTEM, f"Question: {question}\nPlan rationale: {plan.rationale}\nInterpretation: {json.dumps(plan.interpretation, default=str)}\n"
-                                               f"Trace: {tr}\nFindings: {json.dumps(turn['findings'])[:3000]}\nExtracted answer: {json.dumps(turn['answer'], default=str)[:2000]}").text.strip()
+            if explain:
+                self.explain(turn, llm)
         except Exception as e:  # noqa: BLE001
             turn["error"] = f"{type(e).__name__}: {e}"
         turn.update({"llm_calls": llm.usage.calls - c0, "tokens_in": llm.usage.input_tokens - i0, "tokens_out": llm.usage.output_tokens - o0,
                      "cost_usd": round(llm.usage.cost_usd - u0, 5), "seconds": round(time.time() - t0, 3)})
         if turn not in self.turns:
             self.turns.append(turn)
+        return turn
+
+    def explain(self, turn: dict, llm: LLM) -> dict:
+        """Prose for an answered turn, written from the executed trace (also after a reading is chosen or a plan is edited)."""
+        if turn.get("trace"):
+            p = turn["plan"]
+            c0, i0, o0, u0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd
+            reading = f"Scope reading in force: {turn['reading']} ({SCOPE_NOTE[turn['reading']]})\n" if turn.get("reading") else ""
+            turn["explanation"] = llm.chat(INTERPRETER_SYSTEM, f"Question: {turn['question']}\nPlan rationale: {p.get('rationale')}\nInterpretation: {json.dumps(p.get('interpretation'), default=str)}\n{reading}"
+                                           f"Trace: {json.dumps(turn['trace'], default=str)[:6000]}\nFindings: {json.dumps(turn['findings'])[:3000]}\n"
+                                           f"Extracted answer: {json.dumps(turn['answer'], default=str)[:2000]}").text.strip()
+            for k, v in (("llm_calls", llm.usage.calls - c0), ("tokens_in", llm.usage.input_tokens - i0), ("tokens_out", llm.usage.output_tokens - o0)):
+                turn[k] = (turn.get(k) or 0) + v
+            turn["cost_usd"] = round((turn.get("cost_usd") or 0) + llm.usage.cost_usd - u0, 5)
         return turn
 
     def submit(self, plan: TurnPlan | dict, question: str, problems: Optional[list[str]] = None, _turn: Optional[dict] = None) -> dict[str, Any]:
@@ -436,9 +459,28 @@ class Session:
         self.scope_choice = {"reading": c["reading"], "turn": turn["turn"]}
         self.clarifications.append({"turn": turn["turn"], "answered": f"scope reading {c['reading']}", "contract": c["contract"]})
         turn["reuse_findings"].append({"check": "scope_reading", "ok": True, "severity": "info", "detail": f"reading {c['reading']} chosen by the user"})
-        self._accept(turn, c.get("result") or self._run(TurnPlan.model_validate(c["plan"]), pend["lg"], pend["question"]), pend["lg"])
+        self._accept(turn, c.get("result") or self._run(TurnPlan.model_validate(c["plan"]), pend["lg"], pend["question"], turn["turn"]), pend["lg"])
         turn["clarification"] = None
         return turn
+
+    def use_reading(self, reading: str, turn_no: int) -> dict[str, Any]:
+        """The user asks for an answered turn under the other scope reading. Runs as a new turn; the choice is remembered."""
+        src = self.turns[turn_no - 1]
+        plan, _ = force_reading(TurnPlan.model_validate(src["plan"]), reading)
+        self.scope_choice = {"reading": reading, "turn": len(self.turns) + 1}
+        self.clarifications.append({"turn": len(self.turns) + 1, "answered": f"scope reading {reading}", "for_turn": turn_no})
+        plan.intent, plan.based_on, plan.patch = "patch", turn_no, {"type": "scope", "what": f"turn {turn_no} under scope reading {reading}"}
+        return self.submit(plan, f"{src['question']} (reading {reading})")
+
+    def ledger(self) -> dict[str, Any]:
+        """Running totals of the session, for the interface and the audit record."""
+        done = [t for t in self.turns if t.get("trace")]
+        tot = lambda k: round(sum(t.get(k) or 0 for t in self.turns), 4)  # noqa: E731
+        return {"turns": len(self.turns), "answered": len(done), "steps_reused": tot("steps_reused"), "steps_executed": tot("steps_executed"),
+                "execute_seconds": tot("execute_seconds"), "seconds_saved": tot("seconds_saved"), "llm_calls": tot("llm_calls"),
+                "tokens_in": tot("tokens_in"), "tokens_out": tot("tokens_out"), "cost_usd": tot("cost_usd"), "stored_results": len(self.store),
+                "accepted_semantics": self.semantics, "scope_choice": self.scope_choice, "reuse": self.reuse,
+                "outcomes": {o: sum(t.get("outcome") == o for t in self.turns) for o in ("exact reuse", "partial reuse", "recompute", "clarify", "error")}}
 
     def _accept(self, turn: dict, result: dict, lg: LoadedGraph) -> None:
         turn.update(result)
