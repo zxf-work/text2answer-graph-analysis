@@ -1,0 +1,93 @@
+{
+ "variant": "codegen_stateful",
+ "model": "claude-haiku-5-5",
+ "sessions": 3,
+ "turns": 24,
+ "answer_accuracy": 0.4167,
+ "trap_turns": 6,
+ "trap_correct": 0,
+ "trap_stale": 5,
+ "trap_other_wrong": 1,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 6,
+   "correct": 0,
+   "stale": 5,
+   "other_wrong": 1
+  }
+ },
+ "valid_turns": 9,
+ "valid_correct": 2,
+ "valid_execute_seconds": 3.27,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 327.16,
+ "compute_seconds": 327.2,
+ "setup_seconds": 451.2,
+ "model_seconds": 95.1,
+ "compute_seconds_by_graph": {
+  "livejournal": {
+   "setup": 112.4,
+   "turns": [
+    10.3,
+    52.8,
+    0.6,
+    2.7,
+    0.6,
+    0.4,
+    0.6,
+    0.6
+   ]
+  },
+  "orkut": {
+   "setup": 255.6,
+   "turns": [
+    10.3,
+    213.8,
+    0.0,
+    2.8,
+    0.0,
+    0.2,
+    0.0,
+    0.0
+   ]
+  },
+  "pokec": {
+   "setup": 83.2,
+   "turns": [
+    8.2,
+    19.9,
+    0.1,
+    1.6,
+    0.1,
+    0.2,
+    0.2,
+    1.2
+   ]
+  }
+ },
+ "wall_seconds": 422.2,
+ "errors": 0,
+ "llm_calls": 26,
+ "tokens_in": 115031,
+ "tokens_out": 21541,
+ "cost_usd": 0.0223,
+ "stale_turns": [
+  "pokec/large t5 (R3)",
+  "pokec/large t6 (R3)",
+  "livejournal/large t6 (R3)",
+  "orkut/large t5 (R3)",
+  "orkut/large t6 (R3)"
+ ],
+ "wrong_turns": [
+  "pokec/large t7 (valid)",
+  "pokec/large t8 (valid)",
+  "livejournal/large t2 (new)",
+  "livejournal/large t3 (valid)",
+  "livejournal/large t5 (R3)",
+  "livejournal/large t7 (valid)",
+  "livejournal/large t8 (valid)",
+  "orkut/large t7 (valid)",
+  "orkut/large t8 (valid)"
+ ]
+}

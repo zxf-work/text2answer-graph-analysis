@@ -65,7 +65,8 @@ def apply_event(ev, live, lg):
         for rank in ev["targets"]:
             t = order[rank - 1]
             have = set(g.neighbors(t, mode="in")) | {t}
-            src = [i for i in sorted(range(g.vcount()), key=lambda i: lg.labels[i]) if i not in have][:ev["n"]]
+            n = indeg[order[0]] if ev["n"] == "max" else ev["n"]
+            src = [i for i in sorted(range(g.vcount()), key=lambda i: lg.labels[i]) if i not in have][:n]
             lines += [f"{lg.labels[s]}{d}{lg.labels[t]}\n" for s in src]
         with open(live, "rb+") as f:
             f.seek(-1, os.SEEK_END)
@@ -131,13 +132,16 @@ class Files:
 
 
 # ------------------------------------------------------------------------------------------------ gold and stale
+GOLD_STORE: dict = {}
+
+
 def evaluate(t, steps, files, version, reading):
     """All correct answers of a plan on one state of the session: the gold plan's, plus accepted conventions."""
     lg, path = files.graph(version, reading), files.path(version)
     plan = P(steps)
     bad = validate(plan, lg, 1e13)
     assert not bad, (t["q"], bad)
-    vals, _ = run_plan(plan, lg, 1, None, {})
+    vals, _ = run_plan(plan, lg, 1, GOLD_STORE, {})
     tt = {**t, "gold": {"-": plan}}
     gold = gold_value(t["expect"], vals[plan.steps[-1].id], t)
     extra = []
@@ -147,7 +151,33 @@ def evaluate(t, steps, files, version, reading):
         with open(table) as f:
             ids = [line.split("\t" if table.endswith((".tsv", ".txt")) else ",")[0] for line in f][1:]
         extra = [gold + sum(i not in lg.index for i in ids)]
+    if lg.facts.n_self_loops:
+        # the loader drops self-loops; an answer that keeps the ones in the file is also accepted
+        lg2 = _with_loops(lg, path)
+        v2, _ = run_plan(plan, lg2, 1, None, {})
+        extra.append(gold_value(t["expect"], v2[plan.steps[-1].id], t))
     return [gold] + extra + alternative_golds(tt, lg, path)
+
+
+_LOOPS: dict = {}
+
+
+def _with_loops(lg, path):
+    import dataclasses
+    import pandas as pd
+    key = (path, os.stat(path).st_mtime_ns)
+    if key not in _LOOPS:
+        f = lg.facts
+        si, ti = f.columns_used[0], f.columns_used[1]
+        d = _delim(path)
+        df = pd.read_csv(path, sep=r"\s+" if d == " " else d, comment="#", header=None, skiprows=1 if f.header else 0,
+                         usecols=[si, ti], dtype=str if not f.ids_numeric else "int64", engine="c")
+        loops = df[df[si] == df[ti]][si].astype(str).unique().tolist()
+        _LOOPS.clear(); _LOOPS[key] = loops
+    g = lg.g.copy()
+    ids = [lg.index[x] for x in _LOOPS[key] if x in lg.index]
+    g.add_edges([(i, i) for i in ids])
+    return dataclasses.replace(lg, g=g)
 
 
 def as_answer(expect, gold):
@@ -172,7 +202,7 @@ def golds_for(t, files, reading):
 class GraphAudit:
     def __init__(self, spec, live, llm):
         from t2r.session import Session
-        self.llm, self.s = llm, Session(live, name=spec["name"], description=spec["description"], on_ambiguity="ask")
+        self.llm, self.s = llm, Session(live, name=spec["name"], description=spec["description"], on_ambiguity="ask", budget_ops=float(os.environ.get("T2A_BUDGET_OPS", "1e10")))
 
     def ask(self, q):
         r = self.s.ask(q, self.llm)
@@ -221,7 +251,12 @@ def summarise(rows, llm, variant, model, out):
          "trap_other_wrong": sum(not r["correct"] and not r["stale"] for r in traps), "void_trap_turns": sum(bool(r["trap"]) and r["void"] for r in rows),
          "by_class": per, "valid_turns": len(valid), "valid_correct": sum(r["correct"] for r in valid),
          "valid_execute_seconds": round(sum(r["execute_seconds"] for r in valid), 2), "valid_share_steps_reused": round(sum(r["steps_reused"] for r in valid) / steps, 4),
-         "execute_seconds": round(sum(r["execute_seconds"] for r in rows), 2), "wall_seconds": round(sum(r["wall_seconds"] for r in rows), 1),
+         "execute_seconds": round(sum(r["execute_seconds"] for r in rows), 2),
+         "compute_seconds": round(sum(r.get("compute_seconds") or 0 for r in rows), 1), "setup_seconds": round(sum(r.get("setup_seconds") or 0 for r in rows), 1),
+         "model_seconds": round(sum(r.get("model_seconds") or 0 for r in rows), 1),
+         "compute_seconds_by_graph": {g: {"setup": round(sum(r.get("setup_seconds") or 0 for r in rows if r["graph"] == g), 1),
+                                          "turns": [round(r.get("compute_seconds") or 0, 1) for r in rows if r["graph"] == g]} for g in sorted({r["graph"] for r in rows})},
+         "wall_seconds": round(sum(r["wall_seconds"] for r in rows), 1),
          "errors": sum(bool(r["error"]) for r in rows), "llm_calls": sum(r.get("llm_calls") or 0 for r in rows), "tokens_in": sum(r.get("tokens_in") or 0 for r in rows),
          "tokens_out": sum(r.get("tokens_out") or 0 for r in rows), "cost_usd": round(sum(r.get("cost_usd") or 0 for r in rows), 4),
          "stale_turns": [f"{r['session']} t{r['turn']} ({r['trap']})" for r in traps if r["stale"]],
@@ -234,7 +269,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out"); ap.add_argument("graphs", nargs="*")
     ap.add_argument("--model", default="claude-haiku-5-5"); ap.add_argument("--variant", default="full"); ap.add_argument("--only", default="")
-    ap.add_argument("--timeout", type=int, default=600); ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--timeout", type=int, default=600)
+    ap.add_argument("--large", default="", help="directory with the SNAP graphs: run the large-graph sessions (workload_large.py) instead")
+    ap.add_argument("--work", default="", help="where the per-session copies of the files go (default: <out>/work; use node scratch for large graphs)"); ap.add_argument("--dry", action="store_true")
     ap.add_argument("--rescore", action="store_true", help="score the answers already in <out>/turns.jsonl again; no system is run")
     a = ap.parse_args()
     assert a.dry or a.variant in VARIANTS
@@ -248,12 +285,19 @@ def main():
             shutil.copy(os.path.join(a.out, "summary.json"), os.path.join(a.out, "summary.before_rescore.json"))
         a.variant, a.model = next(iter(old.values()))["variant"], next(iter(old.values()))["model"]
     log = open(os.path.join(a.out, "turns.rescored.jsonl" if a.rescore else "turns.jsonl"), "w")
-    for spec in specs(a.graphs):
-        for sess in sessions(spec):
+    if a.large:
+        import workload_large
+        all_specs, sessions_of = workload_large.specs(a.large), workload_large.sessions
+    else:
+        all_specs, sessions_of = specs(a.graphs), sessions
+    for spec in all_specs:
+        for sess in sessions_of(spec):
             if a.only and a.only not in sess["id"]:
                 continue
-            files = Files(spec, os.path.join(a.out, "work", sess["id"].replace("/", "_")))
+            files = Files(spec, os.path.join(a.work or os.path.join(a.out, "work"), sess["id"].replace("/", "_")))
+            t_setup = time.time()
             system = None if a.dry or a.rescore else (GraphAudit(spec, files.live, llm) if a.variant == "full" else Codegen(spec, files.live, llm, a.variant, a.timeout))
+            setup = round(time.time() - t_setup, 2)       # GraphAudit: load and profile; agents: file facts
             reading = {}
             for i, t in enumerate(sess["turns"], 1):
                 ev = files.event(t["event"]) if t.get("event") else None
@@ -271,7 +315,7 @@ def main():
                     row = {**d, **base, "correct": ok, "stale": not ok and any(matches(t["expect"], g, d["answer"]) for g in stale), "gold": good, "stale_gold": stale}
                     rows.append(row); log.write(json.dumps(row, default=str) + "\n")
                     continue
-                c0, i0, o0, u0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd
+                c0, i0, o0, u0, m0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd, llm.usage.seconds
                 t0 = time.time()
                 try:
                     r = system.ask(t["q"])
@@ -282,15 +326,17 @@ def main():
                 is_stale = not ok and any(matches(t["expect"], g, r["answer"]) for g in stale)
                 row = {**base, "correct": ok, "stale": is_stale, "asked": r["asked"], "error": r["error"], "outcome": r["outcome"], "flags": r["flags"],
                        "steps_reused": r["steps_reused"], "steps_executed": r["steps_executed"], "execute_seconds": round(r["execute_seconds"], 3), "wall_seconds": round(wall, 3),
+                       # everything that is not waiting for the model: loading, hashing, executing, verifying
+                       "model_seconds": round(llm.usage.seconds - m0, 3), "compute_seconds": round(wall - (llm.usage.seconds - m0), 3), "setup_seconds": setup if i == 1 else 0,
                        "llm_calls": llm.usage.calls - c0, "tokens_in": llm.usage.input_tokens - i0, "tokens_out": llm.usage.output_tokens - o0, "cost_usd": round(llm.usage.cost_usd - u0, 5)}
                 rows.append(row)
                 log.write(json.dumps({**row, "answer": r["answer"], "gold": good, "stale_gold": stale, "plan": r["plan"]}, default=str) + "\n"); log.flush()
                 tag = t.get("trap") or ("valid" if t.get("valid") else "-")
-                print(f"{sess['id']:<28} t{i} {tag:<5} {'OK   ' if ok else ('STALE' if is_stale else 'BAD  ')} exec {r['execute_seconds']:6.1f}s reused {r['steps_reused']}/{r['steps_reused'] + r['steps_executed']}"
+                print(f"{sess['id']:<28} t{i} {tag:<5} {'OK   ' if ok else ('STALE' if is_stale else 'BAD  ')} compute {row['compute_seconds']:7.1f}s exec {r['execute_seconds']:6.1f}s reused {r['steps_reused']}/{r['steps_reused'] + r['steps_executed']}"
                       f"{' asked' if r['asked'] else ''}{' void' if void else ''} {','.join(r['flags'])} {r['error'] or ''}"[:230], flush=True)
             if system:
                 system.close()
-            graphs._GRAPH_CACHE.clear()
+            graphs._GRAPH_CACHE.clear(); GOLD_STORE.clear()
             shutil.rmtree(files.work, ignore_errors=True)
             for f in os.listdir(SCRATCH_CACHE):
                 os.remove(os.path.join(SCRATCH_CACHE, f))

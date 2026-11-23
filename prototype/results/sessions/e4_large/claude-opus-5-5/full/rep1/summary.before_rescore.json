@@ -1,0 +1,77 @@
+{
+ "variant": "full",
+ "model": "claude-opus-5-5",
+ "sessions": 3,
+ "turns": 24,
+ "answer_accuracy": 1.0,
+ "trap_turns": 6,
+ "trap_correct": 6,
+ "trap_stale": 0,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 9,
+ "valid_correct": 9,
+ "valid_execute_seconds": 3.18,
+ "valid_share_steps_reused": 0.4286,
+ "execute_seconds": 86.93,
+ "compute_seconds": 539.1,
+ "setup_seconds": 449.4,
+ "model_seconds": 135.3,
+ "compute_seconds_by_graph": {
+  "livejournal": {
+   "setup": 123.7,
+   "turns": [
+    4.8,
+    11.0,
+    0.3,
+    2.8,
+    136.0,
+    4.6,
+    0.4,
+    1.1
+   ]
+  },
+  "orkut": {
+   "setup": 252.8,
+   "turns": [
+    3.0,
+    15.7,
+    0.2,
+    0.3,
+    271.9,
+    2.9,
+    0.2,
+    0.6
+   ]
+  },
+  "pokec": {
+   "setup": 73.0,
+   "turns": [
+    1.4,
+    4.0,
+    0.1,
+    0.1,
+    75.9,
+    1.4,
+    0.1,
+    0.4
+   ]
+  }
+ },
+ "wall_seconds": 674.4,
+ "errors": 0,
+ "llm_calls": 24,
+ "tokens_in": 204263,
+ "tokens_out": 14607,
+ "cost_usd": 1.1092,
+ "stale_turns": [],
+ "wrong_turns": []
+}

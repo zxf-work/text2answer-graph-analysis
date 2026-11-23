@@ -285,6 +285,62 @@ Stale answers by class (stateful agent, not warned): R1 reading changed 0/10; R2
 - Infrastructure: the first two attempts died on the home-directory quota (the per-copy graph caches); caches of
   throwaway copies now go to node scratch and the project lives under `/project/xzhang12` (200 GB limit).
 
+### 3.10 E4 (first part): sessions on the full large graphs (2026-11-22)
+
+Pokec (30.6M links), LiveJournal (69M), Orkut (117M); one 8-turn session per graph (`bench/sessions/workload_large.py`):
+most-linked top 10, PageRank top 10, "top 20 instead" (valid reuse), component count, then the edge file is changed
+without a word (two users gain 27k to 67k links) and both rankings are asked again (R3), then two follow-ups that
+may reuse what was computed after the change. Four systems, Haiku and Opus, **one run each**. Files are copied to
+node scratch per session. "Compute" is wall time minus time waiting for the model.
+
+| System | Model | Turns correct (24) | After change correct (6) | Stale (6) | Setup s | Compute s | Model cost |
+|---|---|---|---|---|---|---|---|
+| GraphAudit | Opus | 24 | 6 | 0 | 449 | 539 | $1.11 |
+| GraphAudit | Haiku | 24 | 6 | 0 | 457 | 541 | $0.03 |
+| Stateful agent | Opus | 13 | 0 | 6 | 320 | 131 | $0.53 |
+| Stateful agent | Haiku | 13 | 0 | 6 | 451 | 327 | $0.02 |
+| Stateful agent, warned | Opus | 24 | 6 | 0 | 326 | 790 | $0.92 |
+| Stateful agent, warned | Haiku | 12 | 0 | 6 | 309 | 349 | $0.03 |
+| Independent agent | Opus | 24 | 6 | 0 | 319 | 1357 | $0.99 |
+| Independent agent | Haiku | 23 | 6 | 0 | 322 | 1065 | $0.03 |
+
+Compute seconds per turn (Opus runs; t5 is the first turn after the change):
+
+| Graph | System | t1 | t2 | t3 | t4 | t5 | t6 | t7 | t8 | Sum |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Pokec | GraphAudit | 1.4 | 4.0 | 0.1 | 0.1 | 75.9 | 1.4 | 0.1 | 0.4 | 83 |
+| Pokec | Warned agent | 5.0 | 14.9 | 0.7 | 2.1 | 15.3 | 5.5 | 0.8 | 5.3 | 50 |
+| Pokec | Independent | 4.0 | 15.2 | 15.3 | 14.0 | 15.6 | 2.7 | 19.3 | 11.0 | 97 |
+| LiveJournal | GraphAudit | 4.8 | 11.0 | 0.3 | 2.8 | 136.0 | 4.6 | 0.4 | 1.1 | 161 |
+| LiveJournal | Warned agent | 7.6 | 70.3 | 8.8 | 2.8 | 66.8 | 0.9 | 2.4 | 0.5 | 160 |
+| LiveJournal | Independent | 7.8 | 51.5 | 51.0 | 31.4 | 50.7 | 9.3 | 103.1 | 56.6 | 361 |
+| Orkut | GraphAudit | 3.0 | 15.7 | 0.2 | 0.3 | 271.9 | 2.9 | 0.2 | 0.6 | 295 |
+| Orkut | Warned agent | 11.3 | 148.4 | 10.5 | 47.7 | 147.1 | 102.7 | 10.6 | 101.9 | 580 |
+| Orkut | Independent | 11.3 | 214.0 | 200.0 | 15.1 | 218.7 | 11.5 | 216.5 | 11.3 | 898 |
+
+- **The stateful agent never notices the change at this size**: 6 of 6 stale with both models (on the small graphs
+  of 3.9 it was 5 of 9 and 2 of 9), and the follow-ups built on the stale state are wrong too (5 of 9 valid turns
+  wrong). Its sessions are the cheapest because it never re-reads the file.
+- **The one-sentence warning works for Opus and not for Haiku** (6 of 6 stale); on the small graphs it worked for both.
+- **GraphAudit**: all correct, change reported on every graph. Its cost is concentrated in one place: the first turn
+  after the change re-reads, hashes and re-profiles the file (75 / 136 / 272 s), of which the computation is 4 to 16 s.
+  Reused follow-ups take under 0.5 s. Its setup is also the slowest (73 / 124 / 253 s against 43 / 89 / 187 s).
+- **Not a win everywhere**: on Pokec the warned Opus agent is correct and cheaper in compute (50 s against 83 s);
+  on LiveJournal they tie; GraphAudit is ahead only on Orkut and against the independent agent. With a session this
+  short the detection cost is not amortised. Making detection cheaper (hash only what changed, or check size and
+  mtime before hashing, reuse the profile for an append) is the obvious engineering step before claiming a time advantage.
+- **Self-loops**: GraphAudit's loader drops self-loops and says nothing in the answer; the agents keep them and
+  state it. On LiveJournal this swaps PageRank ranks 9 and 10 and gives 776 instead of 775 users above 1000 incoming
+  links. The scorer now accepts both (`run_stale.py`, `_with_loops`); all eight runs were rescored. GraphAudit should
+  report the convention as a finding.
+- Agent errors that are not conventions: Haiku independent, 187 components on Orkut (1); Haiku warned, 914
+  components on LiveJournal (1876).
+- Limits: one run per cell; one session shape; the change is large and append-only; node-to-node timing variation is
+  visible (the Haiku stateful run's setup is 451 s against 309 to 326 s for the other agents); the first attempt of
+  one job hung on a node that was draining (itiger08, now excluded).
+- Not done: the budget sweep of the E4 design; repetitions.
+- Results: `prototype/results/sessions/e4_large/`.
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**
@@ -469,6 +525,8 @@ calls for three repetitions.
   unmutated correct plans (never measured). Try to lift the two weak rows (method swaps 1 of 8, in/out flips 4 of 7).
 
 ### E4. Real large graphs and the budget curve
+
+*First part (sessions with an unannounced change) run 2026-11-22, results in 3.10. The budget sweep below is not started.*
 
 Pokec, LiveJournal, Orkut with regenerated ground truth; full, flat and code generation; three repetitions. Sweep
 the cost budget over two orders of magnitude and report answer quality, wall time and budget compliance. Report
