@@ -341,6 +341,65 @@ Compute seconds per turn (Opus runs; t5 is the first turn after the change):
 - Not done: the budget sweep of the E4 design; repetitions.
 - Results: `prototype/results/sessions/e4_large/`.
 
+### 3.11 Load time: where it went and what replaced it (2026-11-23)
+
+Stage timing of a cold load (`bench/load_profile.py`, `slurm/load_profile.sbatch`, 16 cores, file on node scratch):
+
+| Stage | Orkut before | Orkut after | LiveJournal before | LiveJournal after |
+|---|---|---|---|---|
+| Parse and file statistics (`read_raw_fast`) | 233.6 s | 3.8 s | 105.6 s | 2.5 s |
+| Build (`_build_big`), of which igraph `add_edges` | 79.4 s (38.3) | 40.8 s (37.7) | 25.9 s (24.3) | 24.5 s (23.0) |
+| Profile card | 2.4 s | 2.3 s | 8.6 s | 8.4 s |
+
+- Cause: two `np.unique` calls counting distinct links (224 s on Orkut, 101 s on LiveJournal); polars `n_unique` does
+  the same in 1.1 s and 0.7 s. The pandas parse was 8.8 s; pyarrow reads the file in 0.7 s.
+- Changes in `t2r/graphs.py`: pyarrow reader for plain numeric edge lists (pandas stays as the fallback), polars for
+  distinct counts and deduplication (numpy fallback), lookup-table relabelling of non-contiguous ids, binary cache
+  key on mtime in nanoseconds, cache format 2.
+- **The file hash now covers the whole file** (about 1 s per 1.8 GB). Before, it covered the first megabyte and the
+  size, so an edit further down that kept the size reloaded the graph but could still match stored results.
+- Check: 30 tests pass; the reference answers of all 24 large-session turns are identical to the old loader's.
+- Floor: igraph builds its graph at about 0.35 s per million links, and the same from the binary cache (39 s on
+  Orkut). File order, the constructor, pre-sorted edges and 64-bit ids all take 22 to 24 s on LiveJournal
+  (`bench/igraph_build.py`). Going lower needs appending in place (60k links onto the loaded graph: 15 s on Orkut,
+  10 s on LiveJournal, 5 s on Pokec) or another graph engine. Neither is started.
+
+GraphAudit large sessions again with the new loader (Haiku, one run, `rep2`; 24 of 24 correct, 0 stale):
+
+| Graph | Setup before | Setup after | Turn after change before | after | Session compute before | after |
+|---|---|---|---|---|---|---|
+| Pokec | 73 s | 27 s | 75 s | 30 s | 83 s | 36 s |
+| LiveJournal | 124 s | 35 s | 139 s | 45 s | 161 s | 68 s |
+| Orkut | 253 s | 47 s | 272 s | 62 s | 295 s | 81 s |
+
+Against the Opus agents of 3.10 (compute seconds, not rerun): warned agent 50 / 160 / 580, independent agent
+97 / 361 / 898. GraphAudit is now below both correct agents on all three graphs. The agents' setup in 3.10 (about
+320 s in total) was measured with the old file-facts reader, which they share, and would shrink as well.
+
+### 3.12 Appending in place when the edge file only grew (2026-11-23)
+
+`t2r/graphs.py: append_in_place`, called from `Session._refresh`. If the first `n_bytes` of the file are unchanged
+(hash) and the new rows are integer pairs, the rows are added to the loaded graph; the file statistics are updated
+exactly from the graph and the semantics inferred again. It declines, and the file is loaded in full, when the result
+could differ from a full load: header, text ids or weight column; node table changed too; a new id that sorts between
+old ones or leaves a gap; a self-loop appended to a file that had self-loops; an appended pair already present under
+an undirected reading; reciprocity within reach of a decision threshold; inferred semantics would change; more new
+rows than half the old ones. The reason is kept in `graphs.APPEND_DECLINED`; `T2R_APPEND=0` switches it off.
+Edge order can differ from a full load's (no effect beyond floating-point rounding). Tests: `tests/test_append.py`
+(equality with a full load for directed and undirected readings, eight decline cases, session answers equal to a
+fresh session); 41 tests pass.
+
+GraphAudit large sessions (Haiku, one run each; all 24 of 24 correct, 0 stale):
+
+| Graph | Turn after change: old loader | new loader, full reload (`rep2`) | new loader, append (`rep3`) | of which computing the answer | Session compute: old | reload | append |
+|---|---|---|---|---|---|---|---|
+| Pokec | 75 s | 30 s | 13 s | 3 s | 83 s | 36 s | 19 s |
+| LiveJournal | 139 s | 45 s | 29 s | 10 s | 161 s | 68 s | 52 s |
+| Orkut | 272 s | 62 s | 30 s | 13 s | 295 s | 81 s | 50 s |
+
+What is left of the turn after a change is igraph rebuilding its index after `add_edges` (5 / 10 / 15 s), the
+profile card, and recomputing the answer. Setup is unchanged from 3.11 (27 / 35 / 47 s).
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**

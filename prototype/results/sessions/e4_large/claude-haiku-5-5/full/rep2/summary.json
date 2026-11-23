@@ -1,0 +1,77 @@
+{
+ "variant": "full",
+ "model": "claude-haiku-5-5",
+ "sessions": 3,
+ "turns": 24,
+ "answer_accuracy": 1.0,
+ "trap_turns": 6,
+ "trap_correct": 6,
+ "trap_stale": 0,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 6,
+   "correct": 6,
+   "stale": 0,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 9,
+ "valid_correct": 9,
+ "valid_execute_seconds": 3.02,
+ "valid_share_steps_reused": 0.4286,
+ "execute_seconds": 76.3,
+ "compute_seconds": 184.7,
+ "setup_seconds": 108.5,
+ "model_seconds": 77.8,
+ "compute_seconds_by_graph": {
+  "livejournal": {
+   "setup": 35.0,
+   "turns": [
+    4.3,
+    9.7,
+    0.3,
+    2.6,
+    45.1,
+    4.2,
+    0.3,
+    1.2
+   ]
+  },
+  "orkut": {
+   "setup": 46.8,
+   "turns": [
+    2.6,
+    13.5,
+    0.2,
+    0.2,
+    61.5,
+    2.5,
+    0.2,
+    0.6
+   ]
+  },
+  "pokec": {
+   "setup": 26.6,
+   "turns": [
+    1.2,
+    3.4,
+    0.1,
+    0.1,
+    29.5,
+    1.2,
+    0.1,
+    0.2
+   ]
+  }
+ },
+ "wall_seconds": 262.5,
+ "errors": 0,
+ "llm_calls": 24,
+ "tokens_in": 204556,
+ "tokens_out": 16934,
+ "cost_usd": 0.029,
+ "stale_turns": [],
+ "wrong_turns": []
+}

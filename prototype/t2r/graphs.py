@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 from collections import Counter
 from dataclasses import dataclass, field, asdict
@@ -46,6 +47,7 @@ class RawFacts:
     row_index_column: bool = False          # first column is a running row number, not a node id
     weight_has_fractions: bool = False
     id_ranges_disjoint: bool = False        # source ids and target ids never overlap (bipartite file)
+    n_bytes: int = 0                        # file size the facts describe (large-file reader only; needed to append in place)
 
 
 def _is_number(s: str) -> bool:
@@ -93,33 +95,99 @@ def _pick_columns(header: Optional[list[str]], raw: list[list[str]]) -> tuple[in
 BIG_FILE_BYTES = 60_000_000
 
 
+def _read_arrow(path: str):
+    """Multi-threaded parse of a plain numeric edge list (pyarrow). Returns (u, v, weight column or None, sample rows, column
+    names), or None when pyarrow is missing or the file is not that simple (the pandas reader then takes over).
+    Measured on Orkut (117M rows, 1.8 GB): 0.7 s against 8.8 s for the chunked pandas parse."""
+    try:
+        import pyarrow as pa
+        import pyarrow.csv as pc
+        skip = 0
+        with open(path, "rb") as f:
+            for line in f:
+                if not line.startswith(b"#"):
+                    break
+                skip += 1
+        sep = "\t" if b"\t" in line else ("," if b"," in line else " ")
+        tb = pc.read_csv(path, read_options=pc.ReadOptions(skip_rows=skip, autogenerate_column_names=True, block_size=64 << 20),
+                         parse_options=pc.ParseOptions(delimiter=sep))
+        names = tb.column_names
+        if len(names) < 2 or not all(pa.types.is_integer(tb[c].type) for c in names[:2]) or tb.num_rows == 0:
+            return None
+        if any(tb[c].null_count for c in names[:3]):
+            return None
+        head = tb.slice(0, 200).to_pandas()
+        sample = head.astype(str).values.tolist()
+        u = tb[names[0]].to_numpy(); v = tb[names[1]].to_numpy()
+        wcol = tb[names[2]].to_pandas() if len(names) > 2 else None
+        return u, v, wcol, sample, list(range(len(names)))
+    except Exception:  # noqa: BLE001  (anything unusual: comments inside the file, ragged rows, text ids)
+        return None
+
+
+def _n_distinct(key) -> int:
+    """Number of distinct values. polars (parallel hashing) when installed: 1 s where numpy's sort-based unique took 110 s
+    per array on 117M rows."""
+    try:
+        import polars as pl
+        return int(pl.Series("k", key).n_unique())
+    except ImportError:
+        return len(np.unique(key))
+
+
+def _sorted_distinct(key):
+    try:
+        import polars as pl
+        return pl.Series("k", key).unique().sort().to_numpy()
+    except ImportError:
+        return np.unique(key)
+
+
+def _first_of_each(key):
+    """Row index of the first occurrence of every distinct key, ordered by key (what np.unique(return_index=True) gives)."""
+    try:
+        import polars as pl
+        d = pl.DataFrame({"k": key}).with_row_index("i").group_by("k").agg(pl.col("i").min()).sort("k")
+        return d["i"].to_numpy().astype(np.int64)
+    except ImportError:
+        return np.unique(key, return_index=True)[1]
+
+
 def read_raw_fast(path: str) -> tuple[RawFacts, Any]:
     """Large-file path: pandas load, numpy statistics, sampled reciprocity. Returns (facts, (u, v, w) arrays)."""
     import pandas as pd
-    h = hashlib.sha1()
+    # The hash covers the whole file: it is part of every reuse key, so an edit anywhere must change it (about 1 s per GB).
     with open(path, "rb") as f:
-        h.update(f.read(1 << 20)); h.update(str(os.path.getsize(path)).encode())
+        h = hashlib.file_digest(f, "sha1")
+    h.update(str(os.path.getsize(path)).encode())
     with open(path, "r") as f:
         first = f.readline()
     delim = "," if "," in first else r"\s+"
     toks = [x.strip() for x in (first.strip().split(",") if delim == "," else first.split())]
     header = toks if (len(toks) >= 2 and not all(_is_number(x) for x in toks[:2]) and not first.startswith("#")) else None
-    # Read in chunks: a single frame for a 50M-row file peaks at several GB; chunks bound the peak to one chunk plus the column arrays.
-    us, vs, ws = [], [], []
-    raw_sample = None; cols = None; si = ti = wi = row_index = None
-    for df in pd.read_csv(path, sep=delim, header=0 if header else None, comment="#", engine="c", dtype=str if header else None, chunksize=5_000_000):
-        if raw_sample is None:
-            raw_sample = df.head(200).astype(str).values.tolist()
-            si, ti, wi, row_index = _pick_columns(header, raw_sample)
-            cols = list(df.columns)
-        us.append(df[cols[si]].to_numpy()); vs.append(df[cols[ti]].to_numpy())
-        if wi is not None and wi < len(cols):
-            ws.append(df[cols[wi]])
-        del df
-    u = np.concatenate(us); v = np.concatenate(vs); del us, vs
-    wcol = pd.concat(ws, ignore_index=True) if ws else None; del ws
+    fast = None if header else _read_arrow(path)
+    if fast is not None:
+        u, v, wcol, raw_sample, cols = fast
+        si, ti, wi, row_index = _pick_columns(header, raw_sample)
+        if (si, ti) != (0, 1) or (wi is not None and wi != 2):
+            fast = None
+    if fast is None:
+        # Read in chunks: a single frame for a 50M-row file peaks at several GB; chunks bound the peak to one chunk plus the column arrays.
+        us, vs, ws = [], [], []
+        raw_sample = None; cols = None; si = ti = wi = row_index = None
+        for df in pd.read_csv(path, sep=delim, header=0 if header else None, comment="#", engine="c", dtype=str if header else None, chunksize=5_000_000):
+            if raw_sample is None:
+                raw_sample = df.head(200).astype(str).values.tolist()
+                si, ti, wi, row_index = _pick_columns(header, raw_sample)
+                cols = list(df.columns)
+            us.append(df[cols[si]].to_numpy()); vs.append(df[cols[ti]].to_numpy())
+            if wi is not None and wi < len(cols):
+                ws.append(df[cols[wi]])
+            del df
+        u = np.concatenate(us); v = np.concatenate(vs); del us, vs
+        wcol = pd.concat(ws, ignore_index=True) if ws else None; del ws
     try:
-        u = u.astype(np.int64); v = v.astype(np.int64); numeric = True
+        u = u.astype(np.int64, copy=False); v = v.astype(np.int64, copy=False); numeric = True
     except (ValueError, TypeError):
         numeric = False
     w = None
@@ -145,11 +213,9 @@ def read_raw_fast(path: str) -> tuple[RawFacts, Any]:
             srcs_tgts_disjoint = len(np.intersect1d(np.unique(u), np.unique(v))) == 0
         self_loops = int((u == v).sum())
         lo = np.minimum(u, v); hi = np.maximum(u, v)
-        n_dedup_u = len(np.unique(lo * N + hi))
+        n_dedup_u = _n_distinct(lo * N + hi)
         del lo, hi
-        key_d = u * N + v
-        uniq_d = np.unique(key_d)
-        del key_d
+        uniq_d = _sorted_distinct(u * N + v)
         n_dedup_d = len(uniq_d)
         rng = np.random.default_rng(0)
         idx = rng.choice(n_rows, size=min(200_000, n_rows), replace=False)
@@ -172,6 +238,7 @@ def read_raw_fast(path: str) -> tuple[RawFacts, Any]:
         sha1=h.hexdigest()[:12], weight_column_name=(header[wi] if (header and wi is not None and wi < len(header)) else None),
         columns_used=(si, ti, wi), row_index_column=row_index,
         weight_has_fractions=bool(w is not None and (w != np.floor(w)).any()), id_ranges_disjoint=srcs_tgts_disjoint,
+        n_bytes=os.path.getsize(path),
     )
     return facts, (u, v, w)
 
@@ -617,10 +684,19 @@ def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGrap
         a, b = u, v
         del u, v
     else:
-        ids, inv = np.unique(np.concatenate([u, v]), return_inverse=True)
+        if nmin >= 0 and nmax < 50 * len(u) + 1000:
+            # lookup table instead of a sort over 2m values: O(max id) memory, linear time
+            present = np.zeros(nmax + 1, dtype=bool); present[u] = True; present[v] = True
+            ids = np.flatnonzero(present)
+            remap = np.cumsum(present, dtype=np.int64) - 1
+            del present
+            a = remap[u]; b = remap[v]
+            del remap, u, v
+        else:
+            ids, inv = np.unique(np.concatenate([u, v]), return_inverse=True)
+            a = inv[: len(u)].astype(np.int64); b = inv[len(u):].astype(np.int64)
+            del inv, u, v
         N = len(ids)
-        a = inv[: len(u)].astype(np.int64); b = inv[len(u):].astype(np.int64)
-        del inv, u, v
     if not sem.directed:
         lo = np.minimum(a, b); hi = np.maximum(a, b); a, b = lo, hi
         del lo, hi
@@ -634,7 +710,7 @@ def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGrap
     n_dedup = facts.n_rows_dedup_directed if sem.directed else facts.n_rows_dedup_undirected
     if not sem.multigraph and n_dedup < facts.n_rows:
         key = a.astype(np.int64) * N + b
-        _, first = np.unique(key, return_index=True)
+        first = _first_of_each(key)
         del key
         a, b = a[first], b[first]
         ww = ww[first] if ww is not None else None
@@ -653,6 +729,7 @@ def _build_big(name: str, facts: RawFacts, sem: Semantics, arrays) -> LoadedGrap
     g.vs["name"] = labels
     if sem.weighted and ww is not None:
         g.es["weight"] = ww.tolist()
+    g["file_state"] = facts.sha1
     lg = LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index, lower_index=index)
     _disk_cache_put(lg, edges, ww if sem.weighted else None, None if contiguous else ids, contiguous=contiguous)
     del edges
@@ -668,11 +745,167 @@ def _graph_from_edges(n: int, edges, directed: bool) -> "ig.Graph":
     return g
 
 
+# --------------------------------------------------------------------------- appending in place
+APPEND_DECLINED = ""      # why the last append_in_place call returned None (for logs and tests)
+
+
+def _declined(why: str) -> None:
+    global APPEND_DECLINED
+    APPEND_DECLINED = why
+    return None
+
+
+def append_in_place(lg: LoadedGraph, path: str, description: str = "", override: Optional[dict] = None) -> Optional[LoadedGraph]:
+    """The file grew at its end: add the new rows to the loaded graph instead of loading everything again.
+
+    Returns the updated LoadedGraph, or None whenever the result could differ from a full load, in which case the
+    caller loads the file again. It is used only when all of these hold:
+    - the graph came from the large-file reader (integer ids, no header, no weight column) and is in the state its
+      facts describe;
+    - the first n_bytes bytes of the file are unchanged (their hash is the old file hash) and end with a newline;
+    - the new rows parse as integer pairs and are at most half the old row count;
+    - no new node id would change the vertex order a full load gives (new ids come after all old ones, and keep the
+      ids contiguous if they were);
+    - the file statistics can be updated exactly from the graph (see the two early returns on self-loops and on an
+      undirected reading), and the semantics inferred from the updated statistics are the ones already in force.
+    Vertex order equals a full load's; edge order can differ, which changes no result beyond floating-point rounding.
+    The graph object is modified, so any other holder of it must reload (the "file_state" mark tells them)."""
+    if os.environ.get("T2R_APPEND", "1") == "0":
+        return _declined("switched off")
+    f, g = lg.facts, lg.g
+    if (not f.n_bytes or f.header or not f.ids_numeric or f.columns_used != (0, 1, None) or f.row_index_column or f.id_ranges_disjoint
+            or "file_state" not in g.attributes() or g["file_state"] != f.sha1):
+        return _declined("graph not from the large-file reader, or not in the state of its facts")
+    t0 = time.time()
+    try:
+        size = os.path.getsize(path)
+        if size <= f.n_bytes:
+            return _declined("file did not grow")
+        h = hashlib.sha1()
+        with open(path, "rb") as fh:
+            left = f.n_bytes
+            last = b""
+            while left:
+                chunk = fh.read(min(left, 16 << 20))
+                if not chunk:
+                    return _declined("file shorter than before")
+                h.update(chunk); left -= len(chunk); last = chunk[-1:]
+            old = h.copy(); old.update(str(f.n_bytes).encode())
+            if old.hexdigest()[:12] != f.sha1 or last != b"\n":
+                return _declined("the old part of the file changed, or did not end with a newline")
+            tail = fh.read()
+        h.update(tail); h.update(str(size).encode())
+        import io
+        import pandas as pd
+        df = pd.read_csv(io.BytesIO(tail), sep="," if b"," in tail[:4096] else r"\s+", header=None, comment="#", engine="c")
+        if df.shape[1] != f.n_columns or len(df) == 0 or len(df) > f.n_rows // 2 or df[0].dtype.kind != "i" or df[1].dtype.kind != "i":
+            return _declined("new rows are not integer pairs, or too many")
+        tu = df[0].to_numpy(dtype=np.int64); tv = df[1].to_numpy(dtype=np.int64)
+        k = len(tu)
+        # the directedness evidence is a sampled reciprocity: stay away from its two decision thresholds
+        # (k new rows can at most be reciprocated themselves and reciprocate k old rows; 0.01 covers the sampling error)
+        r_lo = f.reciprocity * f.n_rows / (f.n_rows + k) - 0.01
+        r_hi = (f.reciprocity * f.n_rows + 2 * k) / (f.n_rows + k) + 0.01
+        if any(r_lo <= t <= r_hi for t in (0.02, 0.98)):
+            return _declined("reciprocity too close to a decision threshold")
+        n = g.vcount()
+        contiguous = isinstance(lg.index, _RangeIndex)
+        both = np.concatenate([tu, tv])
+        if both.min() < 0:
+            return _declined("negative id")
+        if contiguous:
+            new_ids = np.unique(both[both >= n])
+            if len(new_ids) and not np.array_equal(new_ids, np.arange(n, n + len(new_ids))):
+                return _declined("new ids would leave a gap in contiguous ids")
+            a, b = tu, tv
+        else:
+            ids = np.asarray(lg.labels, dtype=np.int64)
+            pos = np.searchsorted(ids, both); pos[pos >= n] = n - 1
+            found = ids[pos] == both
+            new_ids = np.unique(both[~found])
+            if len(new_ids) and new_ids[0] <= ids[-1]:
+                return _declined("a new id sorts before an existing one")
+            mapped = np.where(found, pos, n + np.searchsorted(new_ids, both))
+            a, b = mapped[:k], mapped[k:]
+        loops = a == b
+        if loops.any() and f.n_self_loops:
+            return _declined("self-loop appended to a file that already had self-loops")                    # the graph holds no self-loops, so a repeated one cannot be recognised
+        m = n + len(new_ids)
+        lo, hi = np.minimum(a, b), np.maximum(a, b)
+        key_d, first_d = np.unique(a * m + b, return_index=True)
+        key_u, first_u = np.unique(lo * m + hi, return_index=True)
+
+        def in_graph(x, y):
+            """For each pair, whether the edge x->y (or {x, y}) is in the graph as loaded."""
+            out = np.zeros(len(x), dtype=bool)
+            q = (x < n) & (y < n) & (x != y)
+            if q.any():
+                out[q] = np.asarray(g.get_eids(np.stack([x[q], y[q]], axis=1).tolist(), error=False)) >= 0
+            return out
+        if g.is_directed():
+            had_d = in_graph(a[first_d], b[first_d])
+            had_u = in_graph(a[first_u], b[first_u]) | in_graph(b[first_u], a[first_u])
+        else:
+            had_u = in_graph(lo[first_u], hi[first_u])
+            if had_u.any():
+                return _declined("appended pair already present under the undirected reading")                # the undirected graph does not say in which direction the old row was written
+            had_d = np.zeros(len(first_d), dtype=bool)
+        facts = dataclasses.replace(
+            f, n_lines=f.n_lines + k, n_rows=f.n_rows + k, n_distinct_ids=f.n_distinct_ids + len(new_ids),
+            n_rows_dedup_directed=f.n_rows_dedup_directed + int((~had_d).sum()),
+            n_rows_dedup_undirected=f.n_rows_dedup_undirected + int((~had_u).sum()),
+            n_self_loops=f.n_self_loops + int(loops.sum()), sha1=h.hexdigest()[:12], n_bytes=size)
+        sem = infer_semantics(facts, description)
+        for kk, vv in (override or {}).items():
+            setattr(sem, kk, vv); sem.confidence[kk] = 1.0; sem.evidence[kk] = "declared by user"
+        sem.needs_clarification = [x for x in sem.needs_clarification if x not in (override or {})]
+        was = lg.semantics
+        if (sem.directed, sem.weighted, sem.multigraph, sem.weight_semantics, sem.labelled) != (was.directed, was.weighted, was.multigraph, was.weight_semantics, was.labelled):
+            return _declined("inferred semantics would change")
+        if sem.directed != g.is_directed():
+            return _declined("directedness would change")
+        # rows to add, in file order: no self-loops; without parallel edges, only the first copy of a pair not yet there
+        if sem.multigraph:
+            keep = np.flatnonzero(~loops)
+        else:
+            keep = np.sort((first_d[~had_d] if g.is_directed() else first_u[~had_u]))
+            keep = keep[~loops[keep]]
+        x, y = (a, b) if g.is_directed() else (lo, hi)
+        dt = np.int32 if m < 2**31 else np.int64
+        edges = np.stack([x[keep].astype(dt), y[keep].astype(dt)], axis=1)
+    except Exception:  # noqa: BLE001  (anything unexpected: load the file again)
+        return _declined("unexpected: " + repr(sys.exc_info()[1]))
+    # ---- from here the graph is modified
+    labels, index = lg.labels, lg.index
+    if len(new_ids):
+        g.add_vertices(len(new_ids))
+        new_labels = [str(int(i)) for i in new_ids]
+        g.vs[n:]["name"] = new_labels
+        labels = lg.labels + new_labels
+        index = _RangeIndex(m) if contiguous else {**lg.index, **{lab: n + j for j, lab in enumerate(new_labels)}}
+    if len(edges):
+        g.add_edges(edges)
+    g["file_state"] = facts.sha1
+    new = dataclasses.replace(lg, facts=facts, semantics=sem, labels=labels, index=index, lower_index=index,
+                              load_info={"source": "append", "seconds": round(time.time() - t0, 1), "rows": int(k), "edges_added": int(len(edges))})
+    if len(new_ids) and "node_table" in g.attributes():
+        del g["node_table"]
+        table = sidecar_node_table(path)
+        if table is not None:
+            attach_node_table(new, table)
+    for kk, vv in list(_GRAPH_CACHE.items()):
+        if vv.g is g:
+            del _GRAPH_CACHE[kk]
+    if os.environ.get("T2R_GRAPH_CACHE") == "1":
+        _GRAPH_CACHE[(os.path.abspath(path), os.path.getmtime(path), json.dumps(override, sort_keys=True) if override else "")] = new
+    return new
+
+
 # --------------------------------------------------------------------------- binary cache on disk
 # The text parse, id statistics and deduplication are the slow part of a load (5.5 minutes for 50M edges). The
 # first load writes the built edge array, weights, labels, facts and semantics to T2R_CACHE_DIR; later loads in
 # any process rebuild the igraph graph from that in seconds (10M edges) to under a minute (50M edges).
-CACHE_FORMAT = 1
+CACHE_FORMAT = 2   # 2: the file hash in the stored facts covers the whole file
 
 
 def _cache_dir() -> str:
@@ -687,7 +920,7 @@ def _disk_cache_enabled() -> bool:
 
 def _cache_key(path: str, override: Optional[dict]) -> str:
     st = os.stat(path)
-    h = hashlib.sha1(f"{os.path.abspath(path)}|{st.st_size}|{int(st.st_mtime)}|{json.dumps(override or {}, sort_keys=True)}|{CACHE_FORMAT}".encode()).hexdigest()
+    h = hashlib.sha1(f"{os.path.abspath(path)}|{st.st_size}|{st.st_mtime_ns}|{json.dumps(override or {}, sort_keys=True)}|{CACHE_FORMAT}".encode()).hexdigest()
     return h[:20]
 
 
@@ -739,6 +972,7 @@ def _disk_cache_get(name: str, path: str, override: Optional[dict]) -> Optional[
         g.vs["name"] = labels
         if "weights" in z.files and sem.weighted:
             g.es["weight"] = z["weights"].tolist()
+        g["file_state"] = facts.sha1
         return LoadedGraph(name=name, g=g, facts=facts, semantics=sem, labels=labels, index=index, lower_index=lower)
     except Exception:  # noqa: BLE001  (a damaged cache entry is ignored, the file is parsed again)
         return None

@@ -23,7 +23,7 @@ from typing import Any, Optional
 import igraph as ig
 from pydantic import Field
 
-from .graphs import LoadedGraph, load_graph, profile_card, sidecar_node_table
+from .graphs import LoadedGraph, append_in_place, load_graph, profile_card, sidecar_node_table
 from .ir import Plan, Step, auto_tier, estimate_cost, execute, extract_answer, plan_keys, step_inputs, step_key, validate, _ref_of
 from .llm import LLM, parse_json
 from .ops import CATALOGUE, catalogue_text
@@ -260,14 +260,22 @@ class Session:
         if sig == self._sig:
             return
         old = (self.lg.facts.sha1, (self.lg.g["node_table"]["sha1"] if "node_table" in self.lg.g.attributes() else None), self.lg.g.vcount(), self.lg.g.ecount())
+        edge_only = [a for a, b in zip(self._sig, sig) if a != b] == [x for x in self._sig if x[0] == self.path] and len(sig) == len(self._sig)
         self._sig = sig
+        k = json.dumps(self._ov or {}, sort_keys=True)
+        cur = self._lgs.get(k)
+        # the file only grew at its end: add the new rows to the loaded graph (None = not safe, load again)
+        grown = append_in_place(cur, self.path, self.description, self._ov or None) if (edge_only and cur is not None) else None
         self._lgs.clear(); self._ov_of.clear()
+        if grown is not None:
+            self._lgs[k] = grown
         self.lg = self._load(self._ov)
         self.card = profile_card(self.lg, with_inference=True)
         new = (self.lg.facts.sha1, (self.lg.g["node_table"]["sha1"] if "node_table" in self.lg.g.attributes() else None), self.lg.g.vcount(), self.lg.g.ecount())
         if new[:2] != old[:2]:
             what = [w for w, a, b in (("edge file", old[0], new[0]), ("node table", old[1], new[1])) if a != b]
-            self.data_changes.append({"before_turn": len(self.turns) + 1, "changed": what, "nodes": [old[2], new[2]], "edges": [old[3], new[3]]})
+            self.data_changes.append({"before_turn": len(self.turns) + 1, "changed": what, "nodes": [old[2], new[2]], "edges": [old[3], new[3]],
+                                      "how": self.lg.load_info.get("source")})
 
     def _standing(self, plan: "TurnPlan") -> list[dict]:
         """Record settings the plan declares, then write the settings in force into every matching step (rule-based)."""
