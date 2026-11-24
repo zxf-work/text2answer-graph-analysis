@@ -400,6 +400,33 @@ GraphAudit large sessions (Haiku, one run each; all 24 of 24 correct, 0 stale):
 What is left of the turn after a change is igraph rebuilding its index after `add_edges` (5 / 10 / 15 s), the
 profile card, and recomputing the answer. Setup is unchanged from 3.11 (27 / 35 / 47 s).
 
+### 3.13 Open models: Qwen3 served on our own GPU (2026-11-23)
+
+Question: does GraphAudit work with a free open model, so that the model bill is zero? `t2r/llm.py` now talks to any OpenAI-compatible server (`T2R_BASE_URL`); `slurm/run_open_model.sbatch` starts the server on the job's own GPU (Ollama with 4-bit weights, or vLLM 0.10.2 with the published weights; `slurm/setup_vllm.sbatch` builds the vLLM environment, pinned to `vllm==0.10.2 transformers<5` because the cluster driver supports CUDA 12 only). One run each; temperature 0.
+
+GraphAudit on the 22 E2b sessions (122 turns, 47 trap turns):
+
+| Model | Server | Correct | Stale | Model seconds | Model cost |
+|---|---|---|---|---|---|
+| Claude Opus 5.5 | API | 122 | 0 | - | $5.86 |
+| Claude Haiku 5.5 | API | 122 | 0 | - | $0.16 |
+| Qwen3-32B | vLLM, H100 | 121 | 0 | 2,932 | 0 |
+| Qwen3-32B | Ollama, 4-bit, H100 | 114 | 0 | 3,298 | 0 |
+| Qwen3-14B | vLLM, RTX 6000 Ada | 116 | 0 | 4,567 | 0 |
+| Qwen3-14B | vLLM, forced JSON | 98 | 0 | 2,516 | 0 |
+| Qwen3-14B | Ollama, 4-bit | 106 | 3 | 3,572 | 0 |
+
+On the three full large graphs (E4 sessions, 24 turns) Qwen3-14B answers 24 of 24 on both servers, no stale answer.
+
+- Every Qwen failure but a handful is a plan the validator rejected (unknown step reference, wrong value type, text that is not JSON): GraphAudit reports an error, it does not answer wrongly. The same questions fail across regions: the count over "those 10", and the scores computed on the whole network then restricted to a district.
+- The three stale answers (14B, 4-bit) have one cause: the turn that set a standing setting ("treat every friendship as mutual") came back unparseable, the setting was never recorded, and the next three turns used the old reading. To fix: a failed turn that carried a setting must be retried or flagged on later turns.
+- Forcing JSON output (`T2R_JSON_MODE=1`) halves model time and lowers accuracy (more plans with wrong step types); cause not confirmed, probably no reasoning before the answer. Left off.
+- Latency is the price: about 24 s of model time per turn for 32B on an H100 and 37 s for 14B on an RTX 6000 Ada, thinking included. The servers were not compared on the same GPU.
+
+Stateful code agent with Qwen3-14B on the same sessions: 2 of 122 correct on Ollama and 0 of 122 on vLLM, mostly because the cell ends in a bare JSON object instead of printing it. With `T2R_AGENT_NOTEBOOK=1` (the harness shows the value of the last expression as a notebook does; off by default, Claude baselines unchanged) it gets 32 of 122 with 4 stale; the rest are wrong answers and igraph calls that do not exist. The same model behind GraphAudit gets 116: a typed plan over a fixed catalogue is within reach of a 14B model, free-form graph code is not.
+
+Summaries: `prototype/results/sessions/open_models/`. Not done: repetitions, 32B on the large graphs, a no-thinking run, a larger open model.
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**

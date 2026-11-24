@@ -52,15 +52,26 @@ SAY = {"A": "I mean: compute the measure over the whole network, then report it 
        "B": "I mean: consider only the members of that group and the links among them, and compute the measure on that part of the network."}
 
 WORKER = r'''
-import contextlib, io, json, sys, time, traceback
+import ast, contextlib, io, json, os, sys, time, traceback
 real = sys.stdout
 ns = {"__name__": "__main__"}
+# T2R_AGENT_NOTEBOOK=1: behave like a notebook, showing the value of a cell's last expression (dicts and lists as JSON),
+# and let a JSON literal written as that expression evaluate (true/false/null). Off by default: the cell must print.
+NB = os.environ.get("T2R_AGENT_NOTEBOOK") == "1"
+if NB:
+    ns.update(true=True, false=False, null=None)
 for line in sys.stdin:
     code = json.loads(line)["code"]
     buf = io.StringIO(); rc = 0; err = ""; t0 = time.time()
     try:
         with contextlib.redirect_stdout(buf):
-            exec(compile(code, "<cell>", "exec"), ns)
+            tree = ast.parse(code, "<cell>")
+            last = tree.body.pop() if NB and tree.body and isinstance(tree.body[-1], ast.Expr) else None
+            exec(compile(tree, "<cell>", "exec"), ns)
+            if last is not None:
+                v = eval(compile(ast.Expression(last.value), "<cell>", "eval"), ns)
+                if v is not None:
+                    print(json.dumps(v, default=str) if isinstance(v, (dict, list)) else repr(v))
     except SystemExit:
         pass
     except BaseException:

@@ -1,0 +1,1 @@
+model=qwen3:32b variant=full workload=stale ctx=32768 ollama=v0.40.17 job=306049 node=itiger01 started=2026-11-23T15:19:25Z

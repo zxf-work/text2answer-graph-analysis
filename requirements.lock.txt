@@ -25,3 +25,4 @@ typing-extensions==4.16.0
 typing-inspection==0.4.5
 tzdata==2026.6
 xxhash==4.1.0
+zstandard==0.25.0

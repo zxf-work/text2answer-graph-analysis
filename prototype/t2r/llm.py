@@ -59,6 +59,8 @@ class LLM:
 
     @staticmethod
     def _detect() -> str:
+        if os.environ.get("T2R_BASE_URL"):
+            return "openai"          # a locally served open model behind an OpenAI-compatible endpoint (Ollama, vLLM)
         if os.environ.get("ANTHROPIC_API_KEY"):
             try:
                 import anthropic  # noqa: F401
@@ -71,6 +73,8 @@ class LLM:
         t0 = time.time()
         if self.backend == "sdk":
             r = self._chat_sdk(system, user, max_tokens)
+        elif self.backend == "openai":
+            r = self._chat_openai(system, user, max_tokens)
         else:
             r = self._chat_cli(system, user)
         r.seconds = time.time() - t0
@@ -93,6 +97,30 @@ class LLM:
         cr = getattr(u, "cache_read_input_tokens", 0) or 0
         cost = (u.input_tokens * pin + cr * pin * 0.1 + u.output_tokens * pout) / 1e6
         return Reply(text=text, input_tokens=u.input_tokens, output_tokens=u.output_tokens, cache_read_tokens=cr, cost_usd=cost, raw=resp.model_dump() if hasattr(resp, "model_dump") else None)
+
+    def _chat_openai(self, system: str, user: str, max_tokens: int) -> Reply:
+        """POST <T2R_BASE_URL>/v1/chat/completions. No price: the model runs on our own hardware. Reasoning that a model
+        writes inside <think> tags is dropped from the text (its tokens still count as output)."""
+        import urllib.request
+        body = {"model": self.model, "max_tokens": max_tokens, "temperature": float(os.environ.get("T2R_TEMPERATURE", "0")),
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        if os.environ.get("T2R_JSON_MODE") == "1":
+            body["response_format"] = {"type": "json_object"}       # constrained decoding where the server supports it
+        req = urllib.request.Request(os.environ["T2R_BASE_URL"].rstrip("/") + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json", "Authorization": "Bearer " + os.environ.get("T2R_API_KEY", "none")})
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=float(os.environ.get("T2R_LLM_TIMEOUT", "1800"))) as f:
+                    d = json.loads(f.read())
+                break
+            except Exception:  # noqa: BLE001
+                if attempt == 2:
+                    raise
+                time.sleep(5 * (attempt + 1))
+        text = d["choices"][0]["message"].get("content") or ""
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+        u = d.get("usage") or {}
+        return Reply(text=text, input_tokens=int(u.get("prompt_tokens", 0)), output_tokens=int(u.get("completion_tokens", 0)), raw=d)
 
     def _chat_cli(self, system: str, user: str) -> Reply:
         cmd = ["claude", "-p", "--output-format", "json", "--model", self.model, "--system-prompt", system,

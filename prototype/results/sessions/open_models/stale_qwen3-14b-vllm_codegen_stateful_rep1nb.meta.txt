@@ -1,0 +1,1 @@
+model=qwen3-14b variant=codegen_stateful workload=stale ctx=32768 server=vllm 0.10.2 Qwen/Qwen3-14B json_mode=0 job=306284 node=itiger06 started=2026-11-23T18:48:37Z
