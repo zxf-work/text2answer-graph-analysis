@@ -37,7 +37,7 @@ from t2r.graphs import load_graph, sidecar_node_table  # noqa: E402
 from t2r.ir import validate  # noqa: E402
 from t2r.llm import LLM  # noqa: E402
 
-VARIANTS = ("full", "codegen_stateful", "codegen_stateful_warned", "codegen_independent")
+VARIANTS = ("full", "full_noreuse", "codegen_stateful", "codegen_stateful_warned", "codegen_independent")
 
 
 # ------------------------------------------------------------------------------------------------ files and events
@@ -200,9 +200,9 @@ def golds_for(t, files, reading):
 
 # ------------------------------------------------------------------------------------------------ systems
 class GraphAudit:
-    def __init__(self, spec, live, llm):
+    def __init__(self, spec, live, llm, reuse=True):
         from t2r.session import Session
-        self.llm, self.s = llm, Session(live, name=spec["name"], description=spec["description"], on_ambiguity="ask", budget_ops=float(os.environ.get("T2A_BUDGET_OPS", "1e10")))
+        self.llm, self.s = llm, Session(live, name=spec["name"], description=spec["description"], on_ambiguity="ask", reuse=reuse, budget_ops=float(os.environ.get("T2A_BUDGET_OPS", "1e10")))
 
     def ask(self, q):
         r = self.s.ask(q, self.llm)
@@ -258,7 +258,8 @@ def summarise(rows, llm, variant, model, out):
                                           "turns": [round(r.get("compute_seconds") or 0, 1) for r in rows if r["graph"] == g]} for g in sorted({r["graph"] for r in rows})},
          "wall_seconds": round(sum(r["wall_seconds"] for r in rows), 1),
          "errors": sum(bool(r["error"]) for r in rows), "llm_calls": sum(r.get("llm_calls") or 0 for r in rows), "tokens_in": sum(r.get("tokens_in") or 0 for r in rows),
-         "tokens_out": sum(r.get("tokens_out") or 0 for r in rows), "cost_usd": round(sum(r.get("cost_usd") or 0 for r in rows), 4),
+         "tokens_out": sum(r.get("tokens_out") or 0 for r in rows), "tokens_cache_read": sum(r.get("tokens_cache_read") or 0 for r in rows),
+         "tokens_cache_write": sum(r.get("tokens_cache_write") or 0 for r in rows), "prompt_cache": os.environ.get("T2R_PROMPT_CACHE") == "1", "plan_replay": os.environ.get("T2R_PLAN_REPLAY") == "1", "cost_usd": round(sum(r.get("cost_usd") or 0 for r in rows), 4),
          "stale_turns": [f"{r['session']} t{r['turn']} ({r['trap']})" for r in traps if r["stale"]],
          "wrong_turns": [f"{r['session']} t{r['turn']} ({r['trap'] or ('valid' if r['valid'] else r['kind'])})" for r in rows if not r["correct"] and not r["stale"]]}
     json.dump(S, open(os.path.join(out, "summary.json"), "w"), indent=1)
@@ -270,6 +271,7 @@ def main():
     ap.add_argument("out"); ap.add_argument("graphs", nargs="*")
     ap.add_argument("--model", default="claude-haiku-5-5"); ap.add_argument("--variant", default="full"); ap.add_argument("--only", default="")
     ap.add_argument("--timeout", type=int, default=600)
+    ap.add_argument("--practice", default="", help="directory with the SNAP graphs: run the practice sessions (workload_practice.py)")
     ap.add_argument("--large", default="", help="directory with the SNAP graphs: run the large-graph sessions (workload_large.py) instead")
     ap.add_argument("--work", default="", help="where the per-session copies of the files go (default: <out>/work; use node scratch for large graphs)"); ap.add_argument("--dry", action="store_true")
     ap.add_argument("--rescore", action="store_true", help="score the answers already in <out>/turns.jsonl again; no system is run")
@@ -285,7 +287,10 @@ def main():
             shutil.copy(os.path.join(a.out, "summary.json"), os.path.join(a.out, "summary.before_rescore.json"))
         a.variant, a.model = next(iter(old.values()))["variant"], next(iter(old.values()))["model"]
     log = open(os.path.join(a.out, "turns.rescored.jsonl" if a.rescore else "turns.jsonl"), "w")
-    if a.large:
+    if a.practice:
+        import workload_practice
+        all_specs, sessions_of = workload_practice.specs(a.practice), workload_practice.sessions
+    elif a.large:
         import workload_large
         all_specs, sessions_of = workload_large.specs(a.large), workload_large.sessions
     else:
@@ -296,7 +301,7 @@ def main():
                 continue
             files = Files(spec, os.path.join(a.work or os.path.join(a.out, "work"), sess["id"].replace("/", "_")))
             t_setup = time.time()
-            system = None if a.dry or a.rescore else (GraphAudit(spec, files.live, llm) if a.variant == "full" else Codegen(spec, files.live, llm, a.variant, a.timeout))
+            system = None if a.dry or a.rescore else (GraphAudit(spec, files.live, llm, reuse=a.variant != "full_noreuse") if a.variant.startswith("full") else Codegen(spec, files.live, llm, a.variant, a.timeout))
             setup = round(time.time() - t_setup, 2)       # GraphAudit: load and profile; agents: file facts
             reading = {}
             for i, t in enumerate(sess["turns"], 1):
@@ -315,7 +320,7 @@ def main():
                     row = {**d, **base, "correct": ok, "stale": not ok and any(matches(t["expect"], g, d["answer"]) for g in stale), "gold": good, "stale_gold": stale}
                     rows.append(row); log.write(json.dumps(row, default=str) + "\n")
                     continue
-                c0, i0, o0, u0, m0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd, llm.usage.seconds
+                c0, i0, o0, u0, m0, r0, w0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd, llm.usage.seconds, llm.usage.cache_read_tokens, llm.usage.cache_write_tokens
                 t0 = time.time()
                 try:
                     r = system.ask(t["q"])
@@ -328,7 +333,8 @@ def main():
                        "steps_reused": r["steps_reused"], "steps_executed": r["steps_executed"], "execute_seconds": round(r["execute_seconds"], 3), "wall_seconds": round(wall, 3),
                        # everything that is not waiting for the model: loading, hashing, executing, verifying
                        "model_seconds": round(llm.usage.seconds - m0, 3), "compute_seconds": round(wall - (llm.usage.seconds - m0), 3), "setup_seconds": setup if i == 1 else 0,
-                       "llm_calls": llm.usage.calls - c0, "tokens_in": llm.usage.input_tokens - i0, "tokens_out": llm.usage.output_tokens - o0, "cost_usd": round(llm.usage.cost_usd - u0, 5)}
+                       "llm_calls": llm.usage.calls - c0, "tokens_in": llm.usage.input_tokens - i0, "tokens_out": llm.usage.output_tokens - o0, "cost_usd": round(llm.usage.cost_usd - u0, 5),
+                       "tokens_cache_read": llm.usage.cache_read_tokens - r0, "tokens_cache_write": llm.usage.cache_write_tokens - w0}
                 rows.append(row)
                 log.write(json.dumps({**row, "answer": r["answer"], "gold": good, "stale_gold": stale, "plan": r["plan"]}, default=str) + "\n"); log.flush()
                 tag = t.get("trap") or ("valid" if t.get("valid") else "-")

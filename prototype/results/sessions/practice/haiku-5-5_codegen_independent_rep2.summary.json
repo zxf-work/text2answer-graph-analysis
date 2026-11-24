@@ -1,0 +1,76 @@
+{
+ "variant": "codegen_independent",
+ "model": "claude-haiku-5-5",
+ "sessions": 3,
+ "turns": 28,
+ "answer_accuracy": 0.9643,
+ "trap_turns": 3,
+ "trap_correct": 3,
+ "trap_stale": 0,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 3,
+   "correct": 3,
+   "stale": 0,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 0,
+ "valid_correct": 0,
+ "valid_execute_seconds": 0,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 440.57,
+ "compute_seconds": 440.6,
+ "setup_seconds": 4.3,
+ "model_seconds": 143.3,
+ "compute_seconds_by_graph": {
+  "pokec": {
+   "setup": 4.3,
+   "turns": [
+    22.6,
+    1.4,
+    1.2,
+    22.8,
+    23.3,
+    26.2,
+    23.5,
+    3.7,
+    3.1,
+    22.6,
+    11.0,
+    33.3,
+    1.5,
+    3.1,
+    22.0,
+    1.4,
+    5.4,
+    19.0,
+    20.9,
+    20.5,
+    17.4,
+    4.1,
+    23.3,
+    24.5,
+    18.3,
+    23.1,
+    24.6,
+    16.8
+   ]
+  }
+ },
+ "wall_seconds": 583.9,
+ "errors": 0,
+ "llm_calls": 29,
+ "tokens_in": 175309,
+ "tokens_out": 34713,
+ "tokens_cache_read": 0,
+ "tokens_cache_write": 0,
+ "prompt_cache": false,
+ "cost_usd": 0.0348,
+ "stale_turns": [],
+ "wrong_turns": [
+  "pokec/refresh t1 (new)"
+ ]
+}

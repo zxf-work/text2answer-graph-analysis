@@ -1,0 +1,77 @@
+{
+ "variant": "codegen_stateful",
+ "model": "claude-opus-5-5",
+ "sessions": 3,
+ "turns": 28,
+ "answer_accuracy": 0.9286,
+ "trap_turns": 3,
+ "trap_correct": 1,
+ "trap_stale": 2,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 3,
+   "correct": 1,
+   "stale": 2,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 0,
+ "valid_correct": 0,
+ "valid_execute_seconds": 0,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 107.48,
+ "compute_seconds": 107.5,
+ "setup_seconds": 4.5,
+ "model_seconds": 116.7,
+ "compute_seconds_by_graph": {
+  "pokec": {
+   "setup": 4.5,
+   "turns": [
+    18.7,
+    1.2,
+    1.1,
+    0.5,
+    0.1,
+    1.2,
+    0.0,
+    0.2,
+    0.0,
+    0.1,
+    17.8,
+    2.5,
+    0.1,
+    0.0,
+    0.1,
+    0.1,
+    6.1,
+    17.5,
+    2.5,
+    0.2,
+    14.4,
+    0.1,
+    6.9,
+    2.5,
+    2.5,
+    8.3,
+    2.7,
+    0.2
+   ]
+  }
+ },
+ "wall_seconds": 224.2,
+ "errors": 0,
+ "llm_calls": 28,
+ "tokens_in": 129677,
+ "tokens_out": 12231,
+ "tokens_cache_read": 0,
+ "tokens_cache_write": 0,
+ "prompt_cache": false,
+ "cost_usd": 0.7633,
+ "stale_turns": [
+  "pokec/refresh t5 (R3)",
+  "pokec/refresh t6 (R3)"
+ ],
+ "wrong_turns": []
+}

@@ -427,6 +427,55 @@ Stateful code agent with Qwen3-14B on the same sessions: 2 of 122 correct on Oll
 
 Summaries: `prototype/results/sessions/open_models/`. Not done: repetitions, 32B on the large graphs, a no-thinking run, a larger open model.
 
+### 3.14 What a session costs: reuse, prompt caching, plan replay (2026-11-24)
+
+Question: how much is reused in a realistic session, and what does that do to the bill? Haiku 5.5 is now the default model (`T2R_MODEL` overrides).
+
+Workload: four sessions on full Pokec (1.6M users, 30.6M friendships, node table), 43 turns, in `bench/sessions/workload_practice.py`, run with `slurm/run_practice.sbatch`.
+
+- `campaign` (10 turns): one PageRank, then cuts of it by gender, region and list length.
+- `refresh` (10): a morning dashboard, 27,466 friendships are appended, the dashboard again in other words.
+- `hubs` (8): the network with and without its five largest hubs.
+- `dashboard` (15): a saved report of five questions run word for word three times, with the same append after the first run. Written to exercise plan replay, so it is a best case for it.
+
+Three switches, all off by default:
+
+- **Reuse** (the `full_noreuse` variant turns it off): stored step results, as before.
+- **Prompt caching** (`T2R_PROMPT_CACHE=1`): GraphAudit sends the catalogue, the session rules and the profile card as a cached prefix (the turn number moves into the message). The code agents send their instructions, the file facts and the conversation so far as a cached prefix that grows by one turn; the text they see is unchanged.
+- **Plan replay** (`T2R_PLAN_REPLAY=1`): a question repeated word for word runs its earlier plan with no model call, only if that plan declared intent "new", no reference to an earlier turn, no setting, no open reading, and the settings and reading in force are the same. The plan is validated and executed on the data as it then is, so a data change in between is still caught by the lineage keys.
+
+All four sessions, model fees and query compute (graph loading excluded: about 28 s per session for GraphAudit, inside the compute figure for the agents). Opus: one run. Haiku: three runs, shown as the range of correct answers and the mean of the rest.
+
+| System | Opus correct | Opus stale | Opus fees | Opus compute | Haiku correct | Haiku stale | Haiku fees | Haiku compute |
+|---|---|---|---|---|---|---|---|---|
+| GraphAudit, cache + replay | 43 | 0 | $0.71 | 62 s | 42 | 0 | $0.020 | 74 s |
+| GraphAudit, cache | 43 | 0 | $0.94 | 66 s | 42–43 | 0 | $0.027 | 69 s |
+| GraphAudit | 43 | 0 | $2.14 | 64 s | 43 | 0 | $0.056 | 66 s |
+| GraphAudit, no reuse | 43 | 0 | $2.13 | 154 s | 41–43 | 0 | $0.057 | 203 s |
+| Stateful agent, cache | 41 | 2 | $0.62 | 158 s | 29–30 | 5–6 | $0.026 | 141 s |
+| Stateful agent | 33 | 5 | $1.20 | 129 s | 29–30 | 5–6 | $0.048 | 218 s |
+| Warned agent, cache | 43 | 0 | $0.89 | 473 s | 33–40 | 2–5 | $0.032 | 356 s |
+| Warned agent | 43 | 0 | $1.78 | 545 s | 37–40 | 2–5 | $0.056 | 306 s |
+| Independent agent, cache | 43 | 0 | $0.99 | 950 s | 43 | 0 | $0.033 | 654 s |
+| Independent agent | 43 | 0 | $1.71 | 908 s | 42–43 | 0 | $0.058 | 676 s |
+
+What it shows:
+
+- **Reuse saves compute, not fees.** 42 steps are reused over the 43 turns; query compute goes from 150–200 s to about 65 s; fees do not move, because the model writes a plan every turn.
+- **Without caching GraphAudit is the dearest in fees** (about 9,200 input tokens per turn against 5,000–7,200 for the agents): its prompt carries the whole catalogue.
+- **With caching on both sides fees are about equal.** Opus: GraphAudit $0.94, warned agent $0.89, independent agent $0.99. Do not claim a fee advantage from caching alone.
+- **Plan replay is a fee saving on verbatim repeats only.** On `dashboard` GraphAudit makes 6–7 model calls for 15 turns and costs $0.11 on Opus against $0.27–0.32 for the cached agents, all 15 answers right including those after the append. On the other three sessions it skips at most one call.
+- **Compute is the robust gap**: about a fifteenth of the independent agent's on Opus, a tenth on Haiku; a seventh and a fifth of the warned agent's.
+- **Stale answers depend on the model.** Haiku stateful agents are stale in every run (always on the turns after the append). The warned agent on Opus was right on all 43 turns in its one run, cached and uncached, so on these sessions the correctness case against it rests on Haiku and on E2b.
+
+Caveats:
+
+- GraphAudit on Haiku misses `hubs` turn 7 ("And without them, the PageRank top 20?") in 4 of 9 runs with reuse on: it reads "them" as the ten users of the previous answer, as rule S3 says. The wording is ambiguous and is mine; Opus reads it as intended. Not caused by caching or replay (no replay happens in that session).
+- The practice sessions were written by us, on one graph. One Opus run.
+- At $1 per hour for a 16-core, 128 GB machine (an assumption), 600 s of compute is $0.17: more than the whole Haiku fee, small next to the Opus fee.
+
+Summaries and per-session totals: `prototype/results/sessions/practice/` (`by_session.json`). Not done: an outside baseline; a second graph; replay for repeats that are not word for word; the agents' equivalent of replay (re-running stored code for a repeated question) was not built.
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**

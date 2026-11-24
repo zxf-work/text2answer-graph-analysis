@@ -15,7 +15,7 @@ from t2r.session import Session  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("path"); ap.add_argument("attribute"); ap.add_argument("--name", required=True)
-ap.add_argument("--model", default="claude-opus-5-5"); ap.add_argument("--choose", default="B"); ap.add_argument("--description", default="")
+ap.add_argument("--model", default="claude-haiku-5-5"); ap.add_argument("--choose", default="B"); ap.add_argument("--description", default="")
 ap.add_argument("--title", default=""); ap.add_argument("--questions", default="", help="JSON list; {x} and {y} are the two most common attribute values")
 a = ap.parse_args()
 

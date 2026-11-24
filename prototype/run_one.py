@@ -7,7 +7,7 @@ from t2r.systems import SYSTEMS
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--system", required=True); ap.add_argument("--qid", required=True); ap.add_argument("--out", required=True)
-ap.add_argument("--model", default=os.environ.get("T2R_MODEL", "claude-opus-5-5"))
+ap.add_argument("--model", default=os.environ.get("T2R_MODEL", "claude-haiku-5-5"))
 ap.add_argument("--questions", default="questions.json")
 a = ap.parse_args()
 q = next(x for x in json.load(open(os.path.join(HERE, "bench", a.questions))) if x["id"] == a.qid)

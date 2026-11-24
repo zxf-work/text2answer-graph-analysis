@@ -1,7 +1,7 @@
 """Record the guided-demo scenes: run each scene's question through the named executor and save the result,
 the profile card and a note to demo/scenes/<nn>_<name>.json. The UI replays these without a model call.
 
-Usage: python3 demo/make_scenes.py [--model claude-opus-5-5] [--only trust_most_trusted,...]
+Usage: python3 demo/make_scenes.py [--model claude-haiku-5-5] [--only trust_most_trusted,...]
 The 50M-edge scene is imported from an earlier experiment run (prototype/results_scale/raw) because recomputing it
 takes 20 minutes; pass --scale-raw <dir> to point at those files.
 """
@@ -61,7 +61,7 @@ SCALE = [
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default=os.environ.get("T2R_MODEL", "claude-opus-5-5"))
+    ap.add_argument("--model", default=os.environ.get("T2R_MODEL", "claude-haiku-5-5"))
     ap.add_argument("--only", default="")
     ap.add_argument("--scale-raw", default=os.path.join(ROOT, "results_scale", "raw"))
     a = ap.parse_args()

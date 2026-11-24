@@ -9,7 +9,7 @@ Standard library only. Serves the single-page UI in demo/static and a small JSON
   GET  /api/scenes             recorded scenes for replay (demo/scenes/*.json)
   GET  /api/catalogue          operator catalogue
 
-Run:  python3 demo/server.py [--port 8765] [--model claude-opus-5-5]
+Run:  python3 demo/server.py [--port 8765] [--model claude-haiku-5-5]
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ STATIC = os.path.join(HERE, "static")
 SCENES = os.path.join(HERE, "scenes")
 UPLOADS = os.path.join(HERE, "uploads")
 JOBS: dict[str, dict] = {}
-DEFAULT_MODEL = "claude-opus-5-5"
+DEFAULT_MODEL = "claude-haiku-5-5"
 # Resident graphs: a graph is loaded once per server process (memory cache in t2r.graphs), restored from the binary
 # disk cache when one exists, and every later question on it skips loading entirely. LOADS tracks the state per file
 # so the UI can show "loading" without blocking; RESULT_CACHE memoises operator results across questions.

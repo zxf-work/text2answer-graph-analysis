@@ -59,7 +59,7 @@ M="${MODEL//[:\/]/-}"
 OUT="runs/$WORKLOAD/$M/$VARIANT/rep${REP:-1}${ONLY:+-${ONLY//\//_}}"
 [ "$WORKLOAD" = large ] && OUT="runs/large/$M/$VARIANT/rep${REP:-1}${ONLY:+-$ONLY}"
 mkdir -p "$OUT"
-echo "model=$MODEL variant=$VARIANT workload=$WORKLOAD ctx=${CTX:-32768} server=$SERVED json_mode=${T2R_JSON_MODE:-0} job=$SLURM_JOB_ID node=$(hostname) started=$(date -u +%FT%TZ)" > "$OUT/run_meta.txt"
+echo "model=$MODEL variant=$VARIANT workload=$WORKLOAD ctx=${CTX:-32768} server=$SERVED json_mode=${T2R_JSON_MODE:-0} temperature=${T2R_TEMPERATURE:-0} seed=${T2R_SEED:-} job=$SLURM_JOB_ID node=$(hostname) started=$(date -u +%FT%TZ)" > "$OUT/run_meta.txt"
 if [ "$WORKLOAD" = large ]; then
   "$PY" bench/sessions/run_stale.py "$OUT" --model "$MODEL" --variant "$VARIANT" --large "$T2A_DATA/snap" --work "$WORK/work" --timeout 3600 ${ONLY:+--only "$ONLY"}
 else

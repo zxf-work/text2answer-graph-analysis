@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-DEFAULT_MODEL = os.environ.get("T2R_MODEL", "claude-opus-5-5")
+DEFAULT_MODEL = os.environ.get("T2R_MODEL", "claude-haiku-5-5")   # 122 of 122 on the E2b sessions at about 3% of the Opus bill
 
 
 @dataclass
@@ -24,6 +24,7 @@ class Reply:
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     cost_usd: float = 0.0
     seconds: float = 0.0
     backend: str = ""
@@ -35,12 +36,16 @@ class Usage:
     calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     cost_usd: float = 0.0
     seconds: float = 0.0
 
     def add(self, r: Reply) -> None:
         self.calls += 1
-        self.input_tokens += r.input_tokens + r.cache_read_tokens
+        self.input_tokens += r.input_tokens + r.cache_read_tokens + r.cache_write_tokens      # everything the model read
+        self.cache_read_tokens += r.cache_read_tokens
+        self.cache_write_tokens += r.cache_write_tokens
         self.output_tokens += r.output_tokens
         self.cost_usd += r.cost_usd
         self.seconds += r.seconds
@@ -69,10 +74,21 @@ class LLM:
                 pass
         return "cli"
 
-    def chat(self, system: str, user: str, max_tokens: int = 8000) -> Reply:
+    def chat(self, system: str, user: str, max_tokens: int = 8000, fixed_system: str = "", fixed_user: Any = "") -> Reply:
+        """fixed_system / fixed_user are the parts that stay the same from turn to turn (the operator catalogue, the profile
+        card). They are sent first; with T2R_PROMPT_CACHE=1 the API path marks them as cache breakpoints, so later turns
+        read them at the cache-read price. Without the switch, or on other backends, they are simply prepended.
+        fixed_user may be a list of strings for a prefix that grows by one piece per turn (a conversation history): each
+        piece is its own block and the breakpoint sits on the last, so the next turn reads everything up to it from cache."""
         t0 = time.time()
-        if self.backend == "sdk":
-            r = self._chat_sdk(system, user, max_tokens)
+        parts = [x for x in ([fixed_user] if isinstance(fixed_user, str) else list(fixed_user)) if x]
+        fixed_user = "".join(parts)
+        if self.backend == "sdk" and os.environ.get("T2R_PROMPT_CACHE") == "1" and (fixed_system or fixed_user):
+            r = self._chat_sdk(system, user, max_tokens, fixed_system, parts)
+        elif self.backend == "sdk":
+            r = self._chat_sdk(fixed_system + system, fixed_user + user, max_tokens)
+        elif fixed_system or fixed_user:
+            return self.chat(fixed_system + system, fixed_user + user, max_tokens)
         elif self.backend == "openai":
             r = self._chat_openai(system, user, max_tokens)
         else:
@@ -85,18 +101,28 @@ class LLM:
     # price table for the CLI path, which does not always report cost: $/MTok input, output
     _PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50)}
 
-    def _chat_sdk(self, system: str, user: str, max_tokens: int) -> Reply:
+    # cache read price as a share of the input price; a 5-minute cache write costs 1.25x the input price
+    _CACHE_READ = {"claude-opus-5-5": 0.05, "claude-sonnet-5-5": 0.05}
+
+    def _chat_sdk(self, system: str, user: str, max_tokens: int, fixed_system: str = "", fixed_user: Any = ()) -> Reply:
+        mark = {"cache_control": {"type": "ephemeral"}}
+        sys_blocks = ([{"type": "text", "text": fixed_system, **mark}] if fixed_system else []) + ([{"type": "text", "text": system}] if system else [])
+        usr_blocks = [{"type": "text", "text": x} for x in fixed_user]
+        if usr_blocks:
+            usr_blocks[-1].update(mark)
+        usr_blocks.append({"type": "text", "text": user})
         resp = self._sdk.messages.create(
-            model=self.model, max_tokens=max_tokens, system=system,
+            model=self.model, max_tokens=max_tokens, system=sys_blocks if fixed_system else system,
             output_config={"effort": self.effort},
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": usr_blocks if fixed_user else user}],
         )
         text = "".join(b.text for b in resp.content if b.type == "text")
         u = resp.usage
         pin, pout = self._PRICES.get(self.model, (4.0, 20.0))
         cr = getattr(u, "cache_read_input_tokens", 0) or 0
-        cost = (u.input_tokens * pin + cr * pin * 0.1 + u.output_tokens * pout) / 1e6
-        return Reply(text=text, input_tokens=u.input_tokens, output_tokens=u.output_tokens, cache_read_tokens=cr, cost_usd=cost, raw=resp.model_dump() if hasattr(resp, "model_dump") else None)
+        cw = getattr(u, "cache_creation_input_tokens", 0) or 0
+        cost = (u.input_tokens * pin + cr * pin * self._CACHE_READ.get(self.model, 0.1) + cw * pin * 1.25 + u.output_tokens * pout) / 1e6
+        return Reply(text=text, input_tokens=u.input_tokens, output_tokens=u.output_tokens, cache_read_tokens=cr, cache_write_tokens=cw, cost_usd=cost, raw=resp.model_dump() if hasattr(resp, "model_dump") else None)
 
     def _chat_openai(self, system: str, user: str, max_tokens: int) -> Reply:
         """POST <T2R_BASE_URL>/v1/chat/completions. No price: the model runs on our own hardware. Reasoning that a model
@@ -104,6 +130,8 @@ class LLM:
         import urllib.request
         body = {"model": self.model, "max_tokens": max_tokens, "temperature": float(os.environ.get("T2R_TEMPERATURE", "0")),
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        if os.environ.get("T2R_SEED"):
+            body["seed"] = int(os.environ["T2R_SEED"])              # for repetitions at a temperature above 0
         if os.environ.get("T2R_JSON_MODE") == "1":
             body["response_format"] = {"type": "json_object"}       # constrained decoding where the server supports it
         req = urllib.request.Request(os.environ["T2R_BASE_URL"].rstrip("/") + "/v1/chat/completions", data=json.dumps(body).encode(),

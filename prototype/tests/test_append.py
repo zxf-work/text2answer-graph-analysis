@@ -132,7 +132,7 @@ class Scripted:
     def __init__(self, plans):
         self.plans, self.usage = list(plans), Usage()
 
-    def chat(self, system, user, max_tokens=0):
+    def chat(self, system, user, max_tokens=0, **kw):
         r = Reply(text=json.dumps(self.plans.pop(0)), input_tokens=1)
         self.usage.add(r)
         return r
@@ -157,3 +157,27 @@ def test_session_appends_and_answers_like_a_fresh_session(tmp_path):
     assert t2["answer"] == fresh["answer"]
     t3 = s.ask("and again", Scripted([plan]))
     assert t3["outcome"] == "exact reuse"
+
+
+def test_repeated_question_replays_its_plan_without_the_model(tmp_path):
+    p = str(tmp_path / "e.txt")
+    rows = base_rows()
+    rows += [(b, a) for a, b in rows[:1500]]
+    write(p, rows)
+    plan = {"interpretation": {"directed": True, "measure": "in-degree"}, "intent": "new",
+            "steps": [{"id": "d", "op": "degree", "args": {"mode": "in"}}, {"id": "top", "op": "top_k", "args": {"map": "d", "k": 3}}],
+            "answer": {"step": "top", "kind": "ranking"}}
+    follow = {**plan, "intent": "patch", "based_on": 1, "references": {"them": "the users of turn 1"}}
+    s, llm = Session(p, replay_plans=True), Scripted([plan, follow, follow])
+    t1 = s.ask("Top 3 by incoming links?", llm)
+    t2 = s.ask("top 3 by  incoming links?", llm)                 # same words: no model call, stored results reused
+    assert t2["llm_calls"] == 0 and t2["plan_replayed_from"] == 1 and t2["outcome"] == "exact reuse" and t2["answer"] == t1["answer"]
+    write(p, [(i, 399) for i in range(300)], "a")
+    t3 = s.ask("Top 3 by incoming links?", llm)                  # the data changed: the plan is replayed, the results are not
+    assert t3["llm_calls"] == 0 and t3["steps_reused"] == 0 and t3["answer"][0]["node"] == "399"
+    s.ask("and for them?", llm)                                  # a plan that leans on the session is never replayed
+    t5 = s.ask("and for them?", llm)
+    assert t5["llm_calls"] == 1 and "plan_replayed_from" not in t5 and not llm.plans
+    s.standing["degree.mode"] = "out"                            # another setting in force: the model is asked again
+    assert s._replay("Top 3 by incoming links?") is None
+    assert Session(p).replay_plans is False

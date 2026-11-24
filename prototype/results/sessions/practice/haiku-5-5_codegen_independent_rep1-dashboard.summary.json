@@ -1,0 +1,62 @@
+{
+ "variant": "codegen_independent",
+ "model": "claude-haiku-5-5",
+ "sessions": 1,
+ "turns": 15,
+ "answer_accuracy": 1.0,
+ "trap_turns": 3,
+ "trap_correct": 3,
+ "trap_stale": 0,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 3,
+   "correct": 3,
+   "stale": 0,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 0,
+ "valid_correct": 0,
+ "valid_execute_seconds": 0,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 243.05,
+ "compute_seconds": 243.1,
+ "setup_seconds": 1.7,
+ "model_seconds": 68.0,
+ "compute_seconds_by_graph": {
+  "pokec": {
+   "setup": 1.7,
+   "turns": [
+    42.3,
+    22.7,
+    3.5,
+    3.5,
+    22.8,
+    21.2,
+    22.7,
+    3.6,
+    3.5,
+    22.9,
+    21.3,
+    22.7,
+    3.5,
+    3.5,
+    23.6
+   ]
+  }
+ },
+ "wall_seconds": 311.0,
+ "errors": 0,
+ "llm_calls": 16,
+ "tokens_in": 132291,
+ "tokens_out": 17403,
+ "tokens_cache_read": 0,
+ "tokens_cache_write": 0,
+ "prompt_cache": false,
+ "plan_replay": false,
+ "cost_usd": 0.0219,
+ "stale_turns": [],
+ "wrong_turns": []
+}

@@ -224,7 +224,7 @@ def _nodes_of(val: Any) -> Optional[list]:
 # ----------------------------------------------------------------------------------------------------- the session
 class Session:
     def __init__(self, path: str, name: Optional[str] = None, description: str = "", seed: int = 1, budget_ops: float = 1e10,
-                 reuse: bool = True, on_ambiguity: str = "ask"):
+                 reuse: bool = True, on_ambiguity: str = "ask", replay_plans: Optional[bool] = None):
         """on_ambiguity: "ask" returns both contracts and waits for choose(); "both" executes both and reports how far
         the answers differ; "planner" goes with the planner's reading and states it (what a system without the rule does)."""
         self.path, self.name, self.description = path, name or os.path.splitext(os.path.basename(path))[0], description
@@ -239,6 +239,10 @@ class Session:
         self._ov_of: dict[int, dict] = {}
         self.standing: dict[str, Any] = {}        # "op.arg" -> value, set by the user for the rest of the session
         self.data_changes: list[dict[str, Any]] = []
+        # replay_plans: a question asked before in the same words is answered from its earlier plan, with no model call
+        # (see _replayable for when that is safe). Default from T2R_PLAN_REPLAY=1.
+        self.replay_plans = os.environ.get("T2R_PLAN_REPLAY") == "1" if replay_plans is None else replay_plans
+        self._plan_memo: dict[str, dict[str, Any]] = {}
         self._sig = self._signature()
         self.lg = self._load(None)
         self.card = profile_card(self.lg, with_inference=True)
@@ -426,20 +430,49 @@ class Session:
                 "keys": {s: k[:12] for s, k in ctx.keys.items()}}
 
     def _plan(self, question: str, llm: LLM, lg_hint: LoadedGraph) -> tuple[TurnPlan, list[str]]:
-        system = PLANNER_SYSTEM.format(catalogue=catalogue_text()) + SESSION_RULES.format(turn=len(self.turns) + 1)
+        # the catalogue and the session rules are the same on every turn, so they go first as the fixed part (cacheable);
+        # the turn number, which the rules mention, is then given in the message instead
+        cached = os.environ.get("T2R_PROMPT_CACHE") == "1"
+        n = len(self.turns) + 1
+        fixed_sys = PLANNER_SYSTEM.format(catalogue=catalogue_text()) + SESSION_RULES.format(turn="N (given in the message)" if cached else n)
+        system = ""
         d = f"Dataset description (from the user): {self.description}\n" if self.description else ""
-        user = (f"PROFILE CARD:\n{json.dumps(self.card, default=str, ensure_ascii=False)}\n\nSESSION STATE:\n"
+        fixed_user = f"PROFILE CARD:\n{json.dumps(self.card, default=str, ensure_ascii=False)}\n\n"   # changes only when the data does
+        user = ((f"Turn: {n}\n" if cached else "") + f"SESSION STATE:\n"
                 f"{json.dumps(self.state(), default=str, ensure_ascii=False)}\n\nGraph file: {os.path.basename(self.path)}\n{d}Question: {question}")
-        plan = TurnPlan.model_validate(parse_json(llm.chat(system, user).text))
+        plan = TurnPlan.model_validate(parse_json(llm.chat(system, user, fixed_system=fixed_sys, fixed_user=fixed_user).text))
         lg, _ = self._graph_for(plan)
         problems = validate(plan, lg, self.budget_ops)
         if problems:
             fix = llm.chat(system, user + "\n\nYour previous plan had these problems, return a corrected full plan:\n" + "\n".join(problems)
-                           + f"\n\nPrevious plan:\n{plan.model_dump_json()}")
+                           + f"\n\nPrevious plan:\n{plan.model_dump_json()}", fixed_system=fixed_sys, fixed_user=fixed_user)
             plan = TurnPlan.model_validate(parse_json(fix.text))
             lg, _ = self._graph_for(plan)
             problems = validate(plan, lg, self.budget_ops)
         return plan, problems
+
+    # ------------------------------------------------------------------ plan replay (no model call for a repeated question)
+    def _context(self) -> str:
+        """What a plan's meaning depends on besides the question: the settings, the chosen reading, how the graph is read."""
+        return json.dumps([self.standing, (self.scope_choice or {}).get("reading"), self._ov, self.description], sort_keys=True, default=str)
+
+    def _replayable(self, plan: TurnPlan, turn: dict) -> bool:
+        """A plan may be replayed for the same words only if the planner declared that it stands on its own: a new
+        question, no reference to an earlier turn or to the current selection, no setting declared, no open reading.
+        The data may change in between: a replayed plan is validated and executed on the data as it is then."""
+        return (plan.intent == "new" and plan.based_on is None and not plan.references and not plan.set_standing and not plan.clarification
+                and not turn.get("contracts") and turn.get("outcome") in ("exact reuse", "partial reuse", "recompute"))
+
+    def _replay(self, question: str) -> Optional[TurnPlan]:
+        memo = self._plan_memo.get(" ".join(question.lower().split()))
+        if not self.replay_plans or memo is None or memo["context"] != self._context():
+            return None
+        plan = TurnPlan.model_validate(json.loads(memo["plan"]))
+        lg, _ = self._graph_for(plan)
+        if validate(plan, lg, self.budget_ops):                   # no longer valid on the data as it is now: ask the planner
+            return None
+        self._replayed_from = memo["turn"]
+        return plan
 
     def ask(self, question: str, llm: LLM, explain: bool = False) -> dict[str, Any]:
         t0 = time.time()
@@ -447,8 +480,18 @@ class Session:
         turn: dict[str, Any] = {"turn": len(self.turns) + 1, "question": question, "outcome": "error"}
         try:
             self._refresh()
-            plan, problems = self._plan(question, llm, self.lg)
+            plan, problems = self._replay(question), []
+            if plan is not None:
+                turn["plan_replayed_from"] = self._replayed_from
+            else:
+                plan, problems = self._plan(question, llm, self.lg)
+            as_planned, context = plan.model_dump_json(), self._context()
             turn.update(self.submit(plan, question, problems=problems, _turn=turn))
+            if "plan_replayed_from" in turn:
+                turn.setdefault("reuse_findings", []).append({"check": "plan_replayed", "ok": True, "severity": "info",
+                                                              "detail": f"same question as turn {turn['plan_replayed_from']}: its plan was run again without asking the model"})
+            elif self.replay_plans and not problems and context == self._context() and self._replayable(plan, turn):
+                self._plan_memo[" ".join(question.lower().split())] = {"plan": as_planned, "context": context, "turn": turn["turn"]}
             if explain:
                 self.explain(turn, llm)
         except Exception as e:  # noqa: BLE001

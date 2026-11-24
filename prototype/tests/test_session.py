@@ -17,7 +17,7 @@ class Scripted:
     def __init__(self, plans):
         self.plans, self.usage, self.seen = list(plans), Usage(), []
 
-    def chat(self, system, user, max_tokens=0):
+    def chat(self, system, user, max_tokens=0, **kw):
         self.seen.append(user)
         r = Reply(text=json.dumps(self.plans.pop(0)), input_tokens=len(user) // 4)
         self.usage.add(r)

@@ -156,16 +156,21 @@ class Agent:
         return self.kernel.run(code) if self.stateful else run_script(code, self.timeout)
 
     def ask(self, question):
-        past = "".join(f"--- turn {i} ---\nUser: {q}\nYour code:\n```python\n{c}\n```\nPrinted output (tail):\n{o[-1500:]}\n" for i, (q, c, o) in enumerate(self.history, 1))
-        user = self.preamble + ("\nConversation so far:\n" + past if past else "") + f"\n--- turn {len(self.history) + 1} ---\nUser: {question}"
+        # the instructions, the file facts and the turns already answered never change, so they are the fixed part: one
+        # piece per earlier turn, which with T2R_PROMPT_CACHE=1 is read from the prompt cache (the text sent is the same)
+        past = [f"--- turn {i} ---\nUser: {q}\nYour code:\n```python\n{c}\n```\nPrinted output (tail):\n{o[-1500:]}\n" for i, (q, c, o) in enumerate(self.history, 1)]
+        if past:
+            past[0] = "\nConversation so far:\n" + past[0]
+        fixed = dict(fixed_system=self.system, fixed_user=[self.preamble] + past)
+        user = f"\n--- turn {len(self.history) + 1} ---\nUser: {question}"
         r = {"execute_seconds": 0.0, "restarted": False, "repaired": False, "error": None}
-        code = _extract_code(self.llm.chat(self.system, user).text)
+        code = _extract_code(self.llm.chat("", user, **fixed).text)
         out, err, rc, secs, restarted = self._exec(code)
         r["execute_seconds"] += secs; r["restarted"] |= restarted
         if rc != 0 or not _last_json(out):
             r["repaired"] = True
-            code = _extract_code(self.llm.chat(self.system, user + f"\n\nYour code for this turn failed (exit {rc}).\n```python\n{code}\n```\nError:\n{err[-3000:]}\nPrinted output:\n{out[-1500:]}\n"
-                                                                    + ("Return a corrected cell." if self.stateful else "Return a corrected full script.")).text)
+            code = _extract_code(self.llm.chat("", user + f"\n\nYour code for this turn failed (exit {rc}).\n```python\n{code}\n```\nError:\n{err[-3000:]}\nPrinted output:\n{out[-1500:]}\n"
+                                                                    + ("Return a corrected cell." if self.stateful else "Return a corrected full script."), **fixed).text)
             out, err, rc, secs, restarted = self._exec(code)
             r["execute_seconds"] += secs; r["restarted"] |= restarted
         fin = _last_json(out)

@@ -1,0 +1,81 @@
+{
+ "variant": "codegen_stateful",
+ "model": "claude-haiku-5-5",
+ "sessions": 3,
+ "turns": 28,
+ "answer_accuracy": 0.8214,
+ "trap_turns": 3,
+ "trap_correct": 0,
+ "trap_stale": 3,
+ "trap_other_wrong": 0,
+ "void_trap_turns": 0,
+ "by_class": {
+  "R3": {
+   "turns": 3,
+   "correct": 0,
+   "stale": 3,
+   "other_wrong": 0
+  }
+ },
+ "valid_turns": 0,
+ "valid_correct": 0,
+ "valid_execute_seconds": 0,
+ "valid_share_steps_reused": 0.0,
+ "execute_seconds": 200.0,
+ "compute_seconds": 200.0,
+ "setup_seconds": 4.8,
+ "model_seconds": 129.2,
+ "compute_seconds_by_graph": {
+  "pokec": {
+   "setup": 4.8,
+   "turns": [
+    23.4,
+    2.7,
+    2.8,
+    4.5,
+    4.7,
+    4.9,
+    0.2,
+    18.9,
+    0.1,
+    0.2,
+    21.6,
+    3.7,
+    0.1,
+    0.1,
+    0.2,
+    0.1,
+    0.1,
+    0.0,
+    0.2,
+    0.2,
+    22.9,
+    2.7,
+    12.2,
+    15.1,
+    26.4,
+    15.2,
+    16.9,
+    0.2
+   ]
+  }
+ },
+ "wall_seconds": 329.2,
+ "errors": 0,
+ "llm_calls": 34,
+ "tokens_in": 171672,
+ "tokens_out": 31577,
+ "tokens_cache_read": 0,
+ "tokens_cache_write": 0,
+ "prompt_cache": false,
+ "cost_usd": 0.033,
+ "stale_turns": [
+  "pokec/refresh t5 (R3)",
+  "pokec/refresh t6 (R3)",
+  "pokec/refresh t7 (R3)"
+ ],
+ "wrong_turns": [
+  "pokec/refresh t9 (param)",
+  "pokec/refresh t10 (repeat)"
+ ]
+}
