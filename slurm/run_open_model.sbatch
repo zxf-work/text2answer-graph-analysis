@@ -9,7 +9,7 @@
 # The session experiments with an open model served on the job's own GPU behind an OpenAI-compatible endpoint:
 # Ollama (default; 4-bit quantised builds) or vLLM (SERVER=vllm; the published weights).
 # Nothing is kept: the server release, caches and model weights go to node-local /tmp and are removed at the end.
-# Usage: sbatch --export=ALL,MODEL=qwen3:14b,VARIANT=full[,WORKLOAD=stale|large][,REP=1][,ONLY=...][,CTX=32768] slurm/run_open_model.sbatch
+# Usage: sbatch --export=ALL,MODEL=qwen3:14b,VARIANT=full[,WORKLOAD=stale|large|write][,REP=1][,ONLY=...][,CTX=32768] slurm/run_open_model.sbatch
 #        sbatch --gres=gpu:h100_80gb:1 --export=ALL,SERVER=vllm,HF_MODEL=Qwen/Qwen3-14B,MODEL=qwen3-14b,VARIANT=full[,T2R_JSON_MODE=1] slurm/run_open_model.sbatch
 set -euo pipefail
 source "$SLURM_SUBMIT_DIR/slurm/env.sh"
@@ -60,7 +60,9 @@ OUT="runs/$WORKLOAD/$M/$VARIANT/rep${REP:-1}${ONLY:+-${ONLY//\//_}}"
 [ "$WORKLOAD" = large ] && OUT="runs/large/$M/$VARIANT/rep${REP:-1}${ONLY:+-$ONLY}"
 mkdir -p "$OUT"
 echo "model=$MODEL variant=$VARIANT workload=$WORKLOAD ctx=${CTX:-32768} server=$SERVED json_mode=${T2R_JSON_MODE:-0} temperature=${T2R_TEMPERATURE:-0} seed=${T2R_SEED:-} job=$SLURM_JOB_ID node=$(hostname) started=$(date -u +%FT%TZ)" > "$OUT/run_meta.txt"
-if [ "$WORKLOAD" = large ]; then
+if [ "$WORKLOAD" = write ]; then      # the model writes sessions from the brief (bench/sessions/write_sessions.py); VARIANT is ignored
+  "$PY" bench/sessions/write_sessions.py "runs/written/$M" --model "$MODEL"
+elif [ "$WORKLOAD" = large ]; then
   "$PY" bench/sessions/run_stale.py "$OUT" --model "$MODEL" --variant "$VARIANT" --large "$T2A_DATA/snap" --work "$WORK/work" --timeout 3600 ${ONLY:+--only "$ONLY"}
 else
   "$PY" bench/sessions/run_stale.py "$OUT" --model "$MODEL" --variant "$VARIANT" --work "$WORK/work" ${ONLY:+--only "$ONLY"} "$T2A_DATA"/sessions/pokec_*.txt

@@ -140,6 +140,14 @@ def edge_multiplicity(ctx, source, target, graph="G"):
     return g.count_multiple(g.get_eids([(_vid(ctx, g, source), _vid(ctx, g, target))], error=False)) [0] if g.get_eid(_vid(ctx, g, source), _vid(ctx, g, target), error=False) >= 0 else 0
 
 
+@op("undirected_graph", "A directed graph with direction dropped: the simple undirected graph with one edge per pair of nodes linked in either direction (a pair linked both ways is one edge), all nodes and node attributes kept. Use it as the graph argument whenever a question on a directed graph says to ignore direction: counts of links or neighbours, degrees, cycles, paths and diameter, components, cliques, clustering, neighbour sums. mode=all on the directed graph is not the same: it counts a pair linked both ways twice.",
+    {"graph": "Graph"}, "Graph", "O(m)", directed_only=True)
+def undirected_graph(ctx, graph="G"):
+    h = _graph(ctx, graph).as_undirected(mode="collapse")
+    h.simplify(multiple=True, loops=True)
+    return h
+
+
 @op("simplify", "Collapse parallel edges and self-loops into a simple graph (parallel edges summed into a 'weight' attribute).", {"graph": "Graph"}, "Graph", "O(m)")
 def simplify(ctx, graph="G"):
     g = _graph(ctx, graph).copy()
@@ -218,7 +226,7 @@ def degree_stats(ctx, graph="G", mode="all"):
             "std": float(d.std()), "histogram": [{"range": [float(edges[i]), float(edges[i + 1])], "count": int(hist[i])} for i in range(len(hist))]}
 
 
-@op("degree", "Degree of every node as a NodeMap. mode in {all,in,out}.", {"graph": "Graph", "mode": "str"}, "NodeMap", "O(n+m)")
+@op("degree", "Degree of every node as a NodeMap. mode in {all,in,out}. On a directed graph mode=all is in-degree plus out-degree, so a node linked in both directions counts twice; for the number of distinct linked nodes take the degree in undirected_graph.", {"graph": "Graph", "mode": "str"}, "NodeMap", "O(n+m)")
 def degree(ctx, graph="G", mode="all"):
     g = _graph(ctx, graph)
     return _nodemap(ctx, g.degree(mode=mode), g)
@@ -250,14 +258,14 @@ def components(ctx, graph="G", mode="weak"):
     g = _graph(ctx, graph)
     c = g.connected_components(mode=mode)
     sizes = sorted(c.sizes(), reverse=True)
-    return {"count": len(c), "sizes": sizes[:20], "largest": sizes[0], "membership": c.membership, "_names": g.vs["name"], "_kind": "components", "_mode": mode}
+    return {"count": len(c), "sizes": sizes[:20], "largest": sizes[0] if sizes else 0, "membership": c.membership, "_names": g.vs["name"], "_kind": "components", "_mode": mode}
 
 
 @op("largest_component", "Induced subgraph of the largest (weakly) connected component.", {"graph": "Graph", "mode": "str: weak|strong"}, "Graph", "O(n+m)")
 def largest_component(ctx, graph="G", mode="weak"):
     g = _graph(ctx, graph)
     c = g.connected_components(mode=mode)
-    return c.giant()
+    return c.giant() if g.vcount() else g
 
 
 @op("is_connected", "Whether the graph is (weakly) connected.", {"graph": "Graph"}, "Bool", "O(n+m)")
@@ -338,10 +346,10 @@ def k_hop_neighbourhood(ctx, node, k, graph="G", mode="all"):
     return [_lab(g, i) for i in nb if i != s]
 
 
-@op("neighbours", "Direct neighbours of a node. mode in {all,in,out}.", {"graph": "Graph", "node": "NodeRef", "mode": "str"}, "NodeSet", "O(deg)")
+@op("neighbours", "Direct neighbours of a node, each once. mode in {all,in,out}.", {"graph": "Graph", "node": "NodeRef", "mode": "str"}, "NodeSet", "O(deg)")
 def neighbours(ctx, node, graph="G", mode="all"):
     g = _graph(ctx, graph)
-    return [_lab(g, i) for i in g.neighbors(_vid(ctx, g, node), mode=mode)]
+    return [_lab(g, i) for i in sorted(set(g.neighbors(_vid(ctx, g, node), mode=mode)))]      # a reciprocated neighbour once
 
 
 # --------------------------------------------------------------------------- clustering
@@ -512,7 +520,8 @@ def _index_of(ctx: Ctx, g: ig.Graph, label: str) -> Optional[int]:
 
 
 _CMP = {"==": lambda a, b: a == b, "!=": lambda a, b: a != b, ">": lambda a, b: a > b, ">=": lambda a, b: a >= b,
-        "<": lambda a, b: a < b, "<=": lambda a, b: a <= b, "in": lambda a, b: a in b}
+        "<": lambda a, b: a < b, "<=": lambda a, b: a <= b, "in": lambda a, b: a in b,
+        "startswith": lambda a, b: str(a).startswith(str(b)), "contains": lambda a, b: str(b) in str(a)}
 
 
 @op("attribute_of", "Join with the node table: the value of a node attribute for each node of a NodeSet, in the same order. Returns list of {node, value}.",
@@ -527,8 +536,9 @@ def attribute_of(ctx, nodes, attribute, graph="G"):
     return out
 
 
-@op("filter_by_attribute", "Nodes (of the graph, or of a NodeSet) whose node attribute satisfies op in {==,!=,>,>=,<,<=,in} value. Nodes with a missing value never match.",
-    {"attribute": "str", "op": "str", "value": "str or number or list", "nodes": "NodeSet or null", "graph": "Graph"}, "NodeSet", "O(n)")
+@op("filter_by_attribute", "Nodes (of the graph, or of a NodeSet) whose node attribute satisfies op in {==,!=,>,>=,<,<=,in,startswith,contains} value. A list as value means any of them (op == or in). "
+    "On a text attribute <,<=,>,>= compare as text, which orders ISO dates correctly: created_at >= '2019-01-01' selects 2019 and later, and startswith '2019' selects the year 2019; startswith and contains also serve prefixes of place names. Nodes with a missing value never match.",
+    {"attribute": "str", "op": "str", "value": "value: a string, a number, or a list of them", "nodes": "NodeSet or null", "graph": "Graph"}, "NodeSet", "O(n)")
 def filter_by_attribute(ctx, attribute, value, op="==", nodes=None, graph="G"):
     g = _graph(ctx, graph)
     vals = _attr(g, attribute)
@@ -549,8 +559,8 @@ def filter_by_attribute(ctx, attribute, value, op="==", nodes=None, graph="G"):
     return out
 
 
-@op("group_by_attribute", "Group nodes (of the graph, or of a NodeSet) by a node attribute. Returns list of {value, count} sorted by count; with values (a NodeMap), also {agg} = sum|mean|max|min of those values per group, sorted by it.",
-    {"attribute": "str", "nodes": "NodeSet or null", "values": "NodeMap or null", "agg": "str: sum|mean|max|min", "graph": "Graph"}, "Table", "O(n)")
+@op("group_by_attribute", "Group nodes (of the graph, or of a NodeSet) by a node attribute. Returns list of {value, count} sorted by count; with values (a NodeMap), also {agg} = sum|mean|max|min|median|std of those values per group, sorted by it.",
+    {"attribute": "str", "nodes": "NodeSet or null", "values": "NodeMap or null", "agg": "str: sum|mean|max|min|median|std", "graph": "Graph"}, "Table", "O(n)")
 def group_by_attribute(ctx, attribute, nodes=None, values=None, agg="mean", graph="G"):
     g = _graph(ctx, graph)
     vals = _attr(g, attribute)
@@ -571,7 +581,7 @@ def group_by_attribute(ctx, attribute, nodes=None, values=None, agg="mean", grap
         if m is not None:
             ys = [x for x in xs if x is not None]
             if ys:
-                row[agg] = {"sum": sum(ys), "mean": sum(ys) / len(ys), "max": max(ys), "min": min(ys)}[agg]
+                row[agg] = float({"sum": np.sum, "mean": np.mean, "max": np.max, "min": np.min, "median": np.median, "std": np.std}[agg](ys))
         rows.append(row)
     rows.sort(key=lambda r: (r.get(agg, float("-inf")) if m is not None else r["count"], r["count"]), reverse=True)
     return rows
@@ -653,6 +663,7 @@ def filter_nodes(ctx, map, op, threshold, nodes=None):
     m = ctx.values[map] if isinstance(map, str) else map
     ns = _nodeset(ctx, nodes) if nodes is not None else list(m.keys())
     f = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b: a < b, "<=": lambda a, b: a <= b, "==": lambda a, b: a == b}[op]
+    threshold = _scalar(ctx, threshold, "threshold")
     return [n for n in ns if f(m[n], threshold)]
 
 
@@ -663,11 +674,13 @@ def restrict_map(ctx, map, nodes):
     return {n: m[n] for n in ns if n in m}
 
 
-@op("map_stats", "min, max, mean, median of a NodeMap.", {"map": "NodeMap"}, "Table", "O(n)")
+@op("map_stats", "min, max, mean, median, std (population standard deviation), sum and n of a NodeMap. An empty map gives n = 0 and no other value.", {"map": "NodeMap"}, "Table", "O(n)")
 def map_stats(ctx, map):
     m = ctx.values[map] if isinstance(map, str) else map
     v = np.array(list(m.values()), dtype=float)
-    return {"min": float(v.min()), "max": float(v.max()), "mean": float(v.mean()), "median": float(np.median(v)), "n": int(len(v))}
+    if not len(v):
+        return {"min": None, "max": None, "mean": None, "median": None, "std": None, "n": 0, "sum": 0.0}
+    return {"min": float(v.min()), "max": float(v.max()), "mean": float(v.mean()), "median": float(np.median(v)), "std": float(v.std()), "n": int(len(v)), "sum": float(v.sum())}
 
 
 @op("set_size", "Number of elements in a NodeSet.", {"nodes": "NodeSet"}, "Scalar", "O(1)")
@@ -690,12 +703,28 @@ def pairwise_distances(ctx, nodes, graph="G"):
     return {"max_distance": best[0], "pair": [best[1], best[2]], "matrix": [[(x if x != math.inf else None) for x in row] for row in d]}
 
 
+def _scalar(ctx: Ctx, v: Any, what: str = "value") -> float:
+    v = ctx.values[v] if isinstance(v, str) and v in ctx.values else v
+    if isinstance(v, (list, dict)):
+        raise ValueError(f"{what} must be one number, got a {'list' if isinstance(v, list) else 'table'} of {len(v)} entries; refer to one entry, e.g. 'step.field[0]'")
+    if v is None:
+        raise ValueError(f"{what} has no value (an earlier step was undefined, e.g. a statistic of an empty set or a division by zero)")
+    return float(v)
+
+
+@op("arithmetic", "One arithmetic operation on two scalars (step ids of Scalar steps, 'step.field' or 'step.field[i]' refs, or literal numbers): a op b with op in {+,-,*,/}. Chain steps for longer formulas (a difference, a share, a complement 1 - x, a count times two).",
+    {"a": "Scalar", "op": "str: + | - | * | /", "b": "Scalar"}, "Scalar", "O(1)")
+def arithmetic(ctx, a, op, b):
+    x, y = _scalar(ctx, a, "a"), _scalar(ctx, b, "b")
+    if op == "/" and y == 0:
+        return None                                        # undefined (a share of an empty group): reported as no value, the other entries of the answer stand
+    return {"+": lambda: x + y, "-": lambda: x - y, "*": lambda: x * y, "/": lambda: x / y}[op]()
+
+
 @op("compare", "Compare two scalars (step refs, 'step.field' refs, or literals), optionally labelled: returns {a, b, a_greater, greater: label, ratio}.",
     {"a": "Scalar", "b": "Scalar", "label_a": "str or null", "label_b": "str or null"}, "Table", "O(1)")
 def compare(ctx, a, b, label_a=None, label_b=None):
-    av = ctx.values[a] if isinstance(a, str) and a in ctx.values else a
-    bv = ctx.values[b] if isinstance(b, str) and b in ctx.values else b
-    av = float(av); bv = float(bv)
+    av, bv = _scalar(ctx, a, "a"), _scalar(ctx, b, "b")
     la = label_a if label_a is not None else (a if isinstance(a, str) else "a")
     lb = label_b if label_b is not None else (b if isinstance(b, str) else "b")
     return {"a": av, "b": bv, "label_a": la, "label_b": lb, "a_greater": av > bv, "greater": la if av > bv else lb, "ratio": (av / bv) if bv else None}
@@ -708,6 +737,274 @@ def is_finite(ctx, value):
         return math.isfinite(float(v))
     except (TypeError, ValueError):
         return False
+
+
+# --------------------------------------------------------------------------- edges between groups, neighbours' values, maps
+_EDGES: dict = {}
+
+
+def _edges(g: ig.Graph):
+    """(sources, targets) of a graph as arrays, kept for the last two graphs asked about."""
+    if id(g) in _EDGES and len(_EDGES[id(g)][1]) != g.ecount():        # the graph grew in place (appended rows)
+        del _EDGES[id(g)]
+    if id(g) not in _EDGES:
+        while len(_EDGES) >= 2:
+            _EDGES.pop(next(iter(_EDGES)))
+        e = np.array(g.get_edgelist(), dtype=np.int64).reshape(-1, 2)
+        _EDGES[id(g)] = (g, e[:, 0].copy(), e[:, 1].copy())
+    return _EDGES[id(g)][1], _EDGES[id(g)][2]
+
+
+def _mask(ctx: Ctx, g: ig.Graph, nodes: Any) -> np.ndarray:
+    m = np.zeros(g.vcount(), dtype=bool)
+    idx = [i for i in (_index_of(ctx, g, lab) for lab in _nodeset(ctx, nodes)) if i is not None]
+    m[idx] = True
+    return m
+
+
+def _map(ctx: Ctx, x: Any) -> dict:
+    m = ctx.values[x] if isinstance(x, str) and x in ctx.values else x
+    if not isinstance(m, dict) or "membership" in m:
+        raise ValueError("not a NodeMap")
+    return m
+
+
+def _over_neighbours(g: ig.Graph, x: np.ndarray, mode: str):
+    """For every node: the sum of x over its neighbours and the number of neighbours with a value (x is nan where missing)."""
+    src, dst = _edges(g)
+    n = g.vcount()
+    has = ~np.isnan(x)
+    x0 = np.where(has, x, 0.0)
+    tot, cnt = np.zeros(n), np.zeros(n)
+    both = (not g.is_directed()) or mode == "all"
+    if both or mode == "out":                # a node sees the far end of the edges it starts
+        tot += np.bincount(src, weights=x0[dst], minlength=n); cnt += np.bincount(src, weights=has[dst].astype(float), minlength=n)
+    if both or mode == "in":
+        tot += np.bincount(dst, weights=x0[src], minlength=n); cnt += np.bincount(dst, weights=has[src].astype(float), minlength=n)
+    return tot, cnt
+
+
+@op("edges_between", "Number of edges with one end in NodeSet a and the other in NodeSet b (directed graphs: from a to b). With a == b: the edges inside the set. Edges between two groups, e.g. between two languages, without any subtraction.",
+    {"a": "NodeSet", "b": "NodeSet", "graph": "Graph"}, "Scalar", "O(n+m)")
+def edges_between(ctx, a, b, graph="G"):
+    g = _graph(ctx, graph)
+    src, dst = _edges(g)
+    ma, mb = _mask(ctx, g, a), _mask(ctx, g, b)
+    hit = ma[src] & mb[dst]
+    if not g.is_directed():
+        hit |= mb[src] & ma[dst]
+    return int(hit.sum())
+
+
+@op("edges_touching", "Number of edges with at least one end in a NodeSet.", {"nodes": "NodeSet", "graph": "Graph"}, "Scalar", "O(n+m)")
+def edges_touching(ctx, nodes, graph="G"):
+    g = _graph(ctx, graph)
+    src, dst = _edges(g)
+    m = _mask(ctx, g, nodes)
+    return int((m[src] | m[dst]).sum())
+
+
+@op("mixing_matrix", "Edge counts by the attribute values of the two ends (of the graph, or only among a NodeSet): list of {a, b, count}, largest first. Undirected graphs: each unordered pair of values once; directed: a is the source's value. Ends with a missing value are left out.",
+    {"attribute": "str", "nodes": "NodeSet or null", "graph": "Graph"}, "Table", "O(n+m)")
+def mixing_matrix(ctx, attribute, nodes=None, graph="G"):
+    g = _graph(ctx, graph)
+    vals = _attr(g, attribute)
+    src, dst = _edges(g)
+    cats = sorted({v for v in vals if v is not None}, key=str)
+    code = {v: i for i, v in enumerate(cats)}
+    c = np.array([code[v] if v is not None else -1 for v in vals], dtype=np.int64)
+    ok = (c[src] >= 0) & (c[dst] >= 0)
+    if nodes is not None:
+        m = _mask(ctx, g, nodes)
+        ok &= m[src] & m[dst]
+    a, b = c[src][ok], c[dst][ok]
+    if not g.is_directed():
+        a, b = np.minimum(a, b), np.maximum(a, b)
+    k = len(cats)
+    counts = np.bincount(a * k + b, minlength=k * k)
+    rows = [{"a": cats[i // k], "b": cats[i % k], "count": int(n)} for i, n in enumerate(counts) if n]
+    rows.sort(key=lambda r: -r["count"])
+    return rows
+
+
+@op("attribute_assortativity", "Assortativity coefficient of a node attribute over the edges (Newman): nominal for a categorical attribute, Pearson for a numeric one. Computed on the nodes that have a value.",
+    {"attribute": "str", "graph": "Graph"}, "Scalar", "O(n+m)")
+def attribute_assortativity(ctx, attribute, graph="G"):
+    g = _graph(ctx, graph)
+    vals = _attr(g, attribute)
+    keep = [i for i, v in enumerate(vals) if v is not None]
+    if len(keep) < g.vcount():
+        g = g.induced_subgraph(keep); vals = [vals[i] for i in keep]
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+        return float(g.assortativity([float(v) for v in vals], directed=g.is_directed()))
+    code: dict = {}
+    return float(g.assortativity_nominal([code.setdefault(v, len(code)) for v in vals], directed=g.is_directed()))
+
+
+@op("neighbour_aggregate", "For every node, an aggregate of a NodeMap over its neighbours: agg in {sum, mean, count} (count = number of neighbours that have a value in the map). mode in {all,in,out}: out = the nodes it points to. Nodes without such a neighbour are left out for mean. "
+    "Examples: mean views of each user's neighbours; with restrict_map first, how much of a quantity sits among neighbours of one group.",
+    {"values": "NodeMap", "agg": "str: sum|mean|count", "mode": "str", "graph": "Graph"}, "NodeMap", "O(n+m)")
+def neighbour_aggregate(ctx, values, agg="mean", mode="all", graph="G"):
+    g = _graph(ctx, graph)
+    m = _map(ctx, values)
+    names = g.vs["name"]
+    x = np.array([m.get(nm, math.nan) for nm in names], dtype=float)
+    tot, cnt = _over_neighbours(g, x, mode)
+    if agg == "sum":
+        return {names[i]: float(v) for i, v in enumerate(tot)}
+    if agg == "count":
+        return {names[i]: float(v) for i, v in enumerate(cnt)}
+    if agg != "mean":
+        raise ValueError(f"unknown agg {agg}")
+    return {names[i]: float(tot[i] / cnt[i]) for i in np.nonzero(cnt)[0]}
+
+
+def _reciprocated(g: ig.Graph):
+    """(sources, targets) of the distinct directed edges whose reverse edge exists, self-loops left out."""
+    s, t = _edges(g)
+    n = g.vcount()
+    key = np.unique(s[s != t] * n + t[s != t])
+    u, v = key // n, key % n
+    keep = np.isin(v * n + u, key)
+    return u[keep], v[keep]
+
+
+@op("mutual_degree", "For every node of a directed graph, the number of nodes it is linked to in both directions (it points to them and they point back): its reciprocated links, as a NodeMap. Divide by out-degree with map_arithmetic for a per-node reciprocity share; sum it over a NodeSet (restrict_map, map_stats) and divide by the set's summed out-degree for a group's reciprocation rate.",
+    {"graph": "Graph"}, "NodeMap", "O(m log m)", directed_only=True)
+def mutual_degree(ctx, graph="G"):
+    g = _graph(ctx, graph)
+    u, _ = _reciprocated(g)
+    cnt = np.bincount(u, minlength=g.vcount())
+    names = g.vs["name"]
+    return {names[i]: float(c) for i, c in enumerate(cnt)}
+
+
+@op("mutual_graph", "The undirected graph of reciprocated links of a directed graph: one edge per pair of nodes linked in both directions, one-way links dropped, node attributes kept. Nodes with no reciprocated link are left out (so averages, component and community counts are over nodes that have at least one mutual tie; say so in the answer) unless keep_isolated. Use it as the graph argument of any operator to analyse mutual ties only (triangles, clustering, k-core, communities, components, edges_between two groups).",
+    {"graph": "Graph", "keep_isolated": "bool"}, "Graph", "O(m log m)", directed_only=True)
+def mutual_graph(ctx, graph="G", keep_isolated=False):
+    g = _graph(ctx, graph)
+    u, v = _reciprocated(g)
+    once = u < v
+    h = ig.Graph(n=g.vcount(), edges=np.column_stack([u[once], v[once]]).tolist(), directed=False)
+    for a_ in g.vs.attributes():
+        h.vs[a_] = g.vs[a_]
+    for a_ in g.attributes():
+        h[a_] = g[a_]
+    if not keep_isolated:
+        h = h.induced_subgraph(np.flatnonzero(np.asarray(h.degree()) > 0).tolist())
+    return h
+
+
+@op("neighbours_in_set", "For every node of the graph, the number of its neighbours that are in a NodeSet (mode in {all,in,out}; out = nodes it points to), as a NodeMap. Divide by degree with map_arithmetic for a share, e.g. the share of a user's links that go to users of the same group.",
+    {"nodes": "NodeSet", "mode": "str", "graph": "Graph"}, "NodeMap", "O(n+m)")
+def neighbours_in_set(ctx, nodes, mode="all", graph="G"):
+    g = _graph(ctx, graph)
+    x = np.where(_mask(ctx, g, nodes), 1.0, math.nan)
+    _, cnt = _over_neighbours(g, x, mode)
+    names = g.vs["name"]
+    return {names[i]: float(v) for i, v in enumerate(cnt)}
+
+
+@op("neighbourhood_of_set", "All nodes within k hops of at least one node of a NodeSet (mode in {all,in,out}; in = the nodes that point to them). The nodes of the set themselves are left out unless include_sources.",
+    {"nodes": "NodeSet", "k": "int", "mode": "str", "include_sources": "bool", "graph": "Graph"}, "NodeSet", "O(n+m)")
+def neighbourhood_of_set(ctx, nodes, k=1, mode="all", include_sources=False, graph="G"):
+    g = _graph(ctx, graph)
+    idx = [i for i in (_index_of(ctx, g, lab) for lab in _nodeset(ctx, nodes)) if i is not None]
+    seen = np.zeros(g.vcount(), dtype=bool)
+    seen[idx] = True
+    frontier = idx
+    for _ in range(int(k)):
+        nxt = set()
+        for row in g.neighborhood(frontier, order=1, mode=mode, mindist=1):
+            nxt.update(row)
+        frontier = [i for i in nxt if not seen[i]]
+        seen[frontier] = True
+        if not frontier:
+            break
+    if not include_sources:
+        seen[idx] = False
+    names = g.vs["name"]
+    return [names[i] for i in np.nonzero(seen)[0]]
+
+
+@op("membership_map", "The block of every node of a Partition (communities or components) as a NodeMap: blocks are numbered by size, 1 = largest. Use with filter_nodes (== b) for the nodes of block b, and with group_by_map for block sizes or per-block aggregates.",
+    {"partition": "Partition"}, "NodeMap", "O(n)")
+def membership_map(ctx, partition):
+    p = ctx.values[partition] if isinstance(partition, str) else partition
+    mem = p["membership"]
+    names = p.get("_names") or ctx.lg.labels
+    counts: dict[int, int] = {}
+    for c in mem:
+        counts[c] = counts.get(c, 0) + 1
+    rank = {c: r for r, c in enumerate(sorted(counts, key=lambda c: (-counts[c], c)), 1)}
+    return {names[i]: float(rank[c]) for i, c in enumerate(mem)}
+
+
+@op("map_arithmetic", "Node-by-node arithmetic on a NodeMap: a op b with op in {+,-,*,/}, where b is another NodeMap (a step id; nodes present in both are kept) or a number. Division by zero drops the node.",
+    {"a": "NodeMap", "op": "str: + | - | * | /", "b": "value: a NodeMap step id or a number"}, "NodeMap", "O(n)")
+def map_arithmetic(ctx, a, op, b):
+    ma = _map(ctx, a)
+    f = {"+": lambda x, y: x + y, "-": lambda x, y: x - y, "*": lambda x, y: x * y, "/": lambda x, y: x / y}[op]
+    if isinstance(b, str) and b in ctx.values:
+        mb = _map(ctx, b)
+        return {n: float(f(v, mb[n])) for n, v in ma.items() if n in mb and not (op == "/" and mb[n] == 0)}
+    y = float(b)
+    if op == "/" and y == 0:
+        raise ValueError("division by zero")
+    return {n: float(f(v, y)) for n, v in ma.items()}
+
+
+@op("map_quantile", "The q-quantile of the values of a NodeMap, q between 0 and 1 (0.99 = 99th percentile), by linear interpolation.", {"map": "NodeMap", "q": "float"}, "Scalar", "O(n log n)")
+def map_quantile(ctx, map, q):
+    q = float(q)
+    q = q / 100.0 if q > 1 else q
+    return float(np.quantile(np.array(list(_map(ctx, map).values()), dtype=float), q))
+
+
+@op("map_bins", "Split the nodes of a NodeMap into `bins` groups of equal size by value (10 = deciles, 4 = quartiles): returns a NodeMap node -> bin number, 1 = lowest values. Ties are split by position. Use with filter_nodes (== b) or group_by_map.",
+    {"map": "NodeMap", "bins": "int"}, "NodeMap", "O(n log n)")
+def map_bins(ctx, map, bins=10):
+    m = _map(ctx, map)
+    names = list(m)
+    order = np.argsort(np.array([m[n] for n in names], dtype=float), kind="stable")
+    out = {}
+    for r, i in enumerate(order):
+        out[names[i]] = float(r * int(bins) // len(names) + 1)
+    return out
+
+
+@op("group_by_map", "Group nodes by the value of a NodeMap (a bin number from map_bins, a block from membership_map, a core number, a 0/1 flag): list of {value, count}, ascending by value; with values (another NodeMap) also {agg} = sum|mean|max|min|median|std of it per group.",
+    {"groups": "NodeMap", "values": "NodeMap or null", "agg": "str: sum|mean|max|min|median|std"}, "Table", "O(n)")
+def group_by_map(ctx, groups, values=None, agg="mean"):
+    gm = _map(ctx, groups)
+    vm = _map(ctx, values) if values is not None else None
+    buckets: dict[float, list] = {}
+    for n, k in gm.items():
+        buckets.setdefault(k, []).append(vm.get(n) if vm is not None else None)
+    rows = []
+    for k in sorted(buckets):
+        row = {"value": int(k) if float(k).is_integer() else k, "count": len(buckets[k])}
+        if vm is not None:
+            ys = [y for y in buckets[k] if y is not None]
+            if ys:
+                row[agg] = float({"sum": np.sum, "mean": np.mean, "max": np.max, "min": np.min, "median": np.median, "std": np.std}[agg](ys))
+        rows.append(row)
+    return rows
+
+
+@op("map_correlation", "Correlation between two NodeMaps over the nodes present in both: method pearson or spearman (rank correlation, ties get average ranks). E.g. degree against a numeric attribute (attribute_map).",
+    {"a": "NodeMap", "b": "NodeMap", "method": "str: pearson|spearman"}, "Scalar", "O(n log n)")
+def map_correlation(ctx, a, b, method="pearson"):
+    import pandas as pd
+    ma, mb = _map(ctx, a), _map(ctx, b)
+    keys = [n for n in ma if n in mb]
+    x, y = pd.Series([ma[n] for n in keys], dtype=float), pd.Series([mb[n] for n in keys], dtype=float)
+    if method == "spearman":
+        x, y = x.rank(), y.rank()
+    elif method != "pearson":
+        raise ValueError(f"unknown method {method}")
+    return float(np.corrcoef(x.to_numpy(), y.to_numpy())[0, 1])
+
 
 
 # Scope-sensitive operators: computed on a subgraph they give different values than computed on the whole graph and

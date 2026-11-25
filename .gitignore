@@ -11,3 +11,4 @@ prototype/demo/*.log
 prototype/.cache/
 logs/
 prototype/runs/*/*/*/raw/
+.venv-lg/

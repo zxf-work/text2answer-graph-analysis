@@ -421,6 +421,10 @@ def infer_semantics(facts: RawFacts, description: str = "") -> Semantics:
         conf["multigraph"] = 0.95
         ev["multigraph"] = "no duplicate rows"
 
+    if facts.n_self_loops:
+        ev["self_loops"] = (f"{facts.n_self_loops} of the {facts.n_rows} rows link a node to itself; they are left out of the graph, "
+                            "so edge counts and degrees do not include them (say so when the answer is a count of rows, edges or degrees)")
+        conf["self_loops"] = 1.0
     labelled = not facts.ids_numeric
     if facts.row_index_column:
         ev["columns"] = f"first column is a running row number; edges read from columns {facts.columns_used[0]} and {facts.columns_used[1]}"

@@ -181,3 +181,42 @@ def test_repeated_question_replays_its_plan_without_the_model(tmp_path):
     s.standing["degree.mode"] = "out"                            # another setting in force: the model is asked again
     assert s._replay("Top 3 by incoming links?") is None
     assert Session(p).replay_plans is False
+
+
+def test_unreadable_reply_is_asked_again_and_a_failed_turn_stays_visible(tmp_path):
+    p = str(tmp_path / "e.txt")
+    rows = base_rows()
+    rows += [(b, a) for a, b in rows[:1500]]
+    write(p, rows)
+    plan = {"interpretation": {"directed": True, "measure": "in-degree"}, "intent": "new",
+            "steps": [{"id": "d", "op": "degree", "args": {"mode": "in"}}, {"id": "top", "op": "top_k", "args": {"map": "d", "k": 3}}],
+            "answer": {"step": "top", "kind": "ranking"}}
+
+    class Raw(Scripted):
+        def chat(self, system, user, max_tokens=0, **kw):
+            self.seen = getattr(self, "seen", []) + [user]
+            r = Reply(text=self.plans.pop(0), input_tokens=1)
+            self.usage.add(r)
+            return r
+
+    s, llm = Session(p), Raw(["not json at all", json.dumps(plan), "still not", "no", json.dumps(plan)])
+    t1 = s.ask("top 3 by incoming links", llm)                   # second reply is read
+    assert t1["llm_calls"] == 2 and t1["outcome"] == "recompute"
+    t2 = s.ask("from now on count outgoing links", llm)          # both replies unreadable: the turn fails
+    assert t2["outcome"] == "error"
+    t3 = s.ask("top 3 again", llm)
+    assert '"unanswered_turns": [{"turn": 2, "question": "from now on count outgoing links"}]' in llm.seen[-1]
+    assert any(f["check"] == "earlier_turn_unanswered" for f in t3["reuse_findings"])
+    assert "- turn 2: from now on count outgoing links\nQuestion: top 3 again" in llm.seen[-1]
+
+
+def test_a_request_outside_the_catalogue_is_reported_as_unsupported(tmp_path):
+    p = str(tmp_path / "e.txt")
+    write(p, base_rows())
+    out = {"interpretation": {"directed": True}, "intent": "new", "steps": [], "answer": None, "unsupported": "a travelling-salesman tour: no operator computes one"}
+    plan = {"interpretation": {"directed": True}, "intent": "new", "steps": [{"id": "n", "op": "node_count", "args": {}}], "answer": {"step": "n", "kind": "scalar"}}
+    s, llm = Session(p), Scripted([out, plan])
+    t1 = s.ask("shortest tour through all users", llm)
+    assert t1["outcome"] == "unsupported" and "tour" in t1["unsupported"] and t1.get("answer") is None and not t1.get("error")
+    t2 = s.ask("how many users", llm)                            # not an error turn: nothing is carried as unanswered
+    assert t2["outcome"] == "recompute" and not any(f["check"] == "earlier_turn_unanswered" for f in t2["reuse_findings"])

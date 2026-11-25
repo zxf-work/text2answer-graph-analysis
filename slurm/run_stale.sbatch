@@ -7,7 +7,7 @@
 #SBATCH -o logs/%x-%j.out
 # E2b: sessions where reusing an earlier result is wrong.
 # Usage: sbatch --export=ALL,MODEL=claude-haiku-5-5,VARIANT=full[,REP=1][,ONLY=trnavsky][,DRY=1] slurm/run_stale.sbatch
-#   VARIANT: full | codegen_stateful | codegen_stateful_warned | codegen_independent
+#   VARIANT: full | codegen_stateful | codegen_stateful_warned | codegen_independent | codeact | codeact_warned (the last two need T2A_PY=<repo>/.venv-lg/bin/python)
 set -euo pipefail
 source "$SLURM_SUBMIT_DIR/slurm/env.sh"
 : "${MODEL:?set MODEL}" "${VARIANT:?set VARIANT}"

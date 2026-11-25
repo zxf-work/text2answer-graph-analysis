@@ -476,6 +476,235 @@ Caveats:
 
 Summaries and per-session totals: `prototype/results/sessions/practice/` (`by_session.json`). Not done: an outside baseline; a second graph; replay for repeats that are not word for word; the agents' equivalent of replay (re-running stored code for a repeated question) was not built.
 
+### 3.15 Repetitions of the session benchmarks (2026-11-24)
+
+Correct answers per run (stale answers in brackets). Claude calls send no temperature, so repetitions differ naturally.
+
+E2b, 22 sessions, 122 turns, 47 trap turns:
+
+| System | Haiku 5.5, 5 runs | Opus 5.5, 3 runs |
+|---|---|---|
+| GraphAudit | 122, 122, 122, 122, 122 [0] | 122, 122, 122 [0] |
+| Stateful agent | 118, 107, 109, 112, 112 [2, 6, 3, 2, 4] | 117, 114, 114 [5, 6, 5] |
+| Warned agent | 120, 120, 114, 118, 119 [0, 0, 0, 1, 0] | 121, 122, 122 [0] |
+| Independent agent | 120, 111, 122, 122, 118 [0] | 121, 122, 122 [0] |
+
+E4, three full large graphs, 24 turns, 6 trap turns:
+
+| System | Haiku 5.5 | Opus 5.5, 3 runs |
+|---|---|---|
+| GraphAudit | 24 in each of 6 runs [0]; compute 119–185 s | 24, 24, 24 [0]; 118–122 s |
+| Stateful agent | 13, 13, 13, 13 [6, 5, 5, 6]; 303–342 s | 13, 13, 13 [6, 6, 6]; 131–418 s |
+| Warned agent | 12, 13, 15, 13 [6, 6, 5, 6]; 349–495 s | 24, 24, 24 [0]; 590–874 s |
+| Independent agent | 23, 23, 24, 23 [0]; 1,065–1,667 s | 24, 24, 24 [0]; 1,357–2,017 s |
+
+(The first run of GraphAudit on each model, 540 s, used the loader that 3.11 replaced.)
+
+Qwen3-14B on vLLM, GraphAudit, E2b: 116 at temperature 0; 110 and 114 at temperature 0.6 (seeds 2, 3); no stale answer. The Qwen3-32B repetitions are still waiting for an H100.
+
+What the repetitions support:
+
+- GraphAudit is the only system that is fully correct in every run on both models (8 runs of E2b, 9 of E4).
+- The unwarned stateful agent gives stale answers in every run, on both models.
+- Telling the agent to check works with Opus and not with Haiku: the warned Opus agent matches GraphAudit's answers, at 5 to 7 times the compute on the large graphs; the warned Haiku agent is still stale on 5 or 6 of the 6 large-graph traps.
+- So the claim is not "agents cannot get this right". It is: GraphAudit gets it right by construction, with a small model, at the lowest compute, and shows why; an agent gets it right only with the strongest model, a warning, and recomputation.
+
+### 3.16 An outside baseline: LangGraph CodeAct (2026-11-24)
+
+`langgraph-codeact` 0.1.3, the framework's own loop, prompt and conversation memory; we supply the sandbox (the same persistent Python process our stateful agent uses) and the task text (same file facts, same answer format). Variants: plain, and warned (the same warning paragraph our warned agent gets). Haiku 5.5, 3 runs each, no prompt caching (framework default). Ranges over runs.
+
+| workload (turns) | system | correct | stale | fees | compute |
+|---|---|---|---|---|---|
+| E2b (122) | GraphAudit | 122 | 0 | $0.16 | |
+| | our stateful agent | 107–118 | 2–6 | | |
+| | CodeAct | 103–114 | 1–4 | $0.13–0.18 | 232–310 s |
+| | our warned agent | 114–120 | 0–1 | | |
+| | CodeAct warned | 111–117 | 0–2 | $0.17–0.22 | 276–340 s |
+| E4 large (24) | GraphAudit | 24 | 0 | | 118–185 s |
+| | our stateful agent | 13 | 5–6 | | |
+| | CodeAct | 13–14 | 6 | $0.03–0.04 | 302–414 s |
+| | our warned agent | 12–15 | 5–6 | | |
+| | CodeAct warned | 15–20 | 2–6 | $0.03–0.05 | 318–603 s |
+| practice (43) | GraphAudit (cache, replay) | 42 | 0 | $0.020 | |
+| | our stateful agent (cache) | 29–30 | 5–6 | $0.026 | |
+| | CodeAct | 30–33 | 5–6 | $0.045–0.047 | 140–359 s |
+| | our warned agent (cache) | 33–40 | 2–5 | $0.032 | |
+| | CodeAct warned | 41–42 | 1 | $0.069–0.080 | 721–759 s |
+
+Reading:
+
+- The framework agent behaves like ours: same level of correct answers, the same stale answers on the same kind of turn. Our stateful baseline was not a weak one.
+- The warning helps CodeAct more than it helps our agent on the practice sessions (41–42 against 33–40) and it pays in compute (about 740 s against 140–359 s): it recomputes. On E4 the warning is not enough with Haiku: 2, 5 and 6 stale answers in the three runs.
+- CodeAct makes about two model calls per turn (code, then the answer), so its fees are above our agents'.
+- Blank cells: not measured in the same configuration; fill from 3.9, 3.10 and 3.14 runs before the paper.
+
+### 3.17 Sessions we did not write: first pass on Twitch (2026-11-24)
+
+Writers: Claude Opus 5.5 (10 sessions, 80 questions) and Qwen3-14B (10 sessions, 52 questions), each given only a brief and the dataset description (`bench/sessions/write_sessions.py`). Runner: `bench/sessions/run_written.py` (answers stored, not scored; a question that announces a refresh gets a real append first). GraphAudit runs on Haiku 5.5 with the new `unsupported` outcome (rule S9); when it asks which scope reading is meant, a simulated user (Haiku, sees the persona, the questions so far and the two contracts) answers: 7 times A, 2 times B. Reference: the independent script agent on Opus 5.5 (answered all 132, $2.89). Comparison: `compare_written.py` (loose match), then an Opus judge on the rest (`judge_written.py`, $0.22). One run.
+
+| GraphAudit (Haiku) on 132 questions | Opus-written (80) | Qwen-written (52) | all |
+|---|---|---|---|
+| same values as the reference | 45 | 34 | 79 (60%) |
+| incomplete: ingredients or part of the answer, nothing conflicting | 5 | 3 | 8 |
+| different from the reference | 12 | 2 | 14 (11%) |
+| unsupported, with the missing capability named | 13 | 10 | 23 (17%) |
+| asks a question back | 3 | 0 | 3 |
+| error (invalid plan, engine error) | 2 | 3 | 5 |
+
+Compute: GraphAudit 50 s for all 132 turns (plus 98 s loading), the Opus script agent 497 s.
+
+What this says:
+
+- On our own sessions GraphAudit is right on every turn; on questions written without knowledge of the catalogue it matches the reference on 60%. The claim "right by construction" holds for what the catalogue expresses, not for what analysts ask.
+- 14 answers differ from the reference and were given without a warning. Not all are GraphAudit's fault (the reference is a model too: 4,354 against 4,335 reached users, 3,632 against 3,589 for a percentile are open), but several are: after two unsupported turns the planner answered a different quantity (s10), and a year filter returned other years. Each needs a hand check before a number goes into the paper.
+- The 8 incomplete answers have one cause: no arithmetic on results. The plan returns the two counts and not their difference or complement.
+- Missing capabilities named in the 23 unsupported turns and behind most incomplete ones: arithmetic on scalars; edges between two node groups (mixing matrix, attribute assortativity); quantiles and binning of a node map; correlation between two node maps; range filters on dates; aggregating an attribute over each node's neighbours; neighbourhoods of a node set; a node map from a partition.
+- Engine bugs found: `float() argument ... not 'list'` on two share questions; a list passed as a filter value.
+- The first runner always chose reading B when GraphAudit asked; that produced wrong group averages (mean degree of affiliates 34 instead of 72) and was replaced by the simulated user. Those runs (rep1) are not used.
+
+Pokec and LiveJournal results are in 3.18.
+
+### 3.18 Catalogue extended from 59 to 73 operators; Pokec and LiveJournal as the held-out test (2026-11-24)
+
+The 14 operators were chosen from the Twitch failures only (3.17): `arithmetic`, `edges_between`, `edges_touching`, `mixing_matrix`, `attribute_assortativity`, `neighbour_aggregate`, `neighbours_in_set`, `neighbourhood_of_set`, `membership_map`, `map_arithmetic`, `map_quantile`, `map_bins`, `group_by_map`, `map_correlation`. Also: text filters (`startswith`, `contains`, date ranges, a list of values), rule S10 (state the value asked for, not its ingredients). Pokec and LiveJournal sessions were not looked at before the additions, so they measure whether the additions generalise.
+
+Same protocol as 3.17: GraphAudit on Haiku 5.5 with the simulated user, one run per column; reference = independent script agent on Opus 5.5 (answered 427 of 429, $12.06); Opus judge on answers the loose match does not accept ($0.6 to $0.7 per pass). "same" = loose match or judged same. Table: `bench/sessions/table_written.py`.
+
+| writer, graph (questions) | catalogue | answered | unsupported | asks back | error | same as reference | incomplete | different |
+|---|---|---|---|---|---|---|---|---|
+| Opus, Twitch (80) — design graph | 59 | 62 | 13 | 3 | 2 | 45 | 6 | 11 |
+| | 73 | 76 | 2 | 0 | 2 | 66 | 2 | 8 |
+| Qwen, Twitch (52) — design graph | 59 | 39 | 10 | 0 | 3 | 33 | 3 | 3 |
+| | 73 | 50 | 0 | 1 | 1 | 47 | 1 | 2 |
+| Opus, Pokec (76) — held out | 59 | 44 | 29 | 3 | 0 | 33 | 3 | 8 |
+| | 73 | 57 | 19 | 0 | 0 | 50 | 1 | 6 |
+| Qwen, Pokec (70) — held out | 59 | 61 | 4 | 1 | 4 | 46 | 6 | 9 |
+| | 73 | 63 | 3 | 1 | 3 | 50 | 5 | 8 |
+| Opus, LiveJournal (81) — held out | 59 | 40 | 40 | 1 | 0 | 26 | 2 | 12 |
+| | 73 | 47 | 33 | 1 | 0 | 32 | 0 | 15 |
+| Qwen, LiveJournal (70) — held out | 59 | 57 | 11 | 0 | 2 | 33 | 1 | 23 |
+| | 73 | 57 | 7 | 1 | 5 | 35 | 1 | 21 |
+| **all (429)** | 59 | 303 | 107 | 8 | 11 | 216 (50%) | 21 | 66 |
+| | 73 | 350 | 64 | 4 | 11 | 280 (65%) | 10 | 60 |
+
+Regression: E2b stays 122 of 122, 47 of 47 traps, 0 stale in four runs with the larger catalogue (rep11ops to rep13ops, rep14fix).
+
+What this says:
+
+- On the design graph the additions close the gap: Twitch unsupported 23 to 2, same-as-reference 78 to 113 of 132. This number is optimistic by construction and must be labelled so.
+- On the held-out graphs the gain is real but smaller: unsupported 84 to 62 of 297, same-as-reference 138 to 167 (46% to 56%). The operators generalise where the questions overlap (Opus-written Pokec: same 33 to 50); they do not cover what only directed graphs raise.
+- What is still unsupported on the held-out graphs, by family: per-user reciprocity and the graph of mutual friendships (about 35 of the 62; one family, two operators would cover it: reciprocated-neighbour count per node, mutual-edge subgraph); per-edge attribute differences (age gap across an edge, 4); arithmetic on node ids (shard = id mod 64, 4); ratio of two grouped tables and row sums of a mixing matrix (4); sampled average path length (2); which rows are new after an append (3); a significance test (1). Adding these now would use up the held-out set: any further addition needs a new unseen set (the published task lists of G6) to be reported honestly.
+- No unsupported turn gave a wrong value; each names the missing capability.
+
+The "different" column, read by hand from plans and reference scripts (not recomputed):
+
+- LiveJournal, Qwen-written, 21 different: about 18 have one cause. The file has 68,993,773 rows of which 518,382 link a user to themselves (counted on the cluster); GraphAudit leaves self-loops out (68,475,391 edges) and did not say so; the reference counts raw rows. Both are defensible, the silence is not. Fixed: the graph reading now carries a `self_loops` line that the planner sees and is told to state. Three more are population against sample standard deviation.
+- Twitch, Opus-written, 8 different: 4 are another reading that the other side lists as its variant (edge share against edge-end share; neighbours counted with or without the 20 seed users, 4,354 = 4,335 + 19); 1 is Louvain's randomness; 2 are GraphAudit errors that passed every check (a "share" of 11.26 from ranking over all users instead of ES users; degree deciles where the previous turn defined views deciles); 1 open (betweenness ranking order).
+- So "different" is not an error rate. A defensible split needs a hand label per row: same value under another stated convention / nondeterministic / GraphAudit wrong / reference wrong. Not done for Pokec and Opus-written LiveJournal (29 rows).
+- Two checks follow from the GraphAudit errors: a value called a share or fraction must lie in [0, 1]; a turn that reuses "deciles" or "top group" must use the grouping variable of the turn it refers to.
+
+Crashes found on the held-out graphs and fixed afterwards (so the 73-operator rows above still contain them): statistics of an empty set, division by zero in a share, components of an empty subgraph, `median` per attribute group, a non-numeric threshold. `std` added to `map_stats` and the grouping operators. A rerun after the fixes (rep4): answered 360, unsupported 60, error 4, same 277, incomplete 7, different 76. Errors drop from 11 to 4 (3 of the 4 came from the division-by-zero fix itself, which evaluated the division for every `arithmetic` step whose second operand was 0; corrected after rep4, tests pass, not rerun); "same" does not move, and "different" moves by 16 between two runs of the same system on Qwen-written sessions, where questions are vague ("fastest-growing languages", "top influencers") and each run picks a definition. One run per cell is not enough for these; repeat three times before quoting.
+
+Compute for all 429 turns: GraphAudit about 1,900 s (rep4; one LiveJournal session in rep3 took 11,000 s on a slow exact computation, to look at), the Opus script agent 5,400 s.
+
+### 3.19 Reciprocity operators (75), then the published task lists as the unseen test (2026-11-24)
+
+**Two operators for the largest unsupported family of 3.18**: `mutual_degree` (per node, the number of nodes linked in both directions) and `mutual_graph` (the undirected graph of reciprocated links). Catalogue 73 to 75. Pokec and LiveJournal are no longer held out from here on: these operators were chosen after reading their questions.
+
+Same 429 model-written questions, GraphAudit on Haiku, same Opus reference:
+
+| operators | answer | unsupported | clarify | error | same as reference | incomplete | different |
+|---|---|---|---|---|---|---|---|
+| 59 (rep2) | 303 | 107 | 8 | 11 | 216 (50%) | 21 | 66 |
+| 73 (rep3) | 350 | 64 | 4 | 11 | 280 (65%) | 10 | 60 |
+| 75 (rep6) | 394 | 27 | 3 | 2 | 305 (71%) | 7 | 82 |
+| 75, mutual graph without isolated nodes (rep7) | 390 | 27 | 5 | 5 | 310 (72%) | 7 | 72 |
+
+- Opus-written LiveJournal: unsupported 33 to 14, same 32 to 47 of 81. Opus-written Pokec: unsupported 19 to 8, same 50 to 59 of 76.
+- Two mistakes of mine on the way, both found by reading results and both fixed: (1) the new operators carried a cost label the estimator did not know, so every plan using them was rejected as too expensive (rep5, 38 errors; `t2r/ir.py` now knows the label); (2) `mutual_graph` first kept users with no mutual tie, which gave 426,975 "communities" on Pokec against the reference's 6,530 and an average local clustering of 0.077 against 0.104. It now leaves them out unless `keep_isolated` and says so in its description (rep7: 6,509 against 6,530, the rest is Louvain's randomness).
+- "Different" is still 72 to 82 and moves by about 10 between runs. Read by hand in this round: LiveJournal counts that differ by the users whose only link is a self-loop (3,919,375 against 3,950,121; GraphAudit now says "self-loops excluded" in the answer); unseeded Louvain; one session where turn 1 returns an empty group and the two systems then follow different groups. No hand label per row yet.
+- Still unsupported (27): per-edge attribute differences (age gap), arithmetic on node ids (id mod 64), sums over rows or the diagonal of a mixing matrix, sampled average path length, comparison with the graph before an append, per-edge triangle tests, a significance test, a seeded Louvain.
+- Regression: E2b 122 of 122, 47 of 47 traps, 0 stale (rep15recip).
+
+**Published task lists (G6 source 2), the test nobody here designed for.** `bench/sessions/workload_published.py`: the 10 task types of GraphArena, the 8 of NLGraph, and the further types of the benchmarks GraphTeam is evaluated on (GraphInstruct, Talk like a Graph, GraphWiz; LLM4DyG and GNN-AutoGL have no counterpart on these graphs), restated on Twitch, Pokec and LiveJournal: 101 questions, each standing alone. We chose the wording, the node ids (by degree only) and the subgraph sizes for the tasks the benchmarks pose on small graphs (the 50 highest-degree users for clique, independent set, vertex cover; two small ego networks for common subgraph and edit distance). Reference: the independent Opus script agent, 100 of 101 answered, $3.05.
+
+First run, 75 operators, before anything was changed (p1):
+
+| graph | questions | answer | unsupported | same as reference | incomplete | different |
+|---|---|---|---|---|---|---|
+| Twitch (undirected) | 33 | 21 | 12 | 20 | 1 | 0 |
+| Pokec (directed) | 34 | 22 | 12 | 16 | 1 | 5 |
+| LiveJournal (directed) | 34 | 20 | 14 | 16 | 0 | 4 |
+| **all** | 101 | 63 | 38 | 52 (51%) | 2 | 9 |
+
+- **38 unsupported, no error, no wrong value among them.** They are the same task types on every graph: maximum clique, maximum independent set, minimum vertex cover, maximum common subgraph, graph edit distance, travelling salesman, maximum flow, maximum matching, Hamilton path, depth-first visit order, the heaviest triangle, induced 4-cycles (and exact triangle counting on LiveJournal, declined for cost). All six NP-complete tasks of GraphArena are outside the catalogue. The script agent answered all of them on the 50-node subgraphs. This is the honest coverage number for combinatorial tasks: the catalogue is an analytics catalogue, and the paper must say so and point to the fallback (G7).
+- **What it answers, it answers like the reference on the undirected graph (20 of 21), not on the directed ones.** Of the 9 different, 6 have one cause, and it is ours: the question says "ignoring direction" and the plan uses `mode=all` on the directed graph, which counts a pair linked both ways twice. Results: user 0 listed twice as a common neighbour, 10 common neighbours where there are 5, a "cycle" found in a tree, neighbour sums 4 times too large, a diameter of 15 against 11. No check flagged any of them. The other 3: two are the self-loop convention on LiveJournal (stated in our answer), one is a number given where a yes or no was asked.
+- This is the most useful result of the round: a silent error class that our own sessions never produced, because we never wrote "ignoring direction" on a directed graph.
+
+Fix, after the first run and therefore reported separately: operator `undirected_graph` (one edge per pair linked in either direction; catalogue 76), `neighbours` returns each neighbour once, and the description of `degree` says what `mode=all` counts. Rerun (p2): same 58 (57%), incomplete 2, different 3 (two self-loop conventions, one yes where the reference says no on the ordering task, which the first run got right), unsupported 38. E2b 122 of 122 (rep16und). The 51% is the number to quote as unseen; 57% is after a fix made with the answers in view.
+
+Also fixed in the comparison: a bare yes against a bare no used to count as agreement (no numbers on either side). It no longer does; one turn of the 3.18 table moves from "same" to unjudged.
+
+Open after this round: a check that would have caught the direction error without the reference (when the question says "ignoring direction" or "linked in either direction" and the graph is directed, the plan must go through `undirected_graph` or `mutual_graph`); the fallback for the 38 (G7); hand labels; three repetitions.
+
+### 3.20 Checked code fallback for requests outside the catalogue (2026-11-25)
+
+Decision (2026-11-25): the 38 declined tasks of 3.19 are covered by a fallback to generated code, not by more operators. Built in `t2r/fallback.py`, switched on with `T2R_CODE_FALLBACK=1` or `Session(code_fallback=True)`; off by default, so every earlier number is unchanged.
+
+How it works when the planner returns `unsupported`:
+
+1. A second planner call (same prompt prefix, so it is read from the prompt cache) returns catalogue steps that prepare the inputs (select the nodes, induce the subgraph, drop direction), the names under which they are handed over, and a task statement for a programmer. These steps are validated, costed, reused and stored like any plan.
+2. Two functions `solve(inputs)` are written by two separate model calls that do not see each other, one told to prefer igraph, the other to avoid igraph's routine for the core computation. Each runs in its own process on the prepared inputs. Neither reads the graph file.
+3. Same value from both: outcome `answer by code`, with the findings `outside_catalogue` (warning, always) and `code_cross_check`. Different values, a failure or a refusal (the writers are told to raise an error when an exact result is not feasible): outcome `unconfirmed`, no answer, the candidates are shown. Code results are not stored for reuse.
+
+What the check covers and what it does not: loading and reading of the graph are the engine's; an implementation slip in one function is caught by the other. Both writers read the same task statement, so a wrong reading of the question passes. The witness (members, path) is not compared.
+
+Published task lists, GraphAudit on Haiku against the Opus reference (101 questions):
+
+| run | answered | of which by code | unconfirmed | unsupported | same as reference | code answers same / different | incomplete | different |
+|---|---|---|---|---|---|---|---|---|
+| p2, no fallback (3.19) | 63 | 0 | 0 | 38 | 58 (57%) | | 2 | 3 |
+| p3, fallback, first run | 99 | 34 | 1 | 0 | 88 (87%) | 31 / 2 | 6 | 5 |
+| p4, after one instruction fix | 98 | 34 | 1 | 1 | 90 (89%) | 33 / 1 | 3 | 5 |
+
+- All six NP-complete GraphArena tasks, maximum flow, matching, Hamilton path, depth-first order, heaviest triangle, induced 4-cycles and the exact triangle count on LiveJournal (285,730,264, 148 s) are now answered with the reference's value. The one withheld turn is a vertex cover on LiveJournal where one function refused its own result.
+- An error that passed the cross-check in p3: on LiveJournal both functions ordered node ids as text ("103117" before "39243") in the depth-first search. The writers' instruction now says to compare numeric ids as numbers (p4). This is the kind of error two writers share.
+- The code answer still different in p4: maximum flow on the LiveJournal top-1000 subgraph, 20 against the reference's 21. Not yet decided who is right.
+- The other "different" rows are from the plan path, not the code: the self-loop convention on LiveJournal (2), and the ordering task answered "yes" on Pokec and LiveJournal although the subgraph has directed cycles (an error of ours, present before the fallback on LiveJournal).
+- Fees on Haiku: about $0.07 per graph for 34 questions, against $0.03 without the fallback.
+
+Model-written sessions (429 questions), where the questions are conversational:
+
+| run | answered | by code | unconfirmed | unsupported | error | same as reference | incomplete | different |
+|---|---|---|---|---|---|---|---|---|
+| rep7, no fallback | 390 | 0 | 0 | 27 | 5 | 310 | 7 | 72 |
+| rep8, fallback | 402 | 13 | 13 | 0 | 3 | 309 | 12 | 81 |
+
+- Of the 27 formerly unsupported turns, 13 got a confirmed code answer and 13 were withheld. The withheld ones are mostly right to be withheld: exact computations on 68 million edges that a function refused or that ran past the 300 s limit, a count of raw file rows that the loaded graph cannot give, a seeded Louvain. In 5 of the 13 a candidate equalled the reference.
+- **Of the 13 confirmed code answers, 8 are the same as the reference and 5 differ.** On precise single-shot questions the cross-check holds (33 of 34); on conversational follow-ups it does not, because the error is in the task statement, which both writers share. Not hand-labelled yet: at least one of the five is a difference of layout (a list of counts against its minimum, maximum and deviation).
+- So the fallback raises coverage, not agreement, on these sessions (309 against 310 same). A confirmed code answer must be shown as a lower grade of answer than an operator answer; the interface and the paper must say so.
+
+Regression: E2b 122 of 122, 47 of 47 traps, 0 stale with the fallback code in place and switched off (rep17fb). Tests: 57 pass (`tests/test_fallback.py`: agreement gives an answer, disagreement gives none, prepared inputs are reused, the switch off leaves the turn unsupported).
+
+**Hand check of the 6 code answers that differ from the reference (2026-11-25).** Read from the task statements, both sides' scripts and, for LiveJournal, a direct recomputation on the cluster under both conventions.
+
+| turn | ours | reference | verdict |
+|---|---|---|---|
+| published, LiveJournal: maximum flow in the top-1000 subgraph | 20 | 21 | self-loop convention. Ranking by in-degree with self-loops counted gives another 1000th user (4 users of the top 1000 change): 21 with them, 20 without. Both reproduced. |
+| Opus-written LiveJournal s05 t3: edges per shard, min / max / deviation | 1,053,003 / 1,096,044 / 8,096.4 | 1,061,052 / 1,104,331 / 8,114.4 | self-loop convention. Both reproduced; our counts sum to 68,475,391. |
+| Opus-written LiveJournal s05 t8: edges with both ends in one shard | 976,990 | 1,495,372 | self-loop convention: the difference is exactly the 518,382 self-loops. For a question about stored rows the reference's count is the one the user wants. |
+| Qwen-written Pokec s04 t3: regions with the highest share of women | includes regions with 1 user | only regions with at least 1,000 users | two readings. The question names no minimum; the reference added one and lists ours as its variant. |
+| Opus-written Pokec s06 t5: regions with the highest share of links to another kraj | 10 krajs | 10 regions | **ours wrong.** The task statement changed the unit from region to kraj; both functions implemented it faithfully. |
+| Opus-written Pokec s02 t8: accounts in the refreshed group but not in the earlier one | the refreshed group (2 accounts) | none | **ours wrong.** The earlier group was no longer available; the task statement said so and asked for the refreshed members instead. The right outcome was to decline. |
+
+- So of the 47 confirmed code answers (34 published, 13 written): 2 wrong, 1 another defensible reading, 3 right under our self-loop convention, 41 the same as the reference. Both errors are in the task statement, none in the code.
+- The self-loop convention is now the largest single source of "different" on LiveJournal, in plans and in code alike. A code answer carries it only in the task statement, not in the answer shown. Decide before the paper: keep self-loops out and print the note with every count, or keep the rows and exclude them per operator.
+- Guard added after the check: the instruction for the input-preparing call now says to answer in the unit the user named, and to return `unsupported` again when a needed input cannot be prepared; the engine then leaves the turn unsupported (`code.declined`). One rerun of the two Pokec sessions: s02 t8 is declined with the reason, s06 t5 is answered per region with the reference's regions. One run each, not a rate. Tests: 58 pass.
+
+**Self-loops: decided 2026-11-25, keep them out of the graph and print the note with every answer.** Every answered turn, by plan or by code, now carries `conventions`, e.g. "518,382 of the 68,993,773 rows link a node to itself; they are left out of the graph, so counts of rows, links and degrees do not include them" (`conventions()` in `t2r/session.py`; empty when the file has no such rows). Checked on one LiveJournal session of the published tasks: all 16 turns carry it. E2b 122 of 122, 0 stale (rep18note); 59 tests pass. Not done: the interface does not show the field yet; the comparison with the reference still counts these turns as "different" (the judge does not see the note); a question about the raw rows themselves (how many self-loops, how many rows) still has no operator and is declined.
+
+Open: the task statement as the weak point (candidates: show it to the user as the contract of the turn; have the second writer restate the question from the conversation instead of sharing the statement); the two new outcomes in the UI; the fallback has not been run on Opus or on the practice sessions.
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**
@@ -776,3 +1005,83 @@ changed scope makes a matching-looking result the wrong one, decided by rules ov
 3. Author list, with a CMT account and ORCID for each.
 4. Whether reviewers get a public demo URL or only the video; where the video is hosted.
 5. Whether to rename the repository and the `t2r` package now or after submission.
+
+## 12. Closing the gaps before submission (written 2026-11-24)
+
+Eight gaps were listed after the cost runs. Status and plan for each, in the order to do them. Submission is Jan 9, UI freeze Dec 20.
+
+### G1. Caching fairness for the baselines — closed
+
+The code agents now use prompt caching (3.14). With caching on both sides the fees are about equal. Nothing further; the paper must not claim a fee advantage from caching.
+
+### G2. Model fees on repeats — closed for word-for-word repeats, one extension
+
+Plan replay is in (3.14). Extension, 1 day, by Dec 1: replay when the question differs only in case, punctuation and filler ("again", "once more", "now", "please", "show"/"show me"), under the same safety conditions. Measure on `refresh` (its repeats are worded this way) and on E2b, where a wrong replay would show as a wrong or stale answer. Keep it only if E2b stays at 122 of 122 in three runs. Also build the same thing for the independent agent (re-run the stored script for a repeated question), so the comparison stays fair.
+
+### G3. Lost standing setting — closed (2026-11-24)
+
+Cause (3.13): a turn that set a standing setting came back unreadable, the setting was never recorded, later turns used the old reading. Fix, in `t2r/session.py`: (a) a reply that cannot be read as a plan is asked for once more, with a larger output limit; (b) a turn that still fails is shown to the planner next to the new question as an earlier request that got no answer, with rule S8 telling it to apply a lasting request from such a turn; (c) later answers carry the finding `earlier_turn_unanswered`.
+
+Verification on E2b (122 turns, 47 traps):
+
+| model | run | correct | stale | turns with no answer |
+|---|---|---|---|---|
+| Qwen3-14B (Ollama), before the fix | 3.13 | 106 | 3 | |
+| Qwen3-14B, first version of the fix (a + JSON state only) | 2 runs | 111, 111 | 1, 1 | 9, 9 |
+| Qwen3-14B, final fix | 1 run | 110 | 0 | 10 |
+| Haiku 5.5, final fix | 1 run | 122 | 0 | 0 |
+| Haiku 5.5, first version (with and without cache+replay) | 2 runs | 122, 122 | 0, 0 | 0, 0 |
+
+The stale answers are gone. What is left on Qwen3-14B are turns with no answer at all (the model's reply is still unreadable after the second request) and the turns that depend on them; these are visible failures, not silent ones. One Qwen run only for the final fix: repeat twice before quoting it.
+
+### G4. Variance — mostly closed
+
+3.14 and 3.15 give 3 to 6 runs for Haiku and 3 for Opus on E2b and E4. Left: the Qwen3-32B repetitions (queued), two more Opus runs of the practice sessions (about $12), and reporting every table in the paper as a range, not a single run.
+
+### G5. Outside baselines — 5 days, by Dec 6
+
+*Status 2026-11-24: LangGraph CodeAct done on Haiku, results in 3.16. Opus (1 run, about $25 for both variants on E2b) not run: needs a yes. GraphTeam not started.*
+
+Two systems we did not write, both run with the same models and the same file facts:
+
+1. **LangGraph CodeAct** (`langgraph-codeact`): a standard agent framework whose agent keeps Python variables between turns. It is the framework version of our stateful agent, so it tests whether our baseline was a weak one. Adapter: `bench/sessions/run_langgraph.py` implementing the same `ask(question)` interface as `Codegen`; variants plain and warned. Run on E2b, E4 and the practice sessions, Haiku 3 runs, Opus 1 run.
+2. **GraphTeam** (BUPT-GAMMA, arXiv 2410.18032): a published multi-agent system for graph analysis with public code. It was built for benchmark problems with the graph in the prompt, so it may not take a 30M-edge file or a multi-turn session. Try it on E2b (graphs of about 100K edges) turn by turn with the conversation in the question; report plainly what it can and cannot run.
+
+If GraphTeam cannot be made to run in 2 days, replace it with a plain LangGraph tool-calling agent with a Python REPL tool and say so. GraphSeek (arXiv 2602.11052) has no public code that we found: related work only.
+
+Done when: one table with our three agents and the outside systems on the same turns, same scoring.
+
+### G6. Workload independence — by Dec 10 (decided 2026-11-24: no human writers, models and published tasks)
+
+Sessions we did not write, from two sources:
+
+1. **Models that are told nothing about the system.** `bench/sessions/write_sessions.py` gives a writer model only a brief (what a conversation with an analyst's assistant looks like; no catalogue, no rules, none of our sessions, no word about reuse or stale answers) and a dataset description. Two writers from different families, Claude Opus 5.5 and Qwen3-14B, 10 sessions of 6 to 10 questions per graph. Questions are kept word for word.
+2. **Published task lists.** The task types of GraphArena, NLGraph and GraphTeam's benchmarks, restated on our graphs. *Done 2026-11-24, 101 questions, results in 3.19.*
+
+Graphs: full Pokec (node table) and LiveJournal (no table). A second graph with a node table needs a download (SNAP twitch-gamers is the candidate): ask first.
+
+Gold answers: for each question a gold plan where the catalogue can express it, proposed by Opus with the catalogue in view and checked by hand; the answer is accepted as gold only when the independent Opus code agent, which sees neither the plan nor the catalogue, computes the same value. Disagreements are resolved by hand and counted. Questions no plan can express go to G7 and are scored against the code agent's answer after a hand check.
+
+Limits to state in the paper: the writers are language models, one of them from the family that also plans; no human wrote a session. Report results per writer, never pooled with our own sessions.
+
+### G7. Catalogue coverage — 3 days, by Dec 12, uses the G6 questions
+
+Status 2026-11-25: fallback to checked code built and measured, results in 3.20 (published tasks 57% to 89% same as the reference, 34 answers by code of which 33 match; on model-written sessions 13 code answers of which 8 match). Status 2026-11-24: `unsupported` outcome built; first coverage numbers in 3.17 and 3.18 (model-written sessions: 65% same as the Opus reference, 15% unsupported with the reason, no wrong value on an unsupported turn). Open: hand labels for the differing answers, the reciprocity family, the fallback to checked code generation, the published task lists as a fresh unseen set.
+
+For every question from G6: (a) can a gold plan be written with the operators (59 at the time of writing, 73 since 3.18, 76 since 3.19) (yes / yes after adding an operator, which one / no); (b) what GraphAudit does when the answer is no: an honest "not supported" with the reason, a clarification, or a wrong answer. The second number is the one that matters: an out-of-catalogue question must never produce a confident wrong answer. Build: an explicit `unsupported` outcome with the missing capability named, shown in the UI; then the fallback to checked code generation that section 8 lists as "hybrid fallback: confirm or build". Expect the NP-hard GraphArena tasks (TSP, maximum clique) to be out of scope; say so.
+
+### G8. Demo deliverables — Dec 8 to Jan 9
+
+| item | by |
+|---|---|
+| Fix the script of the signature session to what the numbers support: reuse, the two-contract moment, a data change caught, the cost ledger (fees, cache, replay, compute) | Dec 8 |
+| UI: cost ledger with cached and replayed turns; `plan_replayed`, `data_changed`, `unsupported` and `earlier_turn_unanswered` shown in the timeline; side-by-side with the stateful agent on the refresh session | Dec 20 (freeze) |
+| Recorded sessions for the booth with no network: Pokec signature, refresh, dashboard | Dec 22 |
+| Paper: full draft from 3.9–3.15 with every number as a range | Dec 27 |
+| Video, 5 minutes | Jan 3 |
+| Cut to 4 pages, final read, submit | Jan 9 |
+
+### Order and budget
+
+Nov 24–Dec 1: G3 verification, G2 extension, G5 adapter. Dec 1–6: G5 runs, G6 model-written sessions. Dec 6–12: G6 gold plans and runs, G7. Dec 8 on: G8. Model fees: about $60 (Opus on the new baselines and sessions is most of it). If time runs out, cut in this order: GraphTeam, published task lists, the replay extension.
+

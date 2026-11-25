@@ -84,7 +84,7 @@ def estimate_cost(op: str, args: dict[str, Any], n: int, m: int) -> float:
     k = num(args.get("k"), 500) or 500
     if c == "O(1)":
         return 1
-    if c in ("O(n)", "O(m)", "O(n+m)", "O(deg)", "O(n log n)"):
+    if c in ("O(n)", "O(m)", "O(n+m)", "O(deg)", "O(n log n)", "O(m log m)"):
         return n + m
     if c == "O(k*m)":
         return num(args.get("k"), 2) * m
@@ -173,7 +173,7 @@ def validate(plan: Plan, lg: LoadedGraph, budget_ops: float = 2e9) -> list[str]:
                     problems.append(f"step {st.id}: attribute '{a}' is categorical; attribute_map needs a numeric attribute")
                 v = st.args.get("value")
                 known = table["values"].get(a)
-                if st.op == "filter_by_attribute" and info["type"] == "categorical" and known is not None and _ref_of(v) is None:
+                if st.op == "filter_by_attribute" and info["type"] == "categorical" and known is not None and _ref_of(v) is None and st.args.get("op", "==") in ("==", "!=", "in"):
                     for x in (v if isinstance(v, list) else [v]):
                         if str(x) not in known:
                             close = [k for k in known if str(x).lower() in k.lower()][:5]
@@ -200,7 +200,7 @@ def validate(plan: Plan, lg: LoadedGraph, budget_ops: float = 2e9) -> list[str]:
                 problems.append(f"answer.steps[{lab}] refers to unknown step {sid}")
         if plan.answer.step is None and not plan.answer.steps:
             problems.append("answer must name a step or steps")
-    if plan.answer is None and plan.clarification is None:
+    if plan.answer is None and plan.clarification is None and not getattr(plan, "unsupported", None):
         problems.append("plan has neither an answer step nor a clarification")
     return problems
 

@@ -39,6 +39,9 @@ class TurnPlan(Plan):
     references: dict[str, Any] = Field(default_factory=dict)   # "them" -> "the 10 users of turn 1"
     scope_reading: Optional[dict[str, Any]] = None             # {"reading": "A"|"B", "explicit": bool, "quote": "..."}
     set_standing: Optional[dict[str, Any]] = None              # {"pagerank.damping": 0.9}: a setting the user wants from now on
+    unsupported: Optional[str] = None            # what the request needs that no combination of operators computes
+    code_inputs: dict[str, str] = Field(default_factory=dict)   # fallback only (t2r/fallback.py): name -> step id or "G"
+    code_task: Optional[str] = None              # fallback only: what the generated function computes from those inputs
 
 
 SESSION_RULES = """
@@ -62,6 +65,9 @@ S5. Restricting a centrality, degree or community measure to a group of nodes ha
     Plan exactly one reading, the one you judge more plausible (never compute the other reading as a variant or as a second answer part: the engine derives it), and add "scope_reading": {{"reading": "A" | "B", "explicit": true | false, "quote": "<the exact words of the question that settle the reading, or empty>"}}.
     Wording such as "within X", "in X", "among X" does not settle it. It is explicit only when the user says which links count or which computation to use (e.g. "using the overall ranking", "counting only links inside the group"). If SESSION STATE records a chosen scope reading, follow it unless the question says otherwise. The engine shows the user both contracts when the reading is not settled: do not set "clarification" for this.
 S6. Standing settings. When the user fixes an operator argument for the rest of the session ("from now on use damping 0.9", "use 1000 samples for estimates from now on"), add "set_standing": {{"<op>.<arg>": <value>, ...}} (e.g. {{"pagerank.damping": 0.9}}; null as the value removes a setting). SESSION STATE lists the standing settings in force: write them into every matching step, including steps copied from earlier turns, unless this question says otherwise.
+S8. SESSION STATE may list unanswered_turns: earlier questions of this session that got no answer (the plan could not be read or was invalid). If one of them asked for something that was meant to last ("from now on ...", "treat links as mutual", "use damping 0.9"), it is not in force yet: apply it in this plan as the user asked (set_standing, or the interpretation fields of S2), in addition to answering the current question. Otherwise ignore them.
+S9. If no combination of the operators in the catalogue computes exactly what is asked, do not answer a different, easier question in its place and do not approximate: return "steps": [], "answer": null and "unsupported": "<one line: what the request needs that the catalogue lacks>". This is not a clarification (the request is clear; it is outside what can be computed here). Use it only after checking that the operators cannot be combined to give the exact result.
+S10. The answer must state the value that was asked for. When the question asks for a difference, a share, a complement, a ratio or a count derived from other counts, compute it with arithmetic (or map_arithmetic for per-node values) and make that step the answer; returning only the ingredients is not an answer. A follow-up that refers to a turn marked unsupported has nothing to build on: plan it from the question itself or return unsupported, never substitute the quantity of another turn.
 S7. If SESSION STATE reports a data change, the file or the node table is not what earlier turns saw. Plan as usual (copy steps as in S1): the engine recomputes whatever depends on the changed data.
 """
 
@@ -202,6 +208,13 @@ def contract_text(pat: dict[str, Any], reading: str) -> str:
     return f"{pat['measure']} computed on the subgraph induced by nodes with {pat['group']}. " + SCOPE_NOTE["B"]
 
 
+def conventions(lg: LoadedGraph) -> list[str]:
+    """How the file was read where it changes a count: printed with every answer, by plan or by code."""
+    f = getattr(lg, "facts", None)
+    n = getattr(f, "n_self_loops", 0) if f is not None else 0
+    return [f"{n:,} of the {f.n_rows:,} rows link a node to itself; they are left out of the graph, so counts of rows, links and degrees do not include them"] if n else []
+
+
 def _size(val: Any) -> Any:
     if isinstance(val, ig.Graph):
         return {"n": val.vcount(), "m": val.ecount()}
@@ -224,7 +237,7 @@ def _nodes_of(val: Any) -> Optional[list]:
 # ----------------------------------------------------------------------------------------------------- the session
 class Session:
     def __init__(self, path: str, name: Optional[str] = None, description: str = "", seed: int = 1, budget_ops: float = 1e10,
-                 reuse: bool = True, on_ambiguity: str = "ask", replay_plans: Optional[bool] = None):
+                 reuse: bool = True, on_ambiguity: str = "ask", replay_plans: Optional[bool] = None, code_fallback: Optional[bool] = None):
         """on_ambiguity: "ask" returns both contracts and waits for choose(); "both" executes both and reports how far
         the answers differ; "planner" goes with the planner's reading and states it (what a system without the rule does)."""
         self.path, self.name, self.description = path, name or os.path.splitext(os.path.basename(path))[0], description
@@ -243,6 +256,9 @@ class Session:
         # (see _replayable for when that is safe). Default from T2R_PLAN_REPLAY=1.
         self.replay_plans = os.environ.get("T2R_PLAN_REPLAY") == "1" if replay_plans is None else replay_plans
         self._plan_memo: dict[str, dict[str, Any]] = {}
+        # code_fallback: an "unsupported" request is computed by generated code on inputs prepared by operators, and
+        # answered only when two separately written functions agree (t2r/fallback.py). Default from T2R_CODE_FALLBACK=1.
+        self.code_fallback = os.environ.get("T2R_CODE_FALLBACK") == "1" if code_fallback is None else code_fallback
         self._sig = self._signature()
         self.lg = self._load(None)
         self.card = profile_card(self.lg, with_inference=True)
@@ -345,7 +361,8 @@ class Session:
                                     for s in t["plan"]["steps"]],
                           "answer": t["plan"].get("answer"), "scope_reading": (t["plan"].get("scope_reading") or {}).get("reading")})
         sel = next((t for t in reversed(done) if t.get("selection_info")), None)
-        return {"turn": len(self.turns) + 1, "graph": self.name, "accepted_semantics": self.semantics,
+        failed = [{"turn": t["turn"], "question": t["question"]} for t in self.turns[-max_turns:] if t.get("outcome") == "error"]
+        return {"turn": len(self.turns) + 1, "graph": self.name, "accepted_semantics": self.semantics, **({"unanswered_turns": failed} if failed else {}),
                 "standing_settings": self.standing, "data_changes": self.data_changes[-3:],
                 "chosen_scope_reading": self.scope_choice,
                 "current_selection": None if sel is None else {"from_turn": sel["turn"], "produced_by_step": sel["selection_info"]["step"], "op": sel["selection_info"]["op"],
@@ -427,9 +444,11 @@ class Session:
                 "sizes": {t["step"]: _size(ctx.values[t["step"]]) for t in trace},
                 "selection": None if sel is None else sel[:200], "selection_info": sel_info,
                 "reading": readings[0] if len(readings) == 1 else None,
+                "conventions": conventions(lg),
                 "keys": {s: k[:12] for s, k in ctx.keys.items()}}
 
-    def _plan(self, question: str, llm: LLM, lg_hint: LoadedGraph) -> tuple[TurnPlan, list[str]]:
+    def _prompt(self, question: str) -> tuple[str, str, str, str]:
+        """(fixed system, fixed user, system, user) of the planner call for the next turn."""
         # the catalogue and the session rules are the same on every turn, so they go first as the fixed part (cacheable);
         # the turn number, which the rules mention, is then given in the message instead
         cached = os.environ.get("T2R_PROMPT_CACHE") == "1"
@@ -437,10 +456,23 @@ class Session:
         fixed_sys = PLANNER_SYSTEM.format(catalogue=catalogue_text()) + SESSION_RULES.format(turn="N (given in the message)" if cached else n)
         system = ""
         d = f"Dataset description (from the user): {self.description}\n" if self.description else ""
+        lost = [t for t in self.turns[-6:] if t.get("outcome") == "error"]
+        pending = ("Earlier requests of this session that got no answer (rule S8: if one asked for a lasting change, apply it in this plan):\n"
+                   + "".join(f"- turn {t['turn']}: {t['question']}\n" for t in lost)) if lost else ""
         fixed_user = f"PROFILE CARD:\n{json.dumps(self.card, default=str, ensure_ascii=False)}\n\n"   # changes only when the data does
         user = ((f"Turn: {n}\n" if cached else "") + f"SESSION STATE:\n"
-                f"{json.dumps(self.state(), default=str, ensure_ascii=False)}\n\nGraph file: {os.path.basename(self.path)}\n{d}Question: {question}")
-        plan = TurnPlan.model_validate(parse_json(llm.chat(system, user, fixed_system=fixed_sys, fixed_user=fixed_user).text))
+                f"{json.dumps(self.state(), default=str, ensure_ascii=False)}\n\nGraph file: {os.path.basename(self.path)}\n{d}{pending}Question: {question}")
+        return fixed_sys, fixed_user, system, user
+
+    def _plan(self, question: str, llm: LLM, lg_hint: LoadedGraph) -> tuple[TurnPlan, list[str]]:
+        fixed_sys, fixed_user, system, user = self._prompt(question)
+        reply = llm.chat(system, user, fixed_system=fixed_sys, fixed_user=fixed_user).text
+        try:
+            plan = TurnPlan.model_validate(parse_json(reply))
+        except Exception as e:  # noqa: BLE001  a reply that is not a plan: ask once more, saying what was wrong
+            reply = llm.chat(system, user + f"\n\nYour previous reply could not be read as a plan ({type(e).__name__}: {str(e)[:300]}). "
+                             "Return only the plan as one JSON object.", max_tokens=16000, fixed_system=fixed_sys, fixed_user=fixed_user).text
+            plan = TurnPlan.model_validate(parse_json(reply))
         lg, _ = self._graph_for(plan)
         problems = validate(plan, lg, self.budget_ops)
         if problems:
@@ -487,6 +519,9 @@ class Session:
                 plan, problems = self._plan(question, llm, self.lg)
             as_planned, context = plan.model_dump_json(), self._context()
             turn.update(self.submit(plan, question, problems=problems, _turn=turn))
+            if turn.get("outcome") == "unsupported" and self.code_fallback:
+                from .fallback import run_fallback
+                run_fallback(self, turn, question, llm)
             if "plan_replayed_from" in turn:
                 turn.setdefault("reuse_findings", []).append({"check": "plan_replayed", "ok": True, "severity": "info",
                                                               "detail": f"same question as turn {turn['plan_replayed_from']}: its plan was run again without asking the model"})
@@ -532,6 +567,9 @@ class Session:
         if problems:
             turn.update({"outcome": "error", "error": "invalid plan: " + "; ".join(problems)})
             return turn
+        if plan.unsupported and not plan.steps:
+            turn.update({"outcome": "unsupported", "unsupported": plan.unsupported})
+            return turn
         if plan.clarification and not plan.steps:
             self.clarifications.append({"turn": turn["turn"], "asked": plan.clarification})
             turn["outcome"] = "clarify"
@@ -541,7 +579,10 @@ class Session:
         data = [{"check": "data_changed", "ok": False, "severity": "warn",
                  "detail": f"the {' and '.join(c['changed'])} changed before this turn; results of the earlier data are not reused"}
                 for c in self.data_changes if c["before_turn"] == turn["turn"]]
-        turn["reuse_findings"] = data + std_findings + sem_findings + checks
+        lost = [t["turn"] for t in self.turns[-7:-1] if t.get("outcome") == "error"]
+        unanswered = [{"check": "earlier_turn_unanswered", "ok": False, "severity": "warn",
+                       "detail": f"turn{'s' if len(lost) > 1 else ''} {', '.join(map(str, lost))} got no answer; if it asked for a lasting change, check that this answer reflects it"}] if lost else []
+        turn["reuse_findings"] = data + unanswered + std_findings + sem_findings + checks
         if pat is not None and pat.get("apply_choice"):          # the user already chose a reading: rewrite to it, say so
             alt, _ = force_reading(plan, self.scope_choice["reading"])
             if not validate(alt, lg, self.budget_ops):
@@ -607,7 +648,7 @@ class Session:
                 "tokens_in": tot("tokens_in"), "tokens_out": tot("tokens_out"), "cost_usd": tot("cost_usd"), "stored_results": len(self.store),
                 "accepted_semantics": self.semantics, "scope_choice": self.scope_choice, "reuse": self.reuse,
                 "standing_settings": self.standing, "data_changes": self.data_changes,
-                "outcomes": {o: sum(t.get("outcome") == o for t in self.turns) for o in ("exact reuse", "partial reuse", "recompute", "clarify", "error")}}
+                "outcomes": {o: sum(t.get("outcome") == o for t in self.turns) for o in ("exact reuse", "partial reuse", "recompute", "clarify", "unsupported", "answer by code", "unconfirmed", "error")}}
 
     def _accept(self, turn: dict, result: dict, lg: LoadedGraph) -> None:
         turn.update(result)
