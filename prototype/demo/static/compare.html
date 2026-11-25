@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraphAudit side by side</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="session.css">
+</head>
+<body class="session-page">
+<header class="top">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="7" cy="9" r="3.2"/><circle cx="25" cy="7" r="3.2"/><circle cx="16" cy="18" r="3.6"/><circle cx="8" cy="26" r="3.2"/><circle cx="26" cy="24" r="3.2"/><path d="M9.5 10.8 14 15.4M22.8 8.6 18.4 15.2M14 20.8 10 23.6M18.6 20.6 23.4 22.6" /></svg>
+    <div><div class="name">Graph<span>Audit</span> · side by side</div><div class="tag">one session, two systems, each answer checked against the file as it is at that turn</div></div>
+  </div>
+  <nav class="modes" aria-label="View">
+    <a class="mode" href="index.html">Single question</a>
+    <a class="mode" href="session.html">Session</a>
+    <span class="mode active" aria-current="page">Side by side</span>
+  </nav>
+  <div class="right">
+    <button id="btn-theme" class="ghost icon" aria-label="Switch between light and dark" title="Light / dark">
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="cmp">
+  <section class="card intro" id="cmp-intro"></section>
+  <div class="cmp-head" id="cmp-head"></div>
+  <div id="rows" class="timeline"></div>
+  <section class="card cmp-total hidden" id="cmp-total"></section>
+  <section class="card ask dock">
+    <div class="askrow"><div id="next-q" class="next-q"></div><button id="all" class="ghost">Show all</button><button id="next" class="primary">Next turn</button></div>
+  </section>
+</main>
+
+<div class="modal hidden" id="modal"><div class="modal-box wide"><div class="modal-head"><h3 id="modal-title"></h3><button class="ghost" id="modal-close">close</button></div><div id="modal-body"></div></div></div>
+
+<script src="compare.js"></script>
+</body>
+</html>

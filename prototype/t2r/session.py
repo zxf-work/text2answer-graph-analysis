@@ -509,6 +509,7 @@ class Session:
     def ask(self, question: str, llm: LLM, explain: bool = False) -> dict[str, Any]:
         t0 = time.time()
         c0, i0, o0, u0 = llm.usage.calls, llm.usage.input_tokens, llm.usage.output_tokens, llm.usage.cost_usd
+        r0 = getattr(llm.usage, "cache_read_tokens", 0)
         turn: dict[str, Any] = {"turn": len(self.turns) + 1, "question": question, "outcome": "error"}
         try:
             self._refresh()
@@ -532,6 +533,7 @@ class Session:
         except Exception as e:  # noqa: BLE001
             turn["error"] = f"{type(e).__name__}: {e}"
         turn.update({"llm_calls": llm.usage.calls - c0, "tokens_in": llm.usage.input_tokens - i0, "tokens_out": llm.usage.output_tokens - o0,
+                     "tokens_cache_read": getattr(llm.usage, "cache_read_tokens", 0) - r0,
                      "cost_usd": round(llm.usage.cost_usd - u0, 5), "seconds": round(time.time() - t0, 3)})
         if turn not in self.turns:
             self.turns.append(turn)
@@ -645,7 +647,8 @@ class Session:
         tot = lambda k: round(sum(t.get(k) or 0 for t in self.turns), 4)  # noqa: E731
         return {"turns": len(self.turns), "answered": len(done), "steps_reused": tot("steps_reused"), "steps_executed": tot("steps_executed"),
                 "execute_seconds": tot("execute_seconds"), "seconds_saved": tot("seconds_saved"), "llm_calls": tot("llm_calls"),
-                "tokens_in": tot("tokens_in"), "tokens_out": tot("tokens_out"), "cost_usd": tot("cost_usd"), "stored_results": len(self.store),
+                "tokens_in": tot("tokens_in"), "tokens_out": tot("tokens_out"), "tokens_cache_read": tot("tokens_cache_read"), "cost_usd": tot("cost_usd"), "stored_results": len(self.store),
+                "turns_replayed": sum("plan_replayed_from" in t for t in self.turns), "conventions": conventions(self.lg),
                 "accepted_semantics": self.semantics, "scope_choice": self.scope_choice, "reuse": self.reuse,
                 "standing_settings": self.standing, "data_changes": self.data_changes,
                 "outcomes": {o: sum(t.get("outcome") == o for t in self.turns) for o in ("exact reuse", "partial reuse", "recompute", "clarify", "unsupported", "answer by code", "unconfirmed", "error")}}

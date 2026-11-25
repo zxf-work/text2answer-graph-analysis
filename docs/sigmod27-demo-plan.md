@@ -913,16 +913,34 @@ with three or four students in week 4.
 
 ## 7. Demo
 
-### Three-minute signature session (Pokec, live)
+### Three-minute signature session (Pokec)
 
-1. **0:00 to 0:40, start a session.** Top influential users; plan and assumptions on screen.
-2. **0:40 to 1:30, fast drill-down.** Their regions; then top 20 instead. Reused steps highlighted, with measured
-   time and tokens against the first turn. A real cache hit.
-3. **1:30 to 2:25, the safety moment.** "Most influential within region X": two contracts side by side; pick the
-   subgraph reading; the global scores are marked invalid for this scope and PageRank reruns on the subgraph. The
-   two rankings differ on screen.
-4. **2:25 to 3:00, audit and cost.** The session's audit record: reused versus executed, checks, time, tokens.
-   Then the budget decision on a large resident graph (requested versus allowed betweenness pivots).
+Fixed 2026-11-25 to what the numbers support. The script is data (`prototype/demo/signature.json`: questions, the file change, and the presenter's line for each step); `demo/make_session.py --script` plays it on a copy of the files and records `demo/sessions/pokec.json`, which the session page replays without a server or a model. Recorded on Haiku 5.5, 7 turns, 15 model calls, about one cent.
+
+| step | what is asked or happens | what the screen shows | recorded result |
+|---|---|---|---|
+| 1 | Who are the 10 most influential users? | plan, reading of the file, measure chosen | PageRank, 4 steps executed |
+| 2 | Which region is each of them from? | drill-down, reused steps marked | 2 reused, 1 executed |
+| 3 | Show the top 20 instead. | parameter patch | scores reused |
+| 4 | the edge file grows by 27,466 rows; nobody tells the system | a "data changed" card | |
+| 5 | the same words as step 1 | plan replayed with no planner call; `data_changed`; nothing reused | two new users lead the ranking |
+| 6 | ... within region X? | two contracts, nothing runs until one is chosen; B chosen, then A shown | the two top-10 lists differ |
+| 7 | largest group of mutual friends among the top 20 | declined by the catalogue, inputs prepared by 4 checked steps, two functions agree, marked "answer by code" | 5 users |
+| close | | ledger: 6 steps reused, 20 executed, 1 turn replayed, 61% of tokens read from the prompt cache, 1 answer by code; audit record | |
+
+The budget decision on a large resident graph (requested against allowed betweenness pivots) is no longer in the three minutes; it stays as a single-question scene.
+
+UI state 2026-11-25 (`demo/static/session.js`, `session.css`), checked in the browser against the recording and against edited copies of it for the two outcomes the recording does not contain:
+- outcomes `Not supported` (reason shown, no answer), `Answered by code` (amber grade box saying what was and was not checked; "Generated code" opens the task statement, the inputs and both functions with their values), `Not confirmed` (both candidates, no answer);
+- the convention note under the answer and in the ledger; a card for a data change; ledger lines for replayed turns, share of tokens from the prompt cache, data changes, answers by code, declined requests;
+- recorded mode shows the presenter's line for each step and a closing line.
+**Live path, checked 2026-11-25.** The server offers the script's graph for live sessions: `server.py --live <edge file> --script demo/signature.json` (`slurm/demo_server.sbatch`; job 308828 on itiger07, Haiku). A session on it runs on a working copy in node `/tmp`, with replay and the code fallback on. The page lists the script's questions as chips and has a "Change the data file" button (`POST /api/session/event`), which appends the rows on disk and tells the session nothing. All seven turns were driven through the page over an SSH tunnel and gave the recorded outcomes: computed, partial reuse twice, the data-change card, the repeat replayed with no planner call and the change noticed, two contracts then B then A (4 of 10 shared), and the answer by code (5 users, same members as the recording). 15 model calls, $0.011, start of the session about 35 s (copy and load of Pokec), turns 5 to 30 s. The generated-code view and the audit record open live. Reach: the server listens on the node's loopback only; `ssh -N -L 8772:localhost:8765 -J <login> <node>`.
+
+Seen in the live run: "Show reading A instead" makes A the reading in force for later turns (the ledger says so); the recording puts B back. Decide which the demo wants. "Not supported" and "Not confirmed" did not occur live (the script does not produce them); they are checked on edited recordings only.
+
+**Side by side with the stateful agent, built 2026-11-25.** Page `demo/static/compare.html` (third tab of the header), data `demo/compare/refresh.json`, built by `demo/make_compare.py` from two stored runs of the practice session `pokec/refresh` and calling no model: stateful agent `runs/practice/claude-haiku-5-5/codegen_stateful-cache/rep1` (job 307147) and GraphAudit `full-cache-replay/rep1` (job 307150), both Haiku, commit 20e1e0a. One row per turn, the two answers next to each other, each with the harness's verdict (correct / stale / wrong), compute time and model calls; the file change is a card between turns 4 and 5; ids that differ from the correct list are marked and the correct answer is printed under the row when either side is wrong. For the agent the row quotes the line of its own code that decides the reuse (turn 5: "# Reuse the PageRank vector from turn 2 if it is still in the session; otherwise recompute it.") and opens the whole script; for GraphAudit it says what was reused and that the change was noticed. Totals of this run: agent 5 of 10 correct, 3 stale, 2 more wrong after the change, 19 s compute, $0.006; GraphAudit 10 of 10, 0 stale, 48 s compute with loading (29 s of it), $0.005. The page says it is one run on Haiku and that the agent's result depends on the model and on the warning (3.14: the warned agent on Opus was right on every turn). Checked in the browser, light and dark, and at phone width. The server serves the record at `/api/compare`; that route was checked by calling the handler, not through a running server.
+
+Not done: recordings of the dashboard session and of GraphAudit's refresh session in the session page (the side-by-side covers refresh); the single-question page is unchanged and has no link to the other two pages; the GraphAudit run in the side-by-side predates the code fallback and the convention note (neither applies to these ten questions).
 
 ### Booth extras, visitor-driven
 

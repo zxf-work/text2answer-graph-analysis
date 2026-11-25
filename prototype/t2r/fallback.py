@@ -203,6 +203,7 @@ def run_fallback(session, turn: dict, question: str, llm) -> dict:
     agree = all(r["ok"] for r in runs) and same_value(runs[0]["value"], runs[1]["value"])
     reused = sum(t["cached"] for t in trace)
     turn.update({"plan": plan.model_dump(), "trace": trace, "steps_reused": reused, "steps_executed": len(trace) - reused,
+                 "seconds_saved": round(sum(t.get("seconds_saved", 0) for t in trace), 3),
                  "execute_seconds": round(time.time() - t0, 3), "sizes": {}, "findings": [
                      {"check": "outside_catalogue", "ok": False, "severity": "warn",
                       "detail": f"no operator computes this ({reason}); the value comes from generated code run on inputs prepared by {len(trace)} checked step{'s' if len(trace) != 1 else ''}"},

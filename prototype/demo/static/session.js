@@ -59,6 +59,12 @@
         ${sem ? `<div>Reading of the graph: <b>${sem.directed ? "directed" : "undirected"}${sem.weighted ? ", weighted" : ""}</b></div>` : ""}
         ${L.scope_choice ? `<div>Group restrictions: <b>reading ${esc(L.scope_choice.reading)}</b>, chosen in turn ${L.scope_choice.turn}</div>` : ""}
         <div><b>${fmt(L.stored_results)}</b> results kept for reuse</div>
+        ${L.turns_replayed ? `<div><b>${plural(L.turns_replayed, "turn")}</b> replayed without asking the model</div>` : ""}
+        ${L.tokens_cache_read ? `<div><b>${Math.round(100 * L.tokens_cache_read / Math.max(1, L.tokens_in))}%</b> of the tokens read came from the prompt cache</div>` : ""}
+        ${(L.data_changes || []).map((c) => `<div class="chg">Before turn ${c.before_turn} the ${esc((c.changed || []).join(" and "))} changed${c.edges ? `: ${fmt(c.edges[0])} to ${fmt(c.edges[1])} edges` : ""}; earlier results were dropped</div>`).join("")}
+        ${L.outcomes && L.outcomes["answer by code"] ? `<div><b>${plural(L.outcomes["answer by code"], "answer")}</b> by generated code</div>` : ""}
+        ${L.outcomes && (L.outcomes.unsupported || L.outcomes.unconfirmed) ? `<div><b>${plural((L.outcomes.unsupported || 0) + (L.outcomes.unconfirmed || 0), "request")}</b> declined, with the reason</div>` : ""}
+        ${(L.conventions || []).map((c) => `<div class="chg">${esc(c)}</div>`).join("")}
       </div>`;
     $("#btn-audit").disabled = false;
   }
@@ -128,7 +134,8 @@
     ? { cls: "reused", key: r.key, text: `would be reused · saves ${secs(r.seconds_saved)}` } : { cls: "pending", key: r.key, text: "would be executed" }]));
 
   // ------------------------------------------------------------------ a turn
-  const OUT = { "exact reuse": ["exact", "Exact reuse"], "partial reuse": ["partial", "Partial reuse"], recompute: ["recompute", "Computed"], clarify: ["clarify", "Needs your choice"], error: ["error", "Error"], "both readings shown": ["partial", "Both readings"] };
+  const OUT = { "exact reuse": ["exact", "Exact reuse"], "partial reuse": ["partial", "Partial reuse"], recompute: ["recompute", "Computed"], clarify: ["clarify", "Needs your choice"], error: ["error", "Error"], "both readings shown": ["partial", "Both readings"],
+    unsupported: ["unsupported", "Not supported"], "answer by code": ["bycode", "Answered by code"], unconfirmed: ["unsupported", "Not confirmed"] };
   const INTENT = { new: "new analysis", patch: "plan patch", drill_down: "drill-down", ambiguous: "ambiguous" };
   const READING = { A: "whole-graph scores, group members kept", B: "recomputed inside the group" };
 
@@ -142,28 +149,49 @@
     const refs = Object.entries(t.references || {});
     if (refs.length) body += `<div class="refs">${refs.map(([k, v]) => `<q>${esc(k)}</q> is read as ${esc(v)}`).join("<br>")}</div>`;
     if (t.error) body += `<div class="error">${esc(t.error)}</div>`;
+    const code = t.code && t.code.scripts ? t.code : null;
     if (t.pending) body += contractsHtml(t);
+    else if (t.outcome === "unsupported") body += `<div class="grade none"><b>No answer was computed.</b> No combination of the operators computes exactly what was asked, and the system does not answer an easier question in its place.<div class="why">${esc(t.unsupported || "")}</div></div>`;
     else if (t.trace) {
-      body += `<div class="answer">${answerHtml(t.answer)}</div>`;
-      if (t.explanation) body += `<div class="explanation">${esc(t.explanation).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</div>`;
+      if (code) body += codeGrade(t, code);
+      if (t.outcome !== "unconfirmed") body += `<div class="answer">${answerHtml(t.answer)}</div>`;
+      if (t.explanation && t.outcome !== "unconfirmed") body += `<div class="explanation">${esc(t.explanation).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</div>`;
       if (t.contracts && !t.pending) body += chosenHtml(t);
       body += `<div class="reuse-line">
         <span class="seg"><span class="key reused"></span><b>${t.steps_reused}</b> reused${t.steps_reused ? `, <b>${secs(t.seconds_saved)}</b> of computation not repeated` : ""}</span>
         <span class="seg"><span class="key ran"></span><b>${t.steps_executed}</b> executed${t.steps_executed ? ` in <b>${secs(t.execute_seconds)}</b>` : ""}</span></div>`;
-      if (t.plan_graph) body += `<div class="plan-wrap">${planSvg(t.plan_graph, traceStatus(t))}</div>`;
+      if (t.plan_graph) body += `${code ? `<div class="plan-cap">Inputs prepared by checked operators, then handed to the generated code</div>` : ""}<div class="plan-wrap">${planSvg(t.plan_graph, traceStatus(t))}</div>`;
+      if ((t.conventions || []).length) body += `<div class="convention"><b>How the file was read</b>${t.conventions.map(esc).join("<br>")}</div>`;
     } else if (t.clarification) body += `<div class="clarify-q">${esc(t.clarification)}</div>`;
     const rules = (t.reuse_findings || []);
     if (rules.length) body += `<div class="rules">${rules.map((f) => `<div class="rule ${f.ok ? "" : "warn"}"><span class="ic">${f.ok ? "i" : "!"}</span><div><b>${esc(f.check.replace(/_/g, " "))}</b>${esc(f.detail)}</div></div>`).join("")}</div>`;
     const f = t.findings || [], bad = f.filter((x) => !x.ok && x.severity === "error").length, warn = f.filter((x) => !x.ok && x.severity === "warn").length;
-    const ver = !t.trace ? "" : bad ? `<span class="bad">${plural(bad, "check")} failed</span>` : warn ? `<span class="warn">${plural(warn, "verifier warning")}</span>` : `<span class="ok">verified: ${plural(f.length, "check")} passed</span>`;
+    const ver = !t.trace ? "" : code ? `<span class="${code.agree ? "warn" : "bad"}">${code.agree ? "answer by code: cross-checked, not verified by operators" : "the two functions disagree"}</span>` : bad ? `<span class="bad">${plural(bad, "check")} failed</span>` : warn ? `<span class="warn">${plural(warn, "verifier warning")}</span>` : `<span class="ok">verified: ${plural(f.length, "check")} passed</span>`;
     const other = t.reading === "A" ? "B" : t.reading === "B" ? "A" : null;
     const foot = `<div class="turn-foot">${ver}${t.trace && !t.steps_executed ? `<span>checked again although nothing was executed</span>` : ""}
       ${t.seconds != null ? `<span>planning and run ${secs(t.seconds)} · ${plural(t.llm_calls || 0, "model call")}</span>` : ""}<span class="sp"></span>
       ${other && t.trace ? `<button class="link" data-act="reading" data-reading="${other}">Show reading ${other} instead</button>` : ""}
-      ${t.plan?.steps?.length && t.trace ? `<button class="link" data-act="edit">Edit plan</button>` : ""}
+      ${t.plan?.steps?.length && t.trace && !code ? `<button class="link" data-act="edit">Edit plan</button>` : ""}
+      ${code ? `<button class="link" data-act="code">Generated code</button>` : ""}
       ${t.trace ? `<button class="link" data-act="steps">Step record</button>` : ""}</div>`;
     return `<div class="turn-head"><div class="turn-no">${t.turn}</div><div><div class="turn-q">${esc(t.question)}</div><div class="turn-meta">${meta.join("")}</div></div><span class="outcome ${ocls}">${olabel}</span></div>
       <div class="turn-body">${body}</div>${foot}`;
+  }
+
+  // a turn outside the catalogue: what was checked, and the grade of the answer
+  function codeGrade(t, c) {
+    const n = (t.trace || []).length;
+    if (c.agree) return `<div class="grade code"><b>Answer by code.</b> No operator computes this, so the value comes from generated code. ${n ? `Its inputs were prepared by ${plural(n, "checked step")}; the code did not read the file.` : ""} Two functions written separately gave the same value. A wrong reading of the question would pass this check: treat it as a lower grade than an operator answer.<div class="why">${esc(t.unsupported || "")}</div></div>`;
+    const cands = c.scripts.map((r, i) => `<div class="cand"><span>function ${i + 1}</span>${r.ok ? `<code>${esc(JSON.stringify(r.value).slice(0, 160))}</code>` : `<i>${esc(r.error || "no result")}</i>`}</div>`).join("");
+    return `<div class="grade none"><b>No answer is given.</b> No operator computes this, and the two functions written for it did not give the same value, so neither is shown as the answer.<div class="cands">${cands}</div><div class="why">${esc(t.unsupported || "")}</div></div>`;
+  }
+  function codeRecord(t) {
+    const c = t.code;
+    modal(`Turn ${t.turn}: generated code`, `<p class="muted">The task below was written by the planner and handed to two writers that did not see each other. Each function ran in its own process on the same prepared inputs.</p>
+      <h4>Task statement</h4><p>${esc(c.task || "")}</p>
+      <h4>Inputs</h4><div class="mono small">${(c.input_lines || []).map(esc).join("<br>")}</div>
+      ${c.scripts.map((r, i) => `<h4>Function ${i + 1} <small class="muted">${r.ok ? "value " + esc(JSON.stringify(r.value).slice(0, 120)) : "failed"} · ${secs(r.seconds)}${r.repaired ? " · repaired once" : ""}</small></h4>
+        <div class="muted small">${esc(r.method || r.error || "")}</div><pre class="code">${esc(r.code)}</pre>`).join("")}`);
   }
 
   function contractCard(t, c, i, pending) {
@@ -207,6 +235,7 @@
     if (S.busy) return;
     const t = S.turns.get(turnNo);
     if (d.act === "steps") return stepRecord(t);
+    if (d.act === "code") return codeRecord(t);
     if (d.act === "edit") return editPlan(t);
     try {
       if (S.rec) {
@@ -233,16 +262,27 @@
     const st = S.rec.steps[S.recIdx]; if (!st) return;
     setBusy(true, st.kind === "ask" ? "Replaying the recorded turn" : "Replaying"); await new Promise((r) => setTimeout(r, 350)); setBusy(false);
     S.recIdx++;
+    if (st.kind === "event") { showEvent(st); return recPrompt(); }
     apply({ turn: st.turn, ledger: st.ledger });
     if (st.kind === "reading") compareWith(st.turn, st.of_turn);
     recPrompt();
   }
+  function showEvent(st) {
+    $("#intro")?.remove();
+    const el = document.createElement("section"); el.className = "card event";
+    el.innerHTML = `<span class="ev-ic" aria-hidden="true">+</span><div><b>The data changed</b><div>${esc(st.text)}</div></div>`;
+    $("#timeline").appendChild(el); el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
   function recPrompt() {
     const st = S.rec.steps[S.recIdx], q = $("#question"), run = $("#run");
     q.readOnly = true; $("#examples").innerHTML = "";
-    if (!st) { q.value = ""; q.placeholder = "End of the recorded session. Pick a graph on the left to ask your own questions."; run.disabled = true; note(""); return; }
+    const say = (x) => x ? `<div class="say">${esc(x)}</div>` : "";
+    const prev = S.rec.steps[S.recIdx - 1];
+    if (!st) { q.value = ""; q.placeholder = "End of the recorded session. Pick a graph on the left to ask your own questions."; run.disabled = true; note(S.rec.close ? say(S.rec.close) : ""); return; }
     run.disabled = false;
-    if (st.kind === "ask") { q.value = st.question; run.textContent = "Ask"; note(`Recorded session · step ${S.recIdx + 1} of ${S.rec.steps.length} · model ${esc(S.rec.model)}`); }
+    const where = `<div class="where">Recorded session · step ${S.recIdx + 1} of ${S.rec.steps.length} · model ${esc(S.rec.model)}</div>`;
+    if (st.kind === "event") { q.value = ""; q.placeholder = "Next: the edge file changes"; run.textContent = "Next"; note(where + say(prev?.say)); return; }
+    if (st.kind === "ask") { q.value = st.question; run.textContent = "Ask"; note(where + say(prev && prev.kind !== "ask" && prev.kind !== "event" ? "" : prev?.say)); }
     else if (st.kind === "choose") { q.value = ""; q.placeholder = "Choose a reading on the card above"; run.textContent = "Next"; note(`The recorded user picks reading <b>${esc(st.turn.reading)}</b>: use the button on the card above, or Next.`); }
     else { q.value = ""; q.placeholder = `Then: show reading ${st.reading} for the same request`; run.textContent = "Next"; note(`The recorded user then looks at reading <b>${esc(st.reading)}</b> of the same request, to see how far the answers differ.`); }
   }
@@ -278,9 +318,17 @@
       const attrs = Object.entries(r.card.node_attributes?.attributes || {}).filter(([, v]) => v.type === "categorical" && v.n_distinct > 2);
       const a = attrs[0]?.[0], v = attrs[0]?.[1]?.top_values?.[0]?.value;
       const ex = ["Who are the 10 most influential nodes?", "Show the top 20 instead.", ...(a ? [`Which ${a} is each of them from?`, `Who is most influential within ${a} "${v}"?`] : ["How many communities are there?"])];
-      $("#examples").innerHTML = ex.map((x) => `<button class="chip">${esc(x)}</button>`).join("");
-      $$("#examples .chip").forEach((c) => c.onclick = () => { q.value = c.textContent; q.focus(); });
+      // a scripted graph: its questions in order, and its file changes as a button (the session itself is not told)
+      S.script = r.script?.length ? r.script : ex.map((x) => ({ ask: x }));
+      $("#examples").innerHTML = S.script.map((x) => x.event ? `<button class="chip change">Change the data file</button>` : `<button class="chip">${esc(x.ask)}</button>`).join("");
+      $$("#examples .chip").forEach((c) => c.onclick = () => c.classList.contains("change") ? changeData(c) : (q.value = c.textContent, q.focus()));
     } catch (e) { note(`<span class="error">${esc(e.message)}</span>`); }
+  }
+
+  async function changeData(btn) {
+    if (S.busy || !S.sid) return;
+    try { const r = await job("/api/session/event", { sid: S.sid }, "Changing the edge file on disk"); showEvent(r.event); btn.remove(); note(""); }
+    catch (e) { note(`<span class="error">${esc(e.message)}</span>`); }
   }
 
   // ------------------------------------------------------------------ modals: step record, plan editor, audit record

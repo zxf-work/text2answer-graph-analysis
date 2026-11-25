@@ -5,8 +5,11 @@
   POST /api/session/choose   {sid, turn, index}                              -> {job}   the user picks a contract
   POST /api/session/reading  {sid, turn, reading}                            -> {job}   rerun a turn under the other scope reading
   POST /api/session/submit   {sid, question, plan}                           -> {job}   run a plan edited in the interface
+  POST /api/session/event    {sid}                                           -> {job}   result: {event}; the next file change of the
+                                                                             script, on a scripted graph only (see add_live)
   GET  /api/session/recorded                                                 recorded sessions (demo/sessions/*.json)
   GET  /api/session/audit?sid=..                                             the whole session as one audit record
+  GET  /api/compare                                                          side-by-side records (demo/compare/*.json)
 """
 from __future__ import annotations
 
@@ -19,6 +22,44 @@ import uuid
 HERE = os.path.dirname(os.path.abspath(__file__))
 RECORDED = os.path.join(HERE, "sessions")
 SESSIONS: dict[str, dict] = {}
+LIVE: dict[str, dict] = {}     # name -> a scripted graph: a working copy of its files that the script's events may change
+
+
+def event_text(info: dict) -> str:
+    if info.get("type") == "append_edges":
+        return f"{info['edges_added']:,} rows were appended to the edge file: new incoming links for users {' and '.join(info['targets'])}."
+    return json.dumps(info)
+
+
+def add_live(edge: str, script: str, work: str) -> dict:
+    """Offer the script's graph for live sessions (server.py --live). The session runs on a copy of the files under
+    `work`, so the script's events really change what the session reads; the original files are never written."""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "bench", "sessions"))
+    sc = json.load(open(script))
+    LIVE[sc["name"]] = {"script": sc, "work": work, "files": None, "lock": threading.Lock(),
+                        "spec": {"name": sc["name"], "path": edge, "directed": True, "weighted": False, "description": sc["description"]}}
+    return LIVE[sc["name"]]
+
+
+def live_datasets() -> list[dict]:
+    out = []
+    for name, lv in LIVE.items():
+        p = lv["spec"]["path"]
+        with open(p, "r", errors="replace") as f:
+            head = [next(f, "").rstrip("\n") for _ in range(4)]
+        out.append({"name": name, "path": "live:" + name, "file": os.path.basename(p), "tier": "scripted", "bytes": os.path.getsize(p),
+                    "description": lv["spec"]["description"], "head": head, "examples": [], "state": "not loaded", "cached": False})
+    return out
+
+
+def _live_start(lv: dict) -> tuple[str, list[dict]]:
+    """A fresh working copy (a file changed by an earlier session is not carried over), and the script's steps."""
+    from run_stale import Files
+    with lv["lock"]:
+        if lv["files"] is None or lv["files"].version:
+            lv["files"] = Files(lv["spec"], lv["work"])
+    return lv["files"].live, [dict(st) for st in lv["script"]["steps"]]
 
 
 def plan_graph(plan):
@@ -62,8 +103,8 @@ def audit(session, model: str = "") -> dict:
             "turns": [turn_payload(session, t) for t in session.turns]}
 
 
-def recorded() -> list[dict]:
-    out = []
+def recorded(d: str = "") -> list[dict]:
+    out, RECORDED = [], d or globals()["RECORDED"]
     for fn in sorted(os.listdir(RECORDED)) if os.path.isdir(RECORDED) else []:
         if fn.endswith(".json") and fn != "index.json":
             try:
@@ -97,11 +138,21 @@ def handle_post(path: str, req: dict, jobs: dict, default_model: str):
     from t2r.session import Session
     if path == "/api/session/start":
         def start():
-            s = Session(req["path"], name=req.get("name"), description=req.get("description") or "",
-                        on_ambiguity=req.get("on_ambiguity") or "ask", reuse=req.get("reuse", True))
+            lv = LIVE.get(req["path"][5:]) if req["path"].startswith("live:") else None
+            path, steps = _live_start(lv) if lv else (req["path"], [])
+            s = Session(path, name=req.get("name"), description=req.get("description") or "",
+                        on_ambiguity=req.get("on_ambiguity") or "ask", reuse=req.get("reuse", True),
+                        replay_plans=req.get("replay_plans", True), code_fallback=req.get("code_fallback", True))
             sid = uuid.uuid4().hex[:10]
-            SESSIONS[sid] = {"session": s, "llm": LLM(model=req.get("model") or default_model), "lock": threading.Lock()}
-            return {"sid": sid, "card": s.card, "ledger": s.ledger(), "load_info": s.lg.load_info}
+            SESSIONS[sid] = {"session": s, "llm": LLM(model=req.get("model") or default_model), "lock": threading.Lock(), "live": lv,
+                             "events": [st["event"] for st in steps if "event" in st]}
+            script = []
+            if lv:
+                top = s.card["node_attributes"]["attributes"][lv["script"]["attribute"]]["top_values"]
+                for st in steps:
+                    script.append({"event": True} if "event" in st else
+                                  {"ask": st["ask"].replace("{x}", str(top[0]["value"])).replace("{y}", str(top[1]["value"]))})
+            return {"sid": sid, "card": s.card, "ledger": s.ledger(), "load_info": s.lg.load_info, "script": script}
         return _job(jobs, start)
     if not path.startswith("/api/session/"):
         return None
@@ -116,6 +167,15 @@ def handle_post(path: str, req: dict, jobs: dict, default_model: str):
                 t = fn()
                 return {"turn": turn_payload(s, t), "ledger": s.ledger()}
         return _job(jobs, run)
+    if path == "/api/session/event":
+        if not ent.get("live") or not ent["events"]:
+            return {"error": "this session has no file change left to apply"}
+
+        def change():
+            with ent["lock"]:
+                info = ent["live"]["files"].event(ent["events"].pop(0))
+                return {"event": {"text": event_text(info), "info": info}, "left": len(ent["events"])}
+        return _job(jobs, change)
     if path == "/api/session/ask":
         return locked(lambda: s.ask(req["question"], llm, explain=bool(req.get("explain"))))
     if path == "/api/session/choose":
@@ -128,6 +188,8 @@ def handle_post(path: str, req: dict, jobs: dict, default_model: str):
 
 
 def handle_get(path: str, q: dict):
+    if path == "/api/compare":
+        return recorded(os.path.join(HERE, "compare"))
     if path == "/api/session/recorded":
         return recorded()
     if path == "/api/session/audit":

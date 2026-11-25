@@ -102,7 +102,7 @@ def _datasets() -> list[dict]:
         st = LOADS.get(os.path.abspath(path), {})
         out.append({"name": os.path.splitext(fn)[0], "path": path, "file": fn, "tier": "upload", "bytes": os.path.getsize(path), "description": "", "head": head, "examples": [],
                     "state": st.get("state", "not loaded"), "cached": cache_status(path)["cached"]})
-    return out
+    return session_api.live_datasets() + out
 
 
 def _load_key(path: str, description: str) -> str:
@@ -266,8 +266,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json([{"name": s.name, "doc": s.doc, "params": s.params, "returns": s.returns, "cost": s.cost, "tiers": s.tiers} for s in CATALOGUE.values()])
             if u.path == "/api/stages":
                 return self._json(STAGES)
-            if u.path.startswith("/api/session/"):
-                return self._json(session_api.handle_get(u.path, q) or {"error": "not found"})
+            if u.path.startswith("/api/session/") or u.path == "/api/compare":
+                r = session_api.handle_get(u.path, q)
+                return self._json({"error": "not found"} if r is None else r)
             if u.path == "/":
                 self.path = "/index.html"
             return super().do_GET()
@@ -311,8 +312,15 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--model", default=os.environ.get("T2R_MODEL", DEFAULT_MODEL))
     ap.add_argument("--preload", default=os.environ.get("T2R_PRELOAD", ""), help="comma-separated dataset names to load at start (or 'all')")
+    ap.add_argument("--live", default="", help="edge file of the scripted graph: sessions on it run on a working copy that the script's events change")
+    ap.add_argument("--script", default=os.path.join(HERE, "signature.json"))
+    ap.add_argument("--work", default="", help="directory for the working copy (default: a temporary directory)")
     a = ap.parse_args()
     globals()["DEFAULT_MODEL"] = a.model
+    if a.live:
+        import tempfile
+        lv = session_api.add_live(a.live, a.script, a.work or tempfile.mkdtemp(prefix="t2a-live-"))
+        print("scripted graph", lv["spec"]["name"], "working copy in", lv["work"], flush=True)
     if a.preload:
         want = None if a.preload == "all" else {x.strip() for x in a.preload.split(",") if x.strip()}
         for d in _datasets():
