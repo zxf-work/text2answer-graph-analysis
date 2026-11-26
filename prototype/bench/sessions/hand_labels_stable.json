@@ -1,0 +1,1434 @@
+{
+ "about": "Hand labels for the questions judged 'different' from the reference in all three runs (written sets reps 11-13, published p11-p13). Evidence: rerun_reference.py (variants the reference script prints), plans and scripts read by hand. Labelled 2026-11-25.",
+ "labels": {
+  "self_loop_convention": "our value equals the value the reference script itself prints for 'self-loops excluded'",
+  "other_reading": "our value equals another variant the reference lists",
+  "open_choice": "the question leaves a choice open (cut-off, bins, group) and the two systems chose differently",
+  "random_algorithm": "randomised or sampled algorithm; values are not expected to match",
+  "truncated_list": "same list, cut differently",
+  "ours_wrong": "GraphAudit answers another question than the one asked",
+  "reference_wrong": "the reference contradicts its own earlier turns"
+ },
+ "counts": {
+  "ours_wrong": 8,
+  "self_loop_convention": 35,
+  "open_choice": 5,
+  "random_algorithm": 5,
+  "other_reading": 5,
+  "reference_wrong": 1,
+  "truncated_list": 1
+ },
+ "rows": [
+  {
+   "n": 1,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s01",
+    5
+   ],
+   "q": "And how many distinct users are within two hops of them, following declarations backwards (friends-of-friends who point to them)?",
+   "label": "ours_wrong",
+   "note": "'them' is the PageRank top 20; the plan starts the two hops from the 103,396 users of the previous answer",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 2,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s01",
+    6
+   ],
+   "q": "Drop the top 5 by PageRank. How much does that two-hop audience shrink?",
+   "label": "ours_wrong",
+   "note": "follows from turn 5: same wrong starting set",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 3,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s04",
+    1
+   ],
+   "q": "What are the mean and median out-degree and in-degree?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "self-loops removed"
+   ],
+   "matched_per_run": {
+    "11": [
+     "self-loops removed"
+    ],
+    "12": [
+     "self-loops removed"
+    ],
+    "13": [
+     "self-loops removed"
+    ]
+   }
+  },
+  {
+   "n": 4,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s04",
+    2
+   ],
+   "q": "Give the in-degree distribution as counts for degree 0, 1, 2-10, 11-100, 101-1000, and above 1000.",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "self-loops removed"
+   ],
+   "matched_per_run": {
+    "11": [
+     "self-loops removed"
+    ],
+    "12": [
+     "self-loops removed"
+    ],
+    "13": [
+     "self-loops removed"
+    ]
+   }
+  },
+  {
+   "n": 5,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s05",
+    4
+   ],
+   "q": "Now shard by user_b instead. What are the min and max?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 6,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s05",
+    6
+   ],
+   "q": "What share of all edges touch at least one of those users?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 7,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s05",
+    7
+   ],
+   "q": "If those heavy users are excluded, what is the max edges per shard under the user_a mod 64 scheme?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "exclude edges touching heavy users and also self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "exclude edges touching heavy users and also self-loops"
+    ],
+    "12": [
+     "exclude edges touching heavy users and also self-loops"
+    ],
+    "13": [
+     "exclude edges touching heavy users and also self-loops"
+    ]
+   }
+  },
+  {
+   "n": 8,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s05",
+    8
+   ],
+   "q": "How many edges have both endpoints in the same shard under user_a mod 64 placement?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 9,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s08",
+    1
+   ],
+   "q": "How many users have out-degree 0?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "self-loops ignored"
+   ],
+   "matched_per_run": {
+    "11": [
+     "self-loops ignored"
+    ],
+    "12": [
+     "self-loops ignored"
+    ],
+    "13": [
+     "self-loops ignored"
+    ]
+   }
+  },
+  {
+   "n": 10,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s08",
+    2
+   ],
+   "q": "How many have total degree exactly 1?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "self-loops ignored (in+out)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "self-loops ignored (in+out)"
+    ],
+    "12": [
+     "self-loops ignored (in+out)"
+    ],
+    "13": [
+     "self-loops ignored (in+out)"
+    ]
+   }
+  },
+  {
+   "n": 11,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s08",
+    6
+   ],
+   "q": "Of those, how many declared only friends who are themselves in the top 1% by in-degree?",
+   "label": "open_choice",
+   "note": "cut-off of 'top 1%': the plan takes the top of 100 equal bins, the reference all users at or above the threshold; neither of the reference's two other cut-offs gives our value",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 12,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s08",
+    7
+   ],
+   "q": "Same count, but for the top 0.1% instead.",
+   "label": "open_choice",
+   "note": "as turn 6, for the top 0.1%",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 13,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s09",
+    7
+   ],
+   "q": "List the 10 largest of those with their size and internal edge density.",
+   "label": "random_algorithm",
+   "note": "Louvain: the catalogue operator takes no seed, the question asks for seed 7; the partitions differ",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 14,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s09",
+    8
+   ],
+   "q": "For the largest community, how many of its members are also in the 30-core?",
+   "label": "random_algorithm",
+   "note": "built on the Louvain partition of turn 6",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 15,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s10",
+    4
+   ],
+   "q": "Pick the 100 users with highest out-degree as seeds. How many distinct users are within 2 forward hops of at least one seed?",
+   "label": "other_reading",
+   "note": "equals a variant the reference lists, in all runs",
+   "reference_variant_matched": [
+    "including the 100 seeds themselves (union of 2-hop balls)",
+    "users reached in 1-2 forward hops from any seed (seeds counted only if another seed reaches them)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "including the 100 seeds themselves (union of 2-hop balls)",
+     "users reached in 1-2 forward hops from any seed (seeds counted only if another seed reaches them)"
+    ],
+    "12": [
+     "including the 100 seeds themselves (union of 2-hop balls)",
+     "users reached in 1-2 forward hops from any seed (seeds counted only if another seed reaches them)"
+    ],
+    "13": [
+     "including the 100 seeds themselves (union of 2-hop balls)",
+     "users reached in 1-2 forward hops from any seed (seeds counted only if another seed reaches them)"
+    ]
+   }
+  },
+  {
+   "n": 16,
+   "key": [
+    "claude-opus-5-5",
+    "livejournal",
+    "s10",
+    6
+   ],
+   "q": "How many users are in the 2-hop reach of the betweenness seeds but not the out-degree seeds?",
+   "label": "random_algorithm",
+   "note": "sampled betweenness: other sample, and 125 sources where the question asks for 1,000",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 17,
+   "key": [
+    "claude-opus-5-5",
+    "pokec",
+    "s02",
+    6
+   ],
+   "q": "How many friendship edges exist between accounts within that group?",
+   "label": "ours_wrong",
+   "note": "'that group' is the low-completion, high out-degree accounts; the plan counts edges among the users they friended (the previous answer)",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 18,
+   "key": [
+    "claude-opus-5-5",
+    "pokec",
+    "s03",
+    3
+   ],
+   "q": "Now break it down by gender pair (male\u2192male, male\u2192female, female\u2192male, female\u2192female).",
+   "label": "ours_wrong",
+   "note": "asked for the reciprocated fraction per gender pair; the plan returns edge counts per pair",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 19,
+   "key": [
+    "claude-opus-5-5",
+    "pokec",
+    "s04",
+    8
+   ],
+   "q": "What fraction connect users in the same kraj, the part of the region text before the comma?",
+   "label": "ours_wrong",
+   "note": "no variant matches and the value changes between runs (0.667, 0.684)",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 20,
+   "key": [
+    "claude-opus-5-5",
+    "pokec",
+    "s06",
+    4
+   ],
+   "q": "Show the top 10 region pairs, excluding any region in bratislavsky kraj.",
+   "label": "ours_wrong",
+   "note": "the pairs were to be of different regions; the plan lists same-region pairs",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [
+     "top 10 by distinct undirected user pairs (same exclusion)"
+    ],
+    "13": []
+   }
+  },
+  {
+   "n": 21,
+   "key": [
+    "claude-opus-5-5",
+    "pokec",
+    "s08",
+    6
+   ],
+   "q": "How many users list both of the top 2 PageRank users as friends?",
+   "label": "other_reading",
+   "note": "equals a variant the reference lists, in all runs",
+   "reference_variant_matched": [
+    "overall top 2 public PageRank users (5935, 5867)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "overall top 2 public PageRank users (5935, 5867)"
+    ],
+    "12": [
+     "overall top 2 public PageRank users (5935, 5867)"
+    ],
+    "13": [
+     "overall top 2 public PageRank users (5935, 5867)"
+    ]
+   }
+  },
+  {
+   "n": 22,
+   "key": [
+    "claude-opus-5-5",
+    "pokec",
+    "s09",
+    7
+   ],
+   "q": "For each of those 5 communities, which kraj contains the most of its members, and what share of the community is that?",
+   "label": "ours_wrong",
+   "note": "asked per kraj; the plan groups by the full region text (the partition also differs: Louvain)",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 23,
+   "key": [
+    "claude-opus-5-5",
+    "twitch",
+    "s05",
+    8
+   ],
+   "q": "For each of those communities, what is the most common language and its share?",
+   "label": "random_algorithm",
+   "note": "Louvain partitions differ",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 24,
+   "key": [
+    "claude-opus-5-5",
+    "twitch",
+    "s08",
+    3
+   ],
+   "q": "Now rank FR users by betweenness centrality within the FR subgraph and show the top 15.",
+   "label": "random_algorithm",
+   "note": "approximate betweenness (500 sources, by the budget rule) against exact: 14 of the top 15 are the same users, order differs",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 25,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s01",
+    5
+   ],
+   "q": "What's the average number of friends per user in the entire network?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "average out-degree excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "average out-degree excluding self-loops"
+    ],
+    "12": [
+     "average out-degree excluding self-loops"
+    ],
+    "13": [
+     "average out-degree excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 26,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s01",
+    7
+   ],
+   "q": "What's the total number of users with zero outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 27,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s03",
+    2
+   ],
+   "q": "How many users have both incoming and outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 28,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s03",
+    6
+   ],
+   "q": "What's the average number of friends per user in the top 1% by outgoing count?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "declared friends, self-loops excluded"
+   ],
+   "matched_per_run": {
+    "11": [
+     "declared friends, self-loops excluded"
+    ],
+    "12": [
+     "declared friends, self-loops excluded"
+    ],
+    "13": [
+     "declared friends, self-loops excluded"
+    ]
+   }
+  },
+  {
+   "n": 29,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s03",
+    7
+   ],
+   "q": "What's the total number of users with exactly 0 friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "zero outgoing, self-loops excluded"
+   ],
+   "matched_per_run": {
+    "11": [
+     "zero outgoing, self-loops excluded"
+    ],
+    "12": [
+     "zero outgoing, self-loops excluded"
+    ],
+    "13": [
+     "zero outgoing, self-loops excluded"
+    ]
+   }
+  },
+  {
+   "n": 30,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s04",
+    1
+   ],
+   "q": "What's the total number of friend declarations in the network?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-declarations (self-loops)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-declarations (self-loops)"
+    ],
+    "12": [
+     "excluding self-declarations (self-loops)"
+    ],
+    "13": [
+     "excluding self-declarations (self-loops)"
+    ]
+   }
+  },
+  {
+   "n": 31,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s04",
+    4
+   ],
+   "q": "What's the average number of friends per user?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "mean out-degree excluding self-declarations"
+   ],
+   "matched_per_run": {
+    "11": [
+     "mean out-degree excluding self-declarations"
+    ],
+    "12": [
+     "mean out-degree excluding self-declarations"
+    ],
+    "13": [
+     "mean out-degree excluding self-declarations"
+    ]
+   }
+  },
+  {
+   "n": 32,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s04",
+    6
+   ],
+   "q": "What's the standard deviation of outgoing friend counts across all users?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-declarations (ddof=0)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-declarations (ddof=0)"
+    ],
+    "12": [
+     "excluding self-declarations (ddof=0)"
+    ],
+    "13": [
+     "excluding self-declarations (ddof=0)"
+    ]
+   }
+  },
+  {
+   "n": 33,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s04",
+    7
+   ],
+   "q": "What's the total number of users with exactly 1 friend declaration?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "out-degree == 1 excluding self-declarations"
+   ],
+   "matched_per_run": {
+    "11": [
+     "out-degree == 1 excluding self-declarations"
+    ],
+    "12": [
+     "out-degree == 1 excluding self-declarations"
+    ],
+    "13": [
+     "out-degree == 1 excluding self-declarations"
+    ]
+   }
+  },
+  {
+   "n": 34,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s06",
+    3
+   ],
+   "q": "What's the average outgoing friend count for users in the top 1%?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 35,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s06",
+    4
+   ],
+   "q": "How many users have exactly 0 outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (a self-declaration is not counted)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (a self-declaration is not counted)"
+    ],
+    "12": [
+     "excluding self-loops (a self-declaration is not counted)"
+    ],
+    "13": [
+     "excluding self-loops (a self-declaration is not counted)"
+    ]
+   }
+  },
+  {
+   "n": 36,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s06",
+    5
+   ],
+   "q": "What's the standard deviation of outgoing friend counts across all users?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops"
+    ],
+    "12": [
+     "excluding self-loops"
+    ],
+    "13": [
+     "excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 37,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s06",
+    6
+   ],
+   "q": "What's the total number of users with between 1 and 100 outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops, inclusive bounds"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops, inclusive bounds"
+    ],
+    "12": [
+     "excluding self-loops, inclusive bounds"
+    ],
+    "13": [
+     "excluding self-loops, inclusive bounds"
+    ]
+   }
+  },
+  {
+   "n": 38,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s07",
+    4
+   ],
+   "q": "What's the average incoming friend count for users in the top 1%?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops, top 1%"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops, top 1%"
+    ],
+    "12": [
+     "excluding self-loops, top 1%"
+    ],
+    "13": [
+     "excluding self-loops, top 1%"
+    ]
+   }
+  },
+  {
+   "n": 39,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s07",
+    5
+   ],
+   "q": "How many users have exactly 0 incoming friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (users only declared by themselves count as 0)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (users only declared by themselves count as 0)"
+    ],
+    "12": [
+     "excluding self-loops (users only declared by themselves count as 0)"
+    ],
+    "13": [
+     "excluding self-loops (users only declared by themselves count as 0)"
+    ]
+   }
+  },
+  {
+   "n": 40,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s07",
+    6
+   ],
+   "q": "What's the total number of users with between 1 and 100 incoming friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops, inclusive 1..100"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops, inclusive 1..100"
+    ],
+    "12": [
+     "excluding self-loops, inclusive 1..100"
+    ],
+    "13": [
+     "excluding self-loops, inclusive 1..100"
+    ]
+   }
+  },
+  {
+   "n": 41,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s08",
+    5
+   ],
+   "q": "Are any of these users connected to each other through mutual friends?",
+   "label": "reference_wrong",
+   "note": "the group is empty in both systems (turns 1 and 2: no such user); ours answers 0 / false, the reference answers true for a group it no longer defines as asked",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 42,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s09",
+    3
+   ],
+   "q": "What's the average outgoing friend count for users in the top 1%?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (k=48476)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (k=48476)"
+    ],
+    "12": [
+     "excluding self-loops (k=48476)"
+    ],
+    "13": [
+     "excluding self-loops (k=48476)"
+    ]
+   }
+  },
+  {
+   "n": 43,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s09",
+    4
+   ],
+   "q": "How many users have exactly 0 outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (users whose only outgoing row is to themselves count as 0)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (users whose only outgoing row is to themselves count as 0)"
+    ],
+    "12": [
+     "excluding self-loops (users whose only outgoing row is to themselves count as 0)"
+    ],
+    "13": [
+     "excluding self-loops (users whose only outgoing row is to themselves count as 0)"
+    ]
+   }
+  },
+  {
+   "n": 44,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s09",
+    5
+   ],
+   "q": "What's the standard deviation of outgoing friend counts across all users?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (population std)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (population std)"
+    ],
+    "12": [
+     "excluding self-loops (population std)"
+    ],
+    "13": [
+     "excluding self-loops (population std)"
+    ]
+   }
+  },
+  {
+   "n": 45,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s09",
+    6
+   ],
+   "q": "What's the total number of users with between 1 and 100 outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops, inclusive"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops, inclusive"
+    ],
+    "12": [
+     "excluding self-loops, inclusive"
+    ],
+    "13": [
+     "excluding self-loops, inclusive"
+    ]
+   }
+  },
+  {
+   "n": 46,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s10",
+    3
+   ],
+   "q": "What's the average number of friends per user in the entire network?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "mean distinct declared friends (dedup, no self-loops)",
+    "mean out-degree excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "mean out-degree excluding self-loops",
+     "mean distinct declared friends (dedup, no self-loops)"
+    ],
+    "12": [
+     "mean out-degree excluding self-loops",
+     "mean distinct declared friends (dedup, no self-loops)"
+    ],
+    "13": [
+     "mean out-degree excluding self-loops",
+     "mean distinct declared friends (dedup, no self-loops)"
+    ]
+   }
+  },
+  {
+   "n": 47,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s10",
+    4
+   ],
+   "q": "How many users have exactly 0 outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (users whose only declaration is to themselves count as 0)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (users whose only declaration is to themselves count as 0)"
+    ],
+    "12": [
+     "excluding self-loops (users whose only declaration is to themselves count as 0)"
+    ],
+    "13": [
+     "excluding self-loops (users whose only declaration is to themselves count as 0)"
+    ]
+   }
+  },
+  {
+   "n": 48,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s10",
+    5
+   ],
+   "q": "What's the standard deviation of outgoing friend counts across all users?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "excluding self-loops (population std)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "excluding self-loops (population std)"
+    ],
+    "12": [
+     "excluding self-loops (population std)"
+    ],
+    "13": [
+     "excluding self-loops (population std)"
+    ]
+   }
+  },
+  {
+   "n": 49,
+   "key": [
+    "qwen3:14b",
+    "livejournal",
+    "s10",
+    6
+   ],
+   "q": "What's the total number of users with between 1 and 100 outgoing friend declarations?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "inclusive, excluding self-loops"
+   ],
+   "matched_per_run": {
+    "11": [
+     "inclusive, excluding self-loops"
+    ],
+    "12": [
+     "inclusive, excluding self-loops"
+    ],
+    "13": [
+     "inclusive, excluding self-loops"
+    ]
+   }
+  },
+  {
+   "n": 50,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s02",
+    4
+   ],
+   "q": "What's the completion percentage for users with age = 0?",
+   "label": "other_reading",
+   "note": "no user has age 0: ours reports that literally (n = 0), the reference reads 'age = 0' as age missing; the reference lists the literal reading as a variant",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 51,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s02",
+    5
+   ],
+   "q": "List users with age = 0 and public profiles",
+   "label": "other_reading",
+   "note": "equals a variant the reference lists, in all runs",
+   "reference_variant_matched": [
+    "literal numeric age == 0 and public == 1 (no such users)"
+   ],
+   "matched_per_run": {
+    "11": [
+     "literal numeric age == 0 and public == 1 (no such users)"
+    ],
+    "12": [
+     "literal numeric age == 0 and public == 1 (no such users)"
+    ],
+    "13": [
+     "literal numeric age == 0 and public == 1 (no such users)"
+    ]
+   }
+  },
+  {
+   "n": 52,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s03",
+    3
+   ],
+   "q": "Show regions with the lowest completion percentages",
+   "label": "ours_wrong",
+   "note": "asked for the lowest; the answer lists the regions with the highest means",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 53,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s03",
+    6
+   ],
+   "q": "List users with <20% completion and public profiles",
+   "label": "truncated_list",
+   "note": "both give the start of the same 416,294-user list, cut at different lengths and in different order",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [
+     "count with completion <= 20% and public"
+    ],
+    "13": []
+   }
+  },
+  {
+   "n": 54,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s04",
+    3
+   ],
+   "q": "Show regions with the highest proportion of female users",
+   "label": "other_reading",
+   "note": "equals a variant the reference lists, in all runs",
+   "reference_variant_matched": [
+    "top 10 with no minimum region size"
+   ],
+   "matched_per_run": {
+    "11": [
+     "top 10 with no minimum region size"
+    ],
+    "12": [
+     "top 10 with no minimum region size"
+    ],
+    "13": [
+     "top 10 with no minimum region size"
+    ]
+   }
+  },
+  {
+   "n": 55,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s05",
+    4
+   ],
+   "q": "What's the region distribution of highly connected users?",
+   "label": "open_choice",
+   "note": "'highly connected' is not defined: top 100 by degree (ours, differently in each run) against the top 1% (reference)",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [
+     "top 10 users by out-degree from previous turn"
+    ],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 56,
+   "key": [
+    "qwen3:14b",
+    "pokec",
+    "s07",
+    4
+   ],
+   "q": "Compare completion percentages between age groups",
+   "label": "open_choice",
+   "note": "the age groups are not given: the three youngest groups agree, the older ones are cut at other ages",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [],
+    "13": []
+   }
+  },
+  {
+   "n": 57,
+   "key": [
+    "qwen3:14b",
+    "twitch",
+    "s01",
+    4
+   ],
+   "q": "What's the average lifetime for users in the top 5 languages?",
+   "label": "open_choice",
+   "note": "which 'top 5 languages': of all users (ours, pooled in one run, per language in two) or of the users above 1M views (reference)",
+   "reference_variant_matched": [],
+   "matched_per_run": {
+    "11": [],
+    "12": [
+     "top 5 languages over all users (EN,DE,FR,ES,RU), per language mean"
+    ],
+    "13": [
+     "all users (any views) in those same 5 languages, per language",
+     "top 5 languages over all users (EN,DE,FR,ES,RU), per language mean"
+    ]
+   }
+  },
+  {
+   "n": 58,
+   "key": [
+    "published-tasks",
+    "livejournal",
+    "s02",
+    5
+   ],
+   "q": "Take the 1000 users with the highest in-degree (declared a friend by the most users; ties broken by the lower user id) and the friend declarations among them, each link with capacity 1 in its own direction. What is the maximum flow from the highest-ranked of those users to the lowest-ranked one?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "in-degree excluding self-loops for ranking"
+   ],
+   "matched_per_run": {
+    "p11": [
+     "in-degree excluding self-loops for ranking"
+    ],
+    "p12": [
+     "in-degree excluding self-loops for ranking"
+    ],
+    "p13": [
+     "in-degree excluding self-loops for ranking"
+    ]
+   }
+  },
+  {
+   "n": 59,
+   "key": [
+    "published-tasks",
+    "livejournal",
+    "s03",
+    5
+   ],
+   "q": "How many users and how many friend declarations does the network have?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "declarations excluding self-loops (distinct directed)"
+   ],
+   "matched_per_run": {
+    "p11": [
+     "declarations excluding self-loops (distinct directed)"
+    ],
+    "p12": [
+     "declarations excluding self-loops (distinct directed)"
+    ],
+    "p13": [
+     "declarations excluding self-loops (distinct directed)"
+    ]
+   }
+  },
+  {
+   "n": 60,
+   "key": [
+    "published-tasks",
+    "livejournal",
+    "s03",
+    6
+   ],
+   "q": "Which user has the highest PageRank (damping factor 0.85), and what is that user's PageRank value?",
+   "label": "self_loop_convention",
+   "note": "equals the reference's own variant in all runs",
+   "reference_variant_matched": [
+    "self-loops removed"
+   ],
+   "matched_per_run": {
+    "p11": [
+     "self-loops removed"
+    ],
+    "p12": [
+     "self-loops removed"
+    ],
+    "p13": [
+     "self-loops removed"
+    ]
+   }
+  }
+ ]
+}

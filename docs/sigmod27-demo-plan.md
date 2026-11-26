@@ -705,6 +705,56 @@ Regression: E2b 122 of 122, 47 of 47 traps, 0 stale with the fallback code in pl
 
 Open: the task statement as the weak point (candidates: show it to the user as the contract of the turn; have the second writer restate the question from the conversation instead of sharing the statement); the two new outcomes in the UI; the fallback has not been run on Opus or on the practice sessions.
 
+### 3.21 Three repetitions of the written and published sets, and guards on the answer (2026-11-25)
+
+Same setting as 3.20 (Haiku 5.5, prompt cache, checked code fallback), three new runs of each set (written: reps 11 to 13; published: p11 to p13), compared with the same Opus reference and judged by Opus ($2.48 for the six passes). The earlier single runs (rep 8, p4) are shown for comparison.
+
+| set | run | answered | same | incomplete | different | by code: same / different | unconfirmed | unsupported | error |
+|---|---|---|---|---|---|---|---|---|---|
+| written (429) | 8 | 402 | 309 | 12 | 81 | 8 / 5 | 13 | 0 | 3 |
+| | 11 | 406 | 316 | 8 | 82 | 8 / 7 | 11 | 2 | 4 |
+| | 12 | 399 | 316 | 11 | 72 | 8 / 5 | 12 | 3 | 7 |
+| | 13 | 404 | 317 | 9 | 78 | 9 / 5 | 12 | 1 | 7 |
+| published (101) | p4 | 98 | 90 | 3 | 5 | 33 / 1 | 1 | 1 | 0 |
+| | p11 | 100 | 93 | 2 | 5 | 35 / 2 | 0 | 0 | 0 |
+| | p12 | 98 | 88 | 6 | 4 | 31 / 1 | 2 | 1 | 0 |
+| | p13 | 95 | 87 | 5 | 3 | 28 / 1 | 1 | 0 | 4 |
+
+- Ranges to report: written, same 316 to 317 of 429 (74%), different 72 to 82; published, same 87 to 93 of 101, different 3 to 5.
+- Per question over the three runs: written, 290 same in all three, 84 in none, 55 in one or two; 57 are "different" in all three (a stable disagreement with the reference, the first candidates for the hand labels) and 40 in one or two. Published: 81 same in all three, 3 different in all three.
+- The 4 errors of p13 are one fault: the planner wrote an operator named `code_task` (a field of the fallback, not an operator) in LiveJournal s01 t7; the plan was rejected, and the next three turns failed with `KeyError` because the session state looked up the unknown operator of the failed turn. Fixed (`Session.state`), test added. The run is reported as it ran.
+- E2b with the guards in place (rep19guards): 122 of 122, 47 of 47 traps, 0 stale.
+
+**Guards (`guards()` in `t2r/verify.py`).** Four checks made from errors found by hand in 3.18 to 3.20: direction ignored in the question but not collapsed in the plan; a value asked for as a share outside [0, 1]; a follow-up that bins by another variable than the turn it builds on; a yes/no taken from a labelled comparison. They add a failed finding and do not change the answer. First version of the share check fired on questions that only mention a share or "top 1%" (26 flags in the new runs, none a real error); it now requires the question to ask for a share, or an answer key named as one. `table_written.py` evaluates the guards again on the stored plans, so all runs are held to the current rules.
+
+Result: the guards do not find the disagreements. Written: 2 answers flagged per run, of which 1 "different" over the three runs (of 232). Published: 3 to 5 flagged per run, all the comparison check, 1 "different" over the three runs; the other 11 flags are on answers that match the reference. The errors they were made from do not recur often enough to matter; what remains "different" has to be read by hand before anything is claimed about it.
+
+**Hand labels of the 60 stable disagreements (2026-11-25).** The questions judged "different" in all three runs (57 written, 3 published; `bench/sessions/stable_differences.py`). Evidence: each reference script prints variants next to its main answer, which the runs had not stored; `bench/sessions/rerun_reference.py` ran the 60 scripts again on the cluster (no model calls; 59 of 60 main answers reproduced) and tested our answers against every variant. The rest was read from the plans and scripts. Labels and notes per question: `bench/sessions/hand_labels_stable.json`.
+
+| label | n | what it means |
+|---|---|---|
+| self-loop convention | 35 | our value equals, in all three runs, the value the reference script itself prints for "self-loops excluded" (LiveJournal has 518,382 such rows; GraphAudit leaves them out and says so with the answer) |
+| another reading the reference lists | 5 | our value equals another of its variants: seeds counted in their own 2-hop reach, the overall top 2 instead of the last list's, "age = 0" taken literally (no such user; 2 questions), no minimum region size |
+| open choice in the question | 5 | cut-off of "top 1%" (2), age groups, "highly connected", which "top 5 languages"; in 2 of these our choice also changes between runs |
+| randomised or sampled algorithm | 5 | Louvain (3; the operator takes no seed although the question names one), sampled betweenness (2; one with 125 sources where 1,000 were asked, one approximate by the budget rule with 14 of the top 15 the same users) |
+| same list, cut differently | 1 | both give the start of a 416,294-user list |
+| GraphAudit wrong | 8 | "them" / "that group" resolved to the previous answer's set instead of the group named (3, one inherited); counts where a reciprocated fraction was asked; same-region pairs where different regions were asked; region where kraj was asked; highest where lowest was asked; one unstable value matching no variant |
+| reference wrong | 1 | the group is empty in both systems (its own turns 1 and 2), yet it answers "true" about the group's members |
+
+- So of the 60 stable disagreements, 8 are errors of GraphAudit and 1 of the reference; 40 are the same computation under a convention or reading the reference itself lists, and 11 are choices or algorithms where no match is expected.
+- The self-loop convention alone is 35 of 60: the judge compares against the reference's main answer and does not see the convention note. Comparing against the reference's "self-loops excluded" variant where it exists would be the fairer test; not done for the whole set (it needs the variants of all 429 + 101 scripts, about an hour of cluster time, no fees).
+- None of the 8 errors was flagged by a guard or any other check. Three share one cause (the referent of "them" / "that group"), which a check could target: when the question refers back to a group, compare the set the plan starts from with the set that the turn defining the group selected.
+- Not labelled: the 40 written and 2 published questions that are "different" in only one or two of the runs.
+
+**Referent check (2026-11-25, `referent()` in `t2r/verify.py`, finding `guard_referent`).** Fires when all of these hold: the question refers back ("them", "those", "that group", ...); the turn it builds on selected a group and reached its answer set from that group through links (neighbours, reach), so the two are different populations; and this turn's new steps continue from the answer set only. It does not say which set is meant; it says which one was taken and names the other, with sizes. A narrowed group ("of those, how many ...") is not flagged. A fault inside any guard can no longer cost a turn its answer (`guards_not_run`).
+
+- On the stored plans of runs 11 to 13: 7 flags in 1,209 answered turns. 5 are the two independent referent errors of the hand labels (LiveJournal s01 t5 in all three runs, Pokec s02 t6 in two; in the third run the plan has another shape), 2 are one Twitch question ("Of those reached users, ..."; same as the reference in one run, different in the other, not labelled). The inherited error (s01 t6) is not flagged: it builds on the flagged turn.
+- A first, wider version (either set, any derivation) fired 81 times, 59 of them on answers that match the reference; that version is not kept.
+- E2b with the check in place (rep20referent): 122 of 122, 47 of 47 traps, 0 stale; no referent flag and no guard fault on its 122 turns. 65 tests pass.
+- Caution: the rule was narrowed on the same runs it is measured on. What it does on questions it has not seen is not known; the next set of fresh sessions is the test.
+
+Open: a seed argument for `communities`; judging against the matching variant; whether the comparison check should stay a warning, since most of its flags are on correct answers.
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**
@@ -1054,7 +1104,7 @@ The stale answers are gone. What is left on Qwen3-14B are turns with no answer a
 
 ### G4. Variance — mostly closed
 
-3.14 and 3.15 give 3 to 6 runs for Haiku and 3 for Opus on E2b and E4. Left: the Qwen3-32B repetitions (queued), two more Opus runs of the practice sessions (about $12), and reporting every table in the paper as a range, not a single run.
+3.14 and 3.15 give 3 to 6 runs for Haiku and 3 for Opus on E2b and E4; 3.21 gives 3 runs of the written and published sets. Left: the Qwen3-32B repetitions (queued), two more Opus runs of the practice sessions (about $12), and reporting every table in the paper as a range, not a single run.
 
 ### G5. Outside baselines — 5 days, by Dec 6
 

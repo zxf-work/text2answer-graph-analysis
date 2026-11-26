@@ -28,7 +28,7 @@ from .ir import Plan, Step, auto_tier, estimate_cost, execute, extract_answer, p
 from .llm import LLM, parse_json
 from .ops import CATALOGUE, catalogue_text
 from .systems import INTERPRETER_SYSTEM, PLANNER_SYSTEM, _jsonable
-from .verify import verify
+from .verify import guards, verify
 
 
 class TurnPlan(Plan):
@@ -357,7 +357,7 @@ class Session:
             sizes = t.get("sizes", {})
             turns.append({"turn": t["turn"], "question": t["question"], "intent": t.get("intent"), "outcome": t["outcome"],
                           "measure": (t["plan"].get("interpretation") or {}).get("measure"),
-                          "steps": [{"id": s["id"], "op": s["op"], "args": s["args"], "returns": CATALOGUE[s["op"]].returns, "size": sizes.get(s["id"])}
+                          "steps": [{"id": s["id"], "op": s["op"], "args": s["args"], "returns": CATALOGUE[s["op"]].returns if s["op"] in CATALOGUE else None, "size": sizes.get(s["id"])}
                                     for s in t["plan"]["steps"]],
                           "answer": t["plan"].get("answer"), "scope_reading": (t["plan"].get("scope_reading") or {}).get("reading")})
         sel = next((t for t in reversed(done) if t.get("selection_info")), None)
@@ -438,7 +438,13 @@ class Session:
                     break
         by = {s.id: s for s in plan.steps}
         sel_info = None if sel is None else {"step": sel_step, "op": by[sel_step].op, "args": by[sel_step].args, "count": len(sel), "nodes": sel[:20]}
-        return {"plan": plan.model_dump(), "trace": trace, "findings": findings, "answer": _jsonable(extract_answer(plan, ctx)),
+        answer = _jsonable(extract_answer(plan, ctx))
+        base = self.turns[plan.based_on - 1] if plan.based_on and 0 < plan.based_on <= len(self.turns) else None
+        try:                                                 # advisory: a fault in a guard must not cost the turn its answer
+            findings += guards(plan, ctx, question, answer, (base or {}).get("plan"), plan.based_on)
+        except Exception as e:  # noqa: BLE001
+            findings.append({"check": "guards_not_run", "ok": True, "severity": "info", "detail": f"{type(e).__name__}: {e}"})
+        return {"plan": plan.model_dump(), "trace": trace, "findings": findings, "answer": answer,
                 "outcome": outcome, "steps_reused": reused, "steps_executed": len(trace) - reused, "execute_seconds": round(dt, 3),
                 "seconds_saved": round(sum(t.get("seconds_saved", 0) for t in trace), 3),
                 "sizes": {t["step"]: _size(ctx.values[t["step"]]) for t in trace},

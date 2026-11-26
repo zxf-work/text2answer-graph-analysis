@@ -260,3 +260,11 @@ def test_remove_nodes_leaves_the_base_graph_alone(path):
     n = s.ask("how many nodes", llm)["answer"]
     assert s.ask("without the top 2: how many nodes", llm)["answer"] == n - 2
     assert s.ask("on the full network: how many nodes", llm)["answer"] == n
+
+
+def test_session_survives_a_plan_with_an_unknown_operator(path):
+    s = Session(path)
+    bad = s.submit(P([("x", "code_task", {})], "x", intent="new"), "something the catalogue lacks")
+    assert bad["outcome"] == "error" and "unknown op" in bad["error"]
+    t = s.ask("top 3 by influence", Scripted([T1]))
+    assert t["outcome"] == "recompute" and len(t["answer"]) == 3

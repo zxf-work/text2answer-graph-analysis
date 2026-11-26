@@ -1,6 +1,8 @@
 """Verification without ground truth: invariants between results, cross-method agreement, approximation bounds."""
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from typing import Any
 
@@ -191,3 +193,206 @@ def verify(plan: Plan, ctx: Ctx, question: str | None = None) -> list[dict[str, 
             add(f"{sid}: diameter over a disconnected graph", False, "the graph is disconnected; the diameter is infinite unless restricted to the largest component", "warn")
     findings.extend(consistency(plan, ctx, question))
     return findings
+
+
+# ---------------------------------------------------------------------------------------------- guards on the answer
+# Each guard comes from an error found by hand in answers that had passed every other check (plan document 3.18 to
+# 3.20). A guard does not change the answer: it adds a failed finding, which the interface shows, the explanation is
+# written from, and the runners record in the turn's flags.
+IGNORE_DIRECTION = r"ignor\w* (the )?direction|regardless of (the )?direction|in either direction|\bundirected\b|direction (is|being) ignored"
+# operators whose value changes when a pair linked both ways is counted as two links
+TWO_WAY_SENSITIVE = {"degree", "node_degree", "strength", "degree_stats", "neighbour_aggregate", "triangle_count", "local_clustering",
+                     "average_clustering", "transitivity", "density", "edge_count", "edges_between", "edges_touching", "core_number", "max_core", "k_core",
+                     "assortativity", "mixing_matrix", "communities"}
+COLLAPSING = {"undirected_graph", "mutual_graph"}
+# a key or a question names a share only as a whole word asked for: "shared_count", "the top 1%" and "given the share of ..." do not
+SHARE_KEY = r"(?<![a-z])(share|fraction|proportion)(?![a-z])"
+PERCENT_KEY = r"(?<![a-z])(percent|percentage|pct)(?![a-z])"
+ASKS_SHARE = r"\b(what|which|how (large|big|small)) (is |are |was |were )?(the |a |an )?(overall |total )?(share|fraction|proportion)\b"
+ASKS_PERCENT = r"\b(what|which) (is |are |was |were )?(the )?(percent|percentage|%)|\bhow many percent\b"
+BINNING = {"map_bins", "map_quantile"}
+
+
+def _bin_source(plan_steps: list[dict], step: dict):
+    """What a binning step bins by: the operator and arguments of the step that produced its map."""
+    src = next((s for s in plan_steps if s["id"] == step.get("args", {}).get("map")), None)
+    if src is None:
+        return None
+    args = {k: v for k, v in (src.get("args") or {}).items() if k in ("attribute", "mode", "values", "agg") and isinstance(v, (str, int, float))}
+    return src["op"], tuple(sorted(args.items()))
+
+
+def guards(plan: Plan, ctx: Ctx, question: str | None, answer: Any, earlier_plan: dict | None = None, earlier_turn: int | None = None,
+           directed: bool | None = None) -> list[dict[str, Any]]:
+    """ctx may be None when directed is given (stored turns, bench/sessions/table_written.py): the comparison guard is then skipped."""
+    import re
+    out: list[dict[str, Any]] = []
+    ql = (question or "").lower()
+    steps = [st.model_dump() if hasattr(st, "model_dump") else dict(st) for st in plan.steps]
+
+    def fail(check, detail, severity="warn"):
+        out.append({"check": check, "ok": False, "detail": detail, "severity": severity})
+
+    # 1. the question says to ignore direction, the graph is directed, and nothing in the plan collapses two-way pairs
+    if ql and (ctx.lg.g.is_directed() if directed is None else directed) and re.search(IGNORE_DIRECTION, ql) and not any(s["op"] in COLLAPSING for s in steps):
+        hit = [s["id"] for s in steps if s["op"] in TWO_WAY_SENSITIVE and (s.get("args") or {}).get("mode", "all") not in ("in", "out")]
+        if hit:
+            fail("guard_direction_ignored", f"the question says to ignore direction, but step(s) {', '.join(hit)} run on the directed graph, where a pair linked "
+                 "both ways counts as two links; no undirected_graph step collapses them, so counts may be too high")
+
+    # 2. a value the question calls a share lies outside [0, 1] (a percentage: outside [0, 100])
+    def numbers(v, key=""):
+        if isinstance(v, bool):
+            return
+        if isinstance(v, (int, float)):
+            yield key, v
+        elif isinstance(v, dict):
+            for k, x in v.items():
+                yield from numbers(x, str(k))
+        elif isinstance(v, list):
+            for x in v:
+                yield from numbers(x, key)
+    asks_share, asks_pct = bool(re.search(ASKS_SHARE, ql)), bool(re.search(ASKS_PERCENT, ql))
+    for key, x in numbers(answer):
+        scalar = not isinstance(answer, (dict, list))
+        is_pct = bool(re.search(PERCENT_KEY, key.lower())) or (scalar and asks_pct and not asks_share)
+        is_share = bool(re.search(SHARE_KEY, key.lower())) or (scalar and asks_share)
+        hi = 100 if is_pct else 1 if is_share else None
+        if hi is not None and not (-1e-9 <= x <= hi + 1e-9):
+            fail("guard_share_out_of_range", f"{'the answer' if scalar else repr(key)} = {x:g} is called a {'percentage' if is_pct else 'share'} but lies outside [0, {hi}]: "
+                 "the numerator and the denominator are probably not counted over the same set", "error")
+            break
+
+    # 3. this turn bins by another variable than the turn it builds on, and the question does not name the new one
+    if earlier_plan and earlier_plan.get("steps"):
+        mine = [_bin_source(steps, s) for s in steps if s["op"] in BINNING]
+        theirs = [_bin_source(earlier_plan["steps"], s) for s in earlier_plan["steps"] if s["op"] in BINNING]
+        mine, theirs = [m for m in mine if m], [t for t in theirs if t]
+        if mine and theirs and not set(mine) & set(theirs):
+            new = mine[0]
+            words = {w for w in re.split(r"[^a-z0-9]+", " ".join([new[0]] + [str(v) for _, v in new[1]]).lower()) if len(w) > 2 and w not in ("map", "node", "all", "attribute", "mean")}
+            if not any(w in ql for w in words):
+                show = lambda x: x[0] + ("(" + ", ".join(f"{k}={v}" for k, v in x[1]) + ")" if x[1] else "")   # noqa: E731
+                fail("guard_grouping_variable", f"this turn groups by {show(new)}, but turn {earlier_turn}, which it builds on, grouped by {show(theirs[0])}, "
+                     "and the question does not name a new variable: the groups are probably not the ones the user means")
+
+    # 4. the answer is the truth value of a labelled comparison, which need not be "yes" to the question
+    a = plan.answer if ctx is not None else None
+    if a is not None and a.step and a.field == "a_greater" and isinstance(answer, bool):
+        st = next((s for s in steps if s["id"] == a.step), None)
+        v = ctx.values.get(a.step) if st and st["op"] == "compare" else None
+        if isinstance(v, dict) and (st["args"].get("label_a") or st["args"].get("label_b")):
+            fail("guard_boolean_from_comparison", f"the answer {str(answer).lower()} is the result of the comparison {v['a']:g} > {v['b']:g} and means "
+                 f"\"{v['greater']}\"; read it as that statement, not as yes or no to the question")
+    out += referent(steps, question, earlier_plan, earlier_turn, {k: len(v) for k, v in ctx.values.items() if isinstance(v, (list, set, tuple, frozenset))} if ctx is not None else None)
+    return out
+
+
+# ---------------------------------------------------------------------------------------------- what "them" was taken to be
+# Three of the eight errors found by hand in the stable disagreements (plan document 3.21) have one cause: the question
+# refers back to a group ("them", "that group"), the turn it builds on selected a group and then derived a second set
+# from it for its answer, and the plan continues from the wrong one of the two. Which one the user means cannot be
+# decided from the plan, so the check does not call it an error: when both sets exist and the plan continues from one
+# only, it says which, and names the other.
+BACK_REFERENCE = r"\b(them|they|their|those|these|that group|this group|that set|the group|the same (users|people|accounts|nodes))\b"
+THROUGH_LINKS = {"reachable_set", "k_hop_neighbourhood", "edges_touching"}       # besides every operator named after neighbours
+SET_LIKE = {"top_k"}                                          # a ranking is used as the set of its nodes
+
+
+def _signatures(steps: list[dict]) -> dict[str, str]:
+    """Step id -> a text that is the same for the same operator on the same inputs, whatever the ids are called."""
+    by_id, sig = {s["id"]: s for s in steps}, {}
+
+    def of(sid):
+        if sid not in sig:
+            sig[sid] = "?"                                   # a step that refers to itself stays unresolved
+            st = by_id[sid]
+
+            def canon(v):
+                if isinstance(v, str):
+                    head, dot, rest = v.partition(".")
+                    return "<" + of(head) + ">" + dot + rest if head in by_id else v
+                if isinstance(v, list):
+                    return [canon(x) for x in v]
+                if isinstance(v, dict):
+                    return {k: canon(x) for k, x in sorted(v.items())}
+                return v
+            args = {k: canon(v) for k, v in sorted((st.get("args") or {}).items()) if v is not None and not (k == "graph" and v == "G")}
+            sig[sid] = hashlib.md5((st["op"] + json.dumps(args, sort_keys=True, default=str)).encode()).hexdigest()[:16]   # short: a signature holds those of its inputs
+        return sig[sid]
+    for s in steps:
+        of(s["id"])
+    return sig
+
+
+def _inputs(step: dict, ids) -> list[str]:
+    out = []
+
+    def walk(v):
+        if isinstance(v, str) and v.partition(".")[0] in ids:
+            out.append(v.partition(".")[0])
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+    walk(step.get("args") or {})
+    return out
+
+
+def referent(steps: list[dict], question: str | None, earlier_plan: dict | None, earlier_turn: int | None, sizes: dict | None = None) -> list[dict[str, Any]]:
+    """steps: this turn's plan; earlier_plan: the plan of the turn it builds on. sizes: step id -> size, of this turn, when known."""
+    import re
+    from .ops import CATALOGUE
+    if not question or not earlier_plan or not earlier_plan.get("steps") or not re.search(BACK_REFERENCE, question.lower()):
+        return []
+    is_set = lambda s: s["op"] in SET_LIKE or (s["op"] in CATALOGUE and CATALOGUE[s["op"]].returns == "NodeSet")   # noqa: E731
+    old = earlier_plan["steps"]
+    old_ids = {s["id"]: s for s in old}
+    old_sig = _signatures(old)
+
+    def ancestors(sid, seen=None):                           # node-set steps a step is computed from, nearest first
+        seen, found = seen if seen is not None else set(), []
+        for i in _inputs(old_ids[sid], old_ids):
+            if i in seen:
+                continue
+            seen.add(i)
+            found += ([i] if is_set(old_ids[i]) else []) + ancestors(i, seen)
+        return found
+    ans = earlier_plan.get("answer") or {}
+    targets = [ans.get("step")] + list((ans.get("steps") or {}).values()) if isinstance(ans.get("steps"), dict) else [ans.get("step")]
+    targets = [str(t).partition(".")[0] for t in targets if t]
+    result = next((t if is_set(old_ids[t]) else (ancestors(t) or [None])[0] for t in targets if t in old_ids), None)
+    if result is None:
+        return []
+    group = (ancestors(result) or [None])[0]                 # the set the earlier turn derived its answer set from
+    if group is None or old_sig[group] == old_sig[result]:
+        return []
+    # a refinement ("of those, how many ...") leaves one group, narrowed; the two sets are different populations only when
+    # the answer set was reached from the group through links (its neighbours, what it reaches)
+    def reaches(sid, target, seen=None):
+        seen = seen if seen is not None else set()
+        return sid == target or any(i not in seen and not seen.add(i) and reaches(i, target, seen) for i in _inputs(old_ids[sid], old_ids))
+    between = [s for s in old if s["id"] != group and reaches(result, s["id"]) and reaches(s["id"], group)]
+    if not any("neighbour" in s["op"] or s["op"] in THROUGH_LINKS for s in between):
+        return []
+    mine = _signatures(steps)
+    by_sig = {v: k for k, v in mine.items()}
+    r, g = by_sig.get(old_sig[result]), by_sig.get(old_sig[group])
+    known = set(old_sig.values())
+    new = [s for s in steps if mine[s["id"]] not in known]   # what this turn adds to the earlier plan
+    ids = {s["id"] for s in steps}
+    used = {i for s in new for i in _inputs(s, ids)}
+    uses_r, uses_g = r in used, g in used
+    if not uses_r or uses_g:                                 # only the case found in practice: continuing from the answer set alone
+        return []
+    word = re.search(BACK_REFERENCE, question.lower()).group(0)
+    taken, other = (r, g) if uses_r else (g, r)
+    n = lambda sid: f" ({sizes[sid]:,} nodes)" if sizes and isinstance(sizes.get(sid), int) else ""   # noqa: E731
+    what = (f"the set turn {earlier_turn} gave as its answer" if uses_r else f"the group turn {earlier_turn} started from")
+    alt = (f"the group turn {earlier_turn} started from" if uses_r else f"the set turn {earlier_turn} gave as its answer")
+    alt_step = old_ids[group if uses_r else result]
+    return [{"check": "guard_referent", "ok": False, "severity": "warn",
+             "detail": f"\"{word}\" is taken to be {what}: step {taken}{n(taken)}. Turn {earlier_turn} also has {alt} "
+                       f"({alt_step['op']}{', step ' + other + n(other) if other else ''}); if that is the group meant, the answer is for another set"}]
