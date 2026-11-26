@@ -80,7 +80,7 @@ Source: https://2027.sigmodconf.hosting.acm.org/calls_sigmod_demos.shtml. It agr
 - **Unguarded error classes** are named in the paper: direction wording (fixed by an operator, no guard), the shared task statement of the fallback, which earlier result "again" means. Not named for space: a share outside [0, 1], reuse of "deciles" with the wrong grouping variable, a number given where yes or no was asked.
 - **"Not supported" and "Not confirmed" in the interface** were checked on edited recordings only, not live (plan 7). The paper lists them as things an attendee may see; it does not claim they were exercised live.
 - **Booth extras from plan 7** ("break the plan, press Audit", "force a reuse", "no file facts") are not in the paper: I could not confirm from the plan that each works in the current interface. Upload of an own edge list is mentioned because the single-question page and the server have it (`/api/upload`).
-- **The "share 4 users" figure** for the two readings comes from the live run; the recording contains both lists and should be checked to give the same count before the camera-ready.
+- **The "share 4 users" figure** was checked against the recording on 2026-11-26: the two top-10 lists in `sessions/pokec.json` share 4 users, as in the live run.
 
 ## 4. Gaps (numbers or facts that are missing)
 
@@ -89,7 +89,7 @@ Source: https://2027.sigmodconf.hosting.acm.org/calls_sigmod_demos.shtml. It agr
 3. Hand labels cover only the 60 stable disagreements; no second reader; the 40 written and 2 published questions that differ in one or two runs are unlabelled (plan 3.21). The total of published answers by code per run is not in the plan table (same + different gives 29 to 37; another session reported 30 to 38), so the paper gives only the same / different split.
 4. No cross-check of the reference answers with a second engine (plan 3.3: the NetworkX check did not finish).
 5. Video URL: placeholder in the abstract.
-6. Author list, e-mail addresses and ORCIDs (plan 11, item 3). The draft has one author and no e-mail address, on purpose.
+6. Sole author (confirmed 2026-11-26). The e-mail address and the ORCID are still to be added by hand.
 
 ## 5. Figures (made 2026-11-26, in `figs/`)
 
@@ -104,14 +104,33 @@ Source: https://2027.sigmodconf.hosting.acm.org/calls_sigmod_demos.shtml. It agr
 - Text in Figure 2 is about 4 pt in print.
 - The ledger in Figure 2 shows the totals at that turn (3 steps reused, 11 executed), not the end-of-session totals the text quotes (6 and 20).
 
-## 6. References: all to be verified
+## 6. References (checked 2026-11-26)
 
-`refs.bib` was written from memory without the papers at hand. Check every entry. In particular:
+Each entry was compared with a primary page. Nothing below was taken from memory.
 
-- **GraphSeek** (arXiv 2602.11052) has no author list or full title in the file, and the sentence about it rests on the summary in `docs/demo-paper-plan.md`, which says the full paper is still to be read.
-- **SParC, CoSQL, Helix**: the plan (section 10) says these are to be read before citing; the sentences about them are one-line characterisations and need checking against the papers.
-- The uncited sentence on semantic caching was cut on 2026-11-26.
-- Not cited for space: GraphInstruct, Talk like a Graph, GraphWiz, the Pokec dataset paper, LangGraph itself, text-to-Cypher, GraphRAG.
+| Entry | Checked against | Result |
+|---|---|---|
+| codeact | proceedings.mlr.press/v235/wang24h.html, arXiv 2402.01030 | authors, title, ICML 2024 correct (PMLR 235, pages 50208–50232, not printed) |
+| graphteam | arXiv 2410.18032 | authors and title correct; no venue found beyond arXiv. A search result shows a later version titled "... Graph Reasoning ..." while the abstract page shows "... Graph Analysis ..."; look at the current PDF once |
+| grapharena | arXiv 2407.00379 ("ICLR 2025 camera ready version") | correct |
+| nlgraph | arXiv 2305.10037 ("NeurIPS 2023 Spotlight") | correct |
+| graphseek | arXiv 2602.11052 | was a stub; now "GraphSeek: Next-Generation Graph Analytics with LLMs", Besta, Jarmocik, Hrycyna and 7 others (shortened for the page limit, as sparc and cosql are) |
+| sparc | aclanthology.org/P19-1443 | correct (19 authors, pages 4511–4523) |
+| cosql | aclanthology.org/D19-1204 | venue corrected to EMNLP-IJCNLP (24 authors, pages 1962–1979) |
+| helix | arXiv 1812.05762; a bibliographic record giving PVLDB 12(4), 2018, DOI 10.14778/3297753.3297763 | authors, title, volume and number correct; page numbers not confirmed and not printed |
+| snap | snap.stanford.edu/data ("Citing SNAP") | correct; month added |
+| igraph | igraph.org (how igraph asks to be cited) | correct; 1695 is an article number, moved from volume to number |
+
+dblp refused automated access, so it was not used.
+
+Sentences that cite these, checked against the abstracts only (the full papers were not read):
+
+- GraphSeek: the abstract describes planning by the model over a "Semantic Catalog" and a separate plane for deterministic execution on a graph database. The sentence was reworded to say this and no more ("non-model executor through structured operator calls" was our inference).
+- Helix: the abstract says it caches and reuses intermediate results across iterations, or recomputes when cheaper. The earlier claim that it "matches operators and inputs as our keys do" was not supported by the abstract and was replaced.
+- SParC, CoSQL: context-dependent question sequences and dialogues over databases, across domains; the sentence stands. "Translates every turn" is our reading of the task, not a quotation.
+- GraphTeam: "the benchmarks GraphTeam is evaluated on" stands (the abstract says six benchmarks).
+- Pokec figures (1,632,803 nodes, 30,622,564 links) match the SNAP page. SNAP asks that the Pokec data be cited as Takac and Zabovsky, 2012; the paper cites only the SNAP collection, for space.
+- Not cited for space: GraphInstruct, Talk like a Graph, GraphWiz, LangGraph itself, text-to-Cypher, GraphRAG.
 
 ## 7. Decisions in the draft that the author should confirm
 

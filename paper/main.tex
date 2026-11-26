@@ -18,8 +18,8 @@
 
 \title{GraphAudit: Verifiable Conversational Graph Analytics with Computation Reuse}
 
-% TODO(authors): the author list is open (plan, section 11, item 3). Every author needs a CMT account and an ORCID.
-% The e-mail address is left out of the draft on purpose; add it by hand before submission.
+% Sole author (confirmed 2026-11-26). The call asks for a CMT account and an ORCID.
+% TODO: add the e-mail address and the ORCID by hand before submission; both are left out of the draft on purpose.
 \author{Xiaofei Zhang}
 \affiliation{%
   \institution{University of Memphis}
@@ -295,13 +295,12 @@ Benchmarks for language models on graph problems, such as NLGraph~\cite{nlgraph}
 GraphArena~\cite{grapharena}, place a small graph in the prompt and pose single questions. Agent systems
 such as GraphTeam~\cite{graphteam} and CodeAct~\cite{codeact} have the model write and run code, and
 CodeAct-style agents keep variables across turns: reuse without a validity condition, which is the baseline
-of our comparison. GraphSeek~\cite{graphseek} is the closest system in design; it also separates a planning
-model from a non-model executor through structured operator calls, over a graph database. \sys{} works on
+of our comparison. GraphSeek~\cite{graphseek} is the closest system in design; it also separates planning by the model, over a catalogue of operations, from deterministic execution,
+on a graph database. \sys{} works on
 files and adds the session layer: reuse decided by keys, change detection, and clarification of scope.
 Conversational text-to-SQL (SParC~\cite{sparc}, CoSQL~\cite{cosql}) translates every turn over a fixed
-database and does not ask when an earlier result may stand in for a new computation. Reuse of
-intermediates in iterative workflows (Helix~\cite{helix}) matches operators and inputs as our keys do,
-for a program rather than a conversation.
+database and does not ask when an earlier result may stand in for a new computation. Helix~\cite{helix} reuses intermediate results across iterations of a machine-learning workflow, or
+recomputes them when that is cheaper; the workflow there is a program, not a conversation.
 
 \section{Status}
 
