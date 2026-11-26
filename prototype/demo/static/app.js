@@ -5,8 +5,8 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const fmt = (n) => typeof n === "number" ? (Number.isInteger(n) ? n.toLocaleString() : (Math.abs(n) < 0.01 && n !== 0 ? n.toExponential(3) : Math.abs(n) >= 1e6 ? n.toExponential(3) : n.toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) >= 1000 ? 1 : 4 }))) : String(n);
   const bytes = (b) => b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b > 1e6 ? (b / 1e6).toFixed(1) + " MB" : (b / 1e3).toFixed(0) + " kB";
-  const TYPE_COLORS = { Graph: "var(--t-graph)", NodeMap: "var(--t-nodemap)", NodeSet: "var(--t-nodeset)", Partition: "var(--t-partition)", Scalar: "var(--t-scalar)", Table: "var(--t-table)", Bool: "var(--t-bool)", Path: "var(--t-path)" };
-  const typeOf = (r) => (Object.keys(TYPE_COLORS).find((t) => String(r || "").startsWith(t)) || "Scalar");
+  const TYPES = ["Graph", "NodeMap", "NodeSet", "Partition", "Scalar", "Table", "Bool", "Path"];
+  const typeOf = (r) => (TYPES.find((t) => String(r || "").startsWith(t)) || "Scalar");
 
   const state = { datasets: [], ds: null, system: "full", card: null, scenes: [], replay: null, static: !!window.T2A_STATIC };
 
@@ -18,15 +18,18 @@
   // ------------------------------------------------------------------ datasets
   async function loadDatasets() {
     if (state.static) { state.datasets = window.T2A_DATASETS || []; }
-    else { state.datasets = await (await fetch("/api/datasets")).json(); }
+    else { try { state.datasets = await (await fetch("/api/datasets")).json(); } catch { state.datasets = []; } if (!Array.isArray(state.datasets)) state.datasets = []; }
     const list = $("#ds-list"); list.innerHTML = "";
+    if (!state.datasets.length) list.innerHTML = `<p class="muted small">No graphs are listed: the live server is not running. The guided demo replays recorded runs without it.</p>`;
     const order = { hard: 0, base: 1, upload: 2, scale: 3 };
     state.datasets.sort((a, b) => order[a.tier] - order[b.tier] || a.name.localeCompare(b.name));
     for (const d of state.datasets) {
       const b = document.createElement("button"); b.className = "ds"; b.dataset.path = d.path;
       const st = d.state === "ready" ? "ready" : d.state === "loading" ? "loading" : d.cached ? "cached" : "cold";
       const stTitle = { ready: "resident in memory", loading: "loading", cached: "binary cache on disk: loads in seconds", cold: "not loaded yet: first load parses the file" }[st];
-      b.innerHTML = `<span class="n"><i class="dot ${st}" title="${stTitle}"></i>${esc(d.name)}</span><span class="tier">${esc(d.tier)}</span><span class="f">${esc(d.file)} <span class="sz">· ${bytes(d.bytes)}</span></span>`;
+      const stWord = { ready: "in memory", loading: "loading", cached: "cached on disk", cold: "" }[st];
+      b.type = "button";
+      b.innerHTML = `<span class="n">${esc(d.name)}</span><span class="tier" title="${stTitle}">${esc(stWord || d.tier)}</span><span class="f">${esc(d.file)}, ${bytes(d.bytes)}</span>`;
       b.title = d.head.join("\n");
       b.onclick = () => pickDataset(d);
       list.appendChild(b);
@@ -37,10 +40,11 @@
     state.ds = d; state.replay = null;
     $$(".ds").forEach((b) => b.classList.toggle("active", b.dataset.path === d.path));
     $("#description").value = d.description || "";
-    $("#examples").innerHTML = (d.examples || []).map((q) => `<button class="chip">${esc(q)}</button>`).join("");
+    $("#examples").innerHTML = (d.examples || []).map((q) => `<button type="button" class="chip">${esc(q)}</button>`).join("");
     $$("#examples .chip").forEach((c) => c.onclick = () => { $("#question").value = c.textContent; $("#question").focus(); setStep(3); });
     $("#run").disabled = false;
-    if (!silent) { $("#result").classList.add("hidden"); $("#details").classList.add("hidden"); $("#top-grid").classList.add("solo"); }
+    if (!silent) { $("#result").classList.add("hidden"); }
+    $("#graph-summary").innerHTML = `<span class="bar-name">${esc(d.name)}</span><span class="muted">loading</span>`;
     setStep(2);
     $("#profile").className = "profile empty"; $("#profile").textContent = "Loading and profiling the file…";
     try {
@@ -55,26 +59,28 @@
           if (r.state === "ready") { card = r.card; if (r.load?.source && card) card.load_info = { source: r.load.source, seconds: r.load.load_seconds ?? r.load.seconds }; break; }
           if (r.state === "error") throw new Error(r.error || "load failed");
           const src = d.cached ? "restoring from the binary cache" : "parsing the file (first load; a binary cache is written for next time)";
-          $("#profile").innerHTML = `<div class="loading"><span class="spin"></span>${src} · ${r.load?.seconds ?? 0} s</div>`;
+          $("#profile").innerHTML = `<div class="status"><span class="spin"></span>${src}, ${r.load?.seconds ?? 0} s</div>`;
           await new Promise((res) => setTimeout(res, 1000));
         }
         await loadDatasets(); $$(".ds").forEach((b) => b.classList.toggle("active", b.dataset.path === d.path));
       }
       if (card.error) throw new Error(card.error);
       state.card = card; renderProfile(card);
-      if (!state.replay) { drawViz(card.viz, { highlights: false }); $("#top-grid").classList.add("solo"); }
-    } catch (e) { $("#profile").innerHTML = `<div class="error">Could not profile this file: ${esc(e.message)}</div>`; }
+      if (!state.replay) { drawViz(card.viz, { highlights: false }); setGraph(false); }
+    } catch (e) { $("#profile").innerHTML = `<div class="notice bad">Could not profile this file: ${esc(e.message)}</div>`; }
   }
 
+  function setGraph(open) { $("#graph-more").classList.toggle("hidden", !open); const b = $("#graph-toggle"); b.setAttribute("aria-expanded", open); b.textContent = open ? "Hide graphs" : "Change graph, or see its profile"; }
   function renderProfile(c) {
     const el = $("#profile"); el.className = "profile";
+    $("#graph-summary").outerHTML = `<dl id="graph-summary" class="bar-figs"><div><dd class="bar-name">${esc(c.name || state.ds?.name || "")}</dd></div><div><dt>nodes</dt><dd>${fmt(c.n_nodes)}</dd></div><div><dt>links</dt><dd>${fmt(c.n_edges)}</dd></div><div><dd>${c.semantics?.directed ? "directed" : "undirected"}${c.semantics?.weighted ? ", weighted" : ""}</dd></div></dl>`;
     const s = c.semantics || {}; const f = c.facts || {};
     const conf = (k) => Math.round(((s.confidence || {})[k] || 0) * 100);
     const bar = (k) => `<div class="conf"><i style="width:${conf(k)}%"></i></div>`;
-    const row = (k, label, val, ev) => `<div class="sem-row"><span class="k">${label}</span><div><span class="val">${val}</span>${bar(k)}<div class="ev">${esc(ev || "")} <span class="muted">· confidence ${conf(k)}%</span></div></div></div>`;
+    const row = (k, label, val, ev) => `<div class="sem-row"><span class="k">${label}</span><div><span class="val">${val}</span>${bar(k)}<div class="ev">${esc(ev || "")} <span class="muted">(confidence ${conf(k)}%)</span></div></div></div>`;
     const stats = [["nodes", fmt(c.n_nodes)], ["edges", fmt(c.n_edges)], ["components", fmt(c.n_components_weak)],
       ["max degree", fmt(c.degree?.max)], ["median degree", fmt(c.degree?.median)], ["density", c.density < 0.0005 ? c.density.toExponential(1) : c.density.toFixed(4)]];
-    let html = `<div class="stat-row">${stats.map(([l, v]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("")}</div>`;
+    let html = `<dl class="bar-figs">${stats.map(([l, v]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join("")}</dl>`;
     html += `<div class="sem">`;
     html += row("directed", "direction", s.directed ? "directed" : "undirected", s.evidence?.directed);
     html += row("weighted", "weights", s.weighted ? `weighted (${s.weight_semantics || "unknown kind"})` : "none", s.evidence?.weighted || s.evidence?.weight_semantics);
@@ -83,22 +89,22 @@
     if (c.columns) html += `<div class="sem-row"><span class="k">columns</span><div><span class="val mono">${esc(c.columns.header ? c.columns.header.join(", ") : c.columns.note)}</span></div></div>`;
     html += `</div>`;
     const ASK = { directed: "is each row one direction of a relation, or an undirected edge?", weighted: "is the extra column a weight?", weight_semantics: "are the weights strengths (more is closer) or distances (more is farther)?", multigraph: "do repeated rows mean repeated interactions?" };
-    if ((s.needs_clarification || []).length) html += `<div class="ask-badge">Would ask before relying on it: ${esc(s.needs_clarification.map((k) => ASK[k] || k).join(" "))}</div>`;
+    if ((s.needs_clarification || []).length) html += `<div class="notice">Would ask before relying on it: ${esc(s.needs_clarification.map((k) => ASK[k] || k).join(" "))}</div>`;
     const sample = (f.sample_rows || []).map((r) => r.join(f.header ? "," : " ")).join("\n");
     html += `<details class="more"><summary>raw file facts</summary><div class="head-sample">${esc(sample)}</div>
-      <div class="kv" style="margin-top:8px;font-size:12.5px">
+      <div class="kv">
         <span class="k">rows</span><span class="v">${fmt(f.rows)}</span>
-        <span class="k">distinct pairs</span><span class="v">${fmt(f.distinct_pairs_directed)} directed · ${fmt(f.distinct_pairs_undirected)} undirected</span>
+        <span class="k">distinct pairs</span><span class="v">${fmt(f.distinct_pairs_directed)} directed, ${fmt(f.distinct_pairs_undirected)} undirected</span>
         <span class="k">reciprocity of rows</span><span class="v">${f.reciprocity_of_rows}</span>
         <span class="k">self loops</span><span class="v">${fmt(f.self_loops)}</span>
         ${f.weight_column ? `<span class="k">weight column</span><span class="v">${esc(f.weight_column)} in [${f.weight_range?.map(fmt).join(", ")}]${f.weight_has_fractions ? ", fractional" : ", integer"}</span>` : ""}
         ${f.row_index_column ? `<span class="k">row index</span><span class="v">first column is a running row number (ignored)</span>` : ""}
-        <span class="k">ids</span><span class="v">${f.ids_numeric ? "integers" : "string labels"} · e.g. ${esc((c.sample_node_ids || []).slice(0, 4).join(", "))}</span>
+        <span class="k">ids</span><span class="v">${f.ids_numeric ? "integers" : "string labels"}, e.g. ${esc((c.sample_node_ids || []).slice(0, 4).join(", "))}</span>
       </div></details>`;
     const li = c.load_info || {};
     if (li.source) {
       const how = li.source === "memory" ? "resident in memory: questions on this graph skip loading" : li.source === "disk-cache" ? `restored from the binary cache in ${li.seconds} s; now resident` : `parsed from the file in ${li.seconds} s; binary cache written, next load takes seconds`;
-      html += `<div class="resident">${esc(how)}</div>`;
+      html += `<p class="muted small">${esc(how.charAt(0).toUpperCase() + how.slice(1))}.</p>`;
     }
     el.innerHTML = html;
   }
@@ -109,7 +115,7 @@
     const q = $("#question").value.trim(); if (!q || !state.ds) return;
     if (state.static) { alert("This is a static preview: it replays recorded scenes only. Run demo/server.py for live questions."); return; }
     setStep(4);
-    $("#result").classList.add("hidden"); $("#details").classList.add("hidden"); $("#progress-card").classList.remove("hidden");
+    $("#result").classList.add("hidden"); $("#progress-card").classList.remove("hidden");
     $("#prog-title").textContent = `Asking the ${labelOf(state.system)} executor…`;
     const req = { path: state.ds.path, name: state.ds.name, description: $("#description").value.trim(), question: q, system: state.system, model: $("#model").value };
     const r = await (await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) })).json();
@@ -127,7 +133,7 @@
       else if (job.status === "error") { clearInterval(timer); $("#progress-card").classList.add("hidden"); showError(job.error + "\n" + (job.traceback || "")); }
     }, 1000);
   }
-  function showError(msg) { $("#result").classList.remove("hidden"); $("#answer").innerHTML = `<div class="error mono">${esc(msg)}</div>`; }
+  function showError(msg) { $("#result").classList.remove("hidden"); $("#answer").innerHTML = `<div class="notice bad mono">${esc(msg)}</div>`; }
   const labelOf = (s) => ({ full: "typed plan", flat: "tool agent", codegen: "code generation", no_verify: "typed plan (no verifier)", no_interp: "typed plan (no interpretation)", codegen_nofacts: "code generation without facts" }[s] || s);
 
   // ------------------------------------------------------------------ render a result
@@ -135,7 +141,6 @@
     $("#result").classList.remove("hidden"); setStep(4);
     renderAnswer(r); renderInterp(r); renderPlan(r); renderFindings(r); renderCost(r); renderSummary(r);
     drawViz(r.viz || state.card?.viz, { highlights: !!r.viz });
-    $("#top-grid").classList.toggle("solo", $("#viz-card").classList.contains("hidden"));
     setDetails(detailsOpen);
     $("#result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -152,9 +157,9 @@
       if (ents0.length && ents0.length <= 6 && ents0.some(([, v]) => typeof v === "object" && v !== null)) {
         return ents0.map(([k, v]) => `<div class="sub"><div class="sub-l">${esc(k.replace(/_/g, " "))}</div>${answerHtml(v)}</div>`).join("");
       }
-      if ("path" in a && Array.isArray(a.path)) return `<div class="big small">${a.path.map(esc).join(" → ")}</div><div class="kv">${Object.entries(a).filter(([k]) => k !== "path").map(([k, v]) => `<span class="k">${esc(k)}</span><span class="v">${fmt(v)}</span>`).join("")}</div>`;
+      if ("path" in a && Array.isArray(a.path)) return `<ol class="path">${a.path.map((x) => `<li>${esc(x)}</li>`).join("")}</ol><div class="kv">${Object.entries(a).filter(([k]) => k !== "path").map(([k, v]) => `<span class="k">${esc(k)}</span><span class="v">${fmt(v)}</span>`).join("")}</div>`;
       const ents = Object.entries(a);
-      if (ents.length <= 6 && ents.every(([, v]) => typeof v !== "object")) return `<div class="stat-row" style="grid-template-columns:repeat(${Math.min(3, ents.length)},1fr)">${ents.map(([k, v]) => `<div class="stat"><div class="v">${typeof v === "boolean" ? (v ? "yes" : "no") : fmt(v)}</div><div class="l">${esc(k)}</div></div>`).join("")}</div>`;
+      if (ents.length <= 6 && ents.every(([, v]) => typeof v !== "object")) return `<dl class="bar-figs big-figs">${ents.map(([k, v]) => `<div><dt>${esc(k.replace(/_/g, " "))}</dt><dd>${typeof v === "boolean" ? (v ? "yes" : "no") : fmt(v)}</dd></div>`).join("")}</dl>`;
       return `<pre class="code">${esc(JSON.stringify(a, null, 1).slice(0, 2000))}</pre>`;
     }
     if (typeof a === "boolean") return `<div class="big">${a ? "Yes" : "No"}</div>`;
@@ -163,19 +168,22 @@
 
   function renderAnswer(r) {
     const el = $("#answer");
-    const head = state.replay ? `<div class="replay-banner"><span>Recorded run · ${esc(labelOf(r.system))} · ${esc(r.model || "")}</span><span class="mono">${esc(r.question || "")}</span></div>` : "";
-    if (r.error && r.answer == null) { el.innerHTML = head + `<div class="error">${esc(r.error)}</div>`; }
+    const qText = r.question || $("#question").value.trim();
+    const head = (qText ? `<h2 class="turn-q">${esc(qText)}</h2>` : "") + (state.replay ? `<p class="muted small">Recorded run, ${esc(labelOf(r.system))}, ${esc(r.model || "")}</p>` : r.system && r.system !== "full" ? `<p class="muted small">Answered by the ${esc(labelOf(r.system))} executor</p>` : "");
+    if (r.error && r.answer == null) { el.innerHTML = head + `<div class="notice bad">${esc(r.error)}</div>`; }
     else el.innerHTML = head + answerHtml(r.answer, r.plan?.answer?.kind);
     const cl = $("#clarification");
     if (r.clarification) { cl.classList.remove("hidden"); cl.innerHTML = `<b>The system asks:</b> ${esc(r.clarification)}`; } else cl.classList.add("hidden");
     const ex = (r.explanation || "").trim(); const isJson = ex.startsWith("{") && ex.endsWith("}");
     $("#explanation").innerHTML = ex && !isJson ? esc(ex).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") : (isJson ? `<span class="muted">The agent returned its answer object with no explanation.</span>` : "");
+    $("#explanation-sec").classList.toggle("hidden", !ex);
     // variants that merely repeat a part of the main answer add nothing: drop them
     const seen = new Set();
     const walk = (v, d = 0) => { if (v == null || d > 3) return; seen.add(JSON.stringify(v)); if (Array.isArray(v)) seen.add(JSON.stringify(v.map((x) => x && typeof x === "object" && "node" in x ? x.node : x))); if (typeof v === "object") Object.values(v).forEach((x) => walk(x, d + 1)); };
     walk(r.answer);
     const vs = (r.variants || []).filter((v) => { const j = JSON.stringify(v.answer); const nodes = Array.isArray(v.answer) ? JSON.stringify(v.answer.map((x) => x && typeof x === "object" && "node" in x ? x.node : x)) : null; return !(seen.has(j) || (nodes && seen.has(nodes))); });
-    $("#variants").innerHTML = vs.length ? `<div class="muted" style="font-size:12.5px">Also computed, under other readings of the question:</div>` + vs.map((v) => `<div class="variant"><b>${esc(v.label || "variant")}</b>${answerHtml(v.answer)}</div>`).join("") : "";
+    $("#variants").innerHTML = vs.map((v) => `<div class="variant"><div class="sub-l">${esc(v.label || "variant")}</div>${answerHtml(v.answer)}</div>`).join("");
+    $("#variants-sec").classList.toggle("hidden", !vs.length); state.nVariants = vs.length;
   }
 
   function renderInterp(r) {
@@ -190,7 +198,7 @@
     const el = $("#plan"); const hint = $("#plan-hint");
     if (r.plan_graph && r.plan_graph.nodes.length) {
       hint.textContent = "typed dataflow the executor ran";
-      el.innerHTML = planSvg(r.plan_graph, r.trace || []) + legend() + planNotes(r);
+      el.innerHTML = `<div class="plan-wrap">${planSvg(r.plan_graph, r.trace || [])}</div><p class="muted small">The step with the heavy outline gives the answer.</p>` + planNotes(r);
     } else if (typeof r.plan === "string" && r.system.startsWith("codegen")) {
       hint.textContent = "the script the model wrote (no plan to inspect)";
       el.innerHTML = `<pre class="code">${esc(r.plan)}</pre>` + (r.trace?.stdout ? `<details class="more"><summary>script output</summary><pre class="code">${esc(r.trace.stdout)}</pre></details>` : "") + (r.trace?.stderr ? `<details class="more"><summary>stderr</summary><pre class="code">${esc(r.trace.stderr)}</pre></details>` : "");
@@ -198,18 +206,14 @@
       hint.textContent = "tool-calling transcript (no plan to inspect)";
       el.innerHTML = transcript(r.trace);
     } else if (r.clarification) {
-      hint.textContent = ""; el.innerHTML = `<div class="absent">No plan was executed: the system asked for clarification instead of guessing.</div>`;
-    } else { hint.textContent = ""; el.innerHTML = `<div class="absent">No plan available.</div>`; }
+      hint.textContent = ""; el.innerHTML = `<p class="muted">No plan was executed: the system asked for clarification instead of guessing.</p>`;
+    } else { hint.textContent = ""; el.innerHTML = `<p class="muted">No plan available.</p>`; }
   }
 
   function planNotes(r) {
     const steps = r.plan?.steps || [];
     const notes = steps.filter((s) => s.note).map((s) => `<li><b>${esc(s.id)}</b>${esc(s.note)}</li>`).join("");
     return (notes ? `<ul class="notes">${notes}</ul>` : "") + (r.plan?.rationale ? `<div class="rationale">${esc(r.plan.rationale)}</div>` : "");
-  }
-
-  function legend() {
-    return `<div class="legend">${Object.entries(TYPE_COLORS).map(([t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join("")}<span style="margin-left:auto">outlined = answer step</span></div>`;
   }
 
   // layered dataflow layout
@@ -230,24 +234,22 @@
     const t = Object.fromEntries(trace.map((s) => [s.step, s]));
     const argStr = (n) => Object.entries(n.args || {}).filter(([k]) => k !== "graph" || n.args.graph !== "G").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" ");
     const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
-    let svg = `<svg viewBox="0 0 ${width} ${height}" style="max-width:${Math.max(width, 320)}px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="plan dataflow">`;
+    let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="plan dataflow">`;
     svg += `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>`;
     for (const e of edges) {
       const a = pos[e.from], b = pos[e.to]; if (!a || !b) continue;
       const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2; const mx = (x1 + x2) / 2;
-      svg += `<path class="edge" marker-end="url(#arr)" d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2 - 2} ${y2}"/>`;
-      svg += `<text class="edge-label" x="${mx}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${esc(e.arg)}</text>`;
+      svg += `<path class="pedge" marker-end="url(#arr)" d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2 - 2} ${y2}"/>`;
+      svg += `<text class="pedge-l" x="${mx}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${esc(e.arg)}</text>`;
     }
     for (const n of nodes) {
-      const p = pos[n.id]; const ty = typeOf(n.returns); const col = TYPE_COLORS[ty]; const tr = t[n.id];
+      const p = pos[n.id]; const ty = typeOf(n.returns); const tr = t[n.id];
       const isAns = (pg.answer_steps || []).includes(n.id);
-      svg += `<g class="node ${isAns ? "answer" : ""}" transform="translate(${p.x},${p.y})"><title>${esc(n.op)}: ${esc(n.doc || "")}\n${esc(argStr(n))}\ncost ${esc(n.cost)}</title>`;
-      svg += `<rect width="${W}" height="${H}" rx="10"/>`;
-      svg += `<rect x="0" y="0" width="6" height="${H}" rx="3" fill="${col}"/>`;
-      svg += `<text class="op" x="14" y="20">${esc(n.id)} · ${esc(n.op)}</text>`;
-      svg += `<text class="args" x="14" y="36">${esc(trunc(argStr(n), 30))}</text>`;
-      svg += `<rect x="${W - 66}" y="${H - 20}" width="58" height="14" rx="7" fill="${col}"/><text class="type" x="${W - 37}" y="${H - 9.5}" text-anchor="middle">${esc(ty.toUpperCase())}</text>`;
-      if (tr) svg += `<text class="time" x="14" y="${H - 9}">${tr.seconds >= 1 ? tr.seconds.toFixed(1) + " s" : Math.round(tr.seconds * 1000) + " ms"}${tr.cached ? " · cached" : ""}</text>`;
+      svg += `<g class="pnode ${isAns ? "answer" : ""}" transform="translate(${p.x},${p.y})"><title>${esc(n.op)}: ${esc(n.doc || "")}\n${esc(argStr(n))}\ncost ${esc(n.cost)}</title>`;
+      svg += `<rect class="box" width="${W}" height="${H}" rx="10"/>`;
+      svg += `<text class="op" x="12" y="20">${esc(trunc(n.id + " " + n.op, 20))}</text><text class="ty" x="${W - 10}" y="20" text-anchor="end">${esc(ty)}</text>`;
+      svg += `<text class="args" x="12" y="36">${esc(trunc(argStr(n) || "whole graph", 30))}</text>`;
+      if (tr) svg += `<text class="st" x="12" y="${H - 9}">${tr.seconds >= 1 ? tr.seconds.toFixed(1) + " s" : Math.round(tr.seconds * 1000) + " ms"}${tr.cached ? ", cached" : ""}</text>`;
       svg += `</g>`;
     }
     return svg + `</svg>`;
@@ -264,23 +266,22 @@
   function renderFindings(r) {
     const el = $("#findings"); const f = r.findings;
     if (!Array.isArray(f)) {
-      el.innerHTML = `<div class="absent">${r.system === "flat" ? "The tool agent returns an answer with no verification: nothing here can be checked against the question." : r.system?.startsWith("codegen") ? "A script that runs is indistinguishable from a script that is right: there is no verification stage." : "No verification was run."}</div>`;
+      el.innerHTML = `<p class="muted">${r.system === "flat" ? "The tool agent returns an answer with no verification: nothing here can be checked against the question." : r.system?.startsWith("codegen") ? "A script that runs is indistinguishable from a script that is right: there is no verification stage." : "No verification was run."}</p>`;
       return;
     }
     const bad = f.filter((x) => !x.ok && x.severity === "error").length, warn = f.filter((x) => !x.ok && x.severity === "warn").length;
-    const verdict = bad ? ["var(--bad)", `${bad} check${bad > 1 ? "s" : ""} failed`] : warn ? ["var(--warn)", `${warn} warning${warn > 1 ? "s" : ""}, no failures`] : ["var(--ok)", `all ${f.length} checks passed`];
-    el.innerHTML = `<div class="verdict"><span class="dot" style="background:${verdict[0]}"></span>${verdict[1]}</div><div class="findings">` + f.map((x) => {
-      const cls = x.ok ? (x.severity === "info" && /approximate|lower bound|pivots/.test(x.check) ? "info" : "ok") : x.severity;
-      const ic = cls === "ok" ? "✓" : cls === "info" ? "i" : "!";
-      return `<div class="finding ${cls}"><span class="ic">${ic}</span><div><div>${esc(x.check)}</div><div class="d">${esc(x.detail)}</div></div></div>`;
-    }).join("") + `</div>`;
+    const verdict = bad ? ["bad", `${bad} check${bad > 1 ? "s" : ""} failed`] : warn ? ["warn", `${warn} warning${warn > 1 ? "s" : ""}, no failures`] : ["ok", `All ${f.length} checks passed`];
+    el.innerHTML = `<div class="line"><span class="${verdict[0]}">${verdict[1]}</span></div><ul class="checks">` + f.map((x) => {
+      const cls = x.ok ? "" : x.severity;
+      return `<li class="${cls}"><span aria-hidden="true">${x.ok ? (x.severity === "info" ? "i" : "✓") : "!"}</span><div><b>${esc(x.check)}</b>${esc(x.detail)}</div></li>`;
+    }).join("") + `</ul>`;
   }
 
   function renderCost(r) {
-    const tiles = [["LLM calls", r.llm_calls ?? 0], ["tokens in", fmt(r.tokens_in ?? 0)], ["tokens out", fmt(r.tokens_out ?? 0)], ["USD", "$" + (r.cost_usd ?? 0).toFixed(3)], ["seconds", (r.seconds ?? 0).toFixed(1)]];
-    $("#cost").innerHTML = tiles.map(([l, v]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+    const tiles = [["model calls", r.llm_calls ?? 0], ["tokens in", fmt(r.tokens_in ?? 0)], ["tokens out", fmt(r.tokens_out ?? 0)], ["in fees", "$" + (r.cost_usd ?? 0).toFixed(3)], ["seconds", (r.seconds ?? 0).toFixed(1)]];
+    $("#cost").innerHTML = tiles.map(([l, v]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join("");
     const notes = (r.assumptions || {}).tier_notes || [];
-    $("#tiers").innerHTML = notes.length ? `<div class="muted" style="background:none;color:var(--muted);padding:0;font-size:12.5px">Cost model decisions:</div>` + notes.map((n) => `<div>${esc(n)}</div>`).join("") : "";
+    $("#tiers").innerHTML = notes.length ? `<div class="notice"><b>Cost model decisions</b>${notes.map((n) => `<div>${esc(n)}</div>`).join("")}</div>` : "";
   }
 
 
@@ -333,7 +334,7 @@
     const order = [...viz.nodes].sort((a, b) => rank3(a) - rank3(b));
     for (const n of order) {
       const role = highlights ? n.role : "context"; const rr = r(highlights ? n : { ...n, role: "context" });
-      svg += `<g><title>${esc(n.label)} · degree ${n.deg}${n.rank ? ` · rank ${n.rank}` : ""}</title><circle class="${role === "answer" ? "ans" : role === "path" ? "pth" : "ctx"}" cx="${X(n).toFixed(1)}" cy="${Y(n).toFixed(1)}" r="${rr.toFixed(1)}"/>`;
+      svg += `<g><title>${esc(n.label)}, degree ${n.deg}${n.rank ? `, rank ${n.rank}` : ""}</title><circle class="${role === "answer" ? "ans" : role === "path" ? "pth" : "ctx"}" cx="${X(n).toFixed(1)}" cy="${Y(n).toFixed(1)}" r="${rr.toFixed(1)}"/>`;
       if (role === "answer" && n.rank && n.rank <= 20) svg += `<text class="rk" x="${X(n).toFixed(1)}" y="${(Y(n) + 2.3).toFixed(1)}">${n.rank}</text>`;
       if (role !== "context" || (!highlights && n.deg >= maxDeg * 0.6)) svg += `<text class="lbl" x="${(X(n) + rr + 2).toFixed(1)}" y="${(Y(n) + 2.5).toFixed(1)}">${esc(n.label)}</text>`;
       svg += `</g>`;
@@ -341,10 +342,10 @@
     el.innerHTML = svg + `</g></svg>`;
     attachZoom(el.querySelector("svg"), W, H);
     const parts = [];
-    if (highlights && viz.highlighted) parts.push(`<span><i style="background:var(--accent)"></i>named in the answer${viz.highlighted > 1 ? " (numbers = rank)" : ""}</span>`);
-    if (highlights && viz.paths) parts.push(`<span><i style="background:var(--t-path)"></i>on the returned path</span>`);
-    parts.push(`<span><i style="background:var(--muted);opacity:.55"></i>neighbourhood</span>`);
-    parts.push(`<span class="n">showing ${fmt(viz.n_shown)} of ${fmt(viz.n_total)} nodes · ${fmt(viz.m_shown)} of ${fmt(viz.m_total)} edges${viz.directed ? " · directed" : ""}</span>`);
+    if (highlights && viz.highlighted) parts.push(`<span><i class="k-ans"></i>named in the answer${viz.highlighted > 1 ? " (numbers = rank)" : ""}</span>`);
+    if (highlights && viz.paths) parts.push(`<span><i class="k-pth"></i>on the returned path</span>`);
+    parts.push(`<span><i class="k-ctx"></i>neighbourhood</span>`);
+    parts.push(`<span class="n">showing ${fmt(viz.n_shown)} of ${fmt(viz.n_total)} nodes and ${fmt(viz.m_shown)} of ${fmt(viz.m_total)} edges${viz.directed ? ", directed" : ""}</span>`);
     lg.innerHTML = parts.join("");
     $("#viz-hint").textContent = highlights && viz.highlighted ? "nodes named in the answer, with their neighbourhood" : highlights ? (viz.note || "a neighbourhood of the graph") : "a neighbourhood of the graph's hubs; answer nodes will be highlighted here";
   }
@@ -354,20 +355,17 @@
     const f = Array.isArray(r.findings) ? r.findings : null;
     if (f) {
       const bad = f.filter((x) => !x.ok && x.severity === "error").length, warn = f.filter((x) => !x.ok && x.severity === "warn").length;
-      items.push(bad ? `<span class="bad">✕ ${bad} check${bad > 1 ? "s" : ""} failed</span>` : warn ? `<span class="warn">! ${warn} warning${warn > 1 ? "s" : ""}</span>` : `<span class="ok">✓ ${f.length ? `all ${f.length} checks passed` : "verified, no issues found"}</span>`);
-    } else items.push(`<span class="warn">not verified</span>`);
-    const steps = r.plan?.steps?.length;
-    items.push(steps ? `plan of ${steps} step${steps > 1 ? "s" : ""}` : r.system?.startsWith("codegen") ? "one generated script" : typeof r.trace === "string" ? "tool transcript" : "no plan");
-    items.push(`${r.llm_calls ?? 0} model call${(r.llm_calls ?? 0) === 1 ? "" : "s"}`);
-    items.push(`$${(r.cost_usd ?? 0).toFixed(3)}`);
-    items.push(`${(r.seconds ?? 0) >= 100 ? Math.round(r.seconds) : (r.seconds ?? 0).toFixed(1)} s`);
-    $("#summary-items").innerHTML = items.join(`<span class="sep">·</span>`);
+      items.push(bad ? `<span class="bad">${bad} check${bad > 1 ? "s" : ""} failed</span>` : warn ? `<span class="warn">${warn} warning${warn > 1 ? "s" : ""}</span>` : `<span class="ok">Verified</span><span>${f.length ? `${f.length} check${f.length > 1 ? "s" : ""} passed` : "no issues found"}</span>`);
+    } else items.push(`<span class="warn">Not verified</span>`);
+    if (state.nVariants) items.push(`<span>${state.nVariants} other reading${state.nVariants > 1 ? "s" : ""} computed</span>`);
+    items.push(`<span>${(r.seconds ?? 0) >= 100 ? Math.round(r.seconds) : (r.seconds ?? 0).toFixed(1)} s</span>`);
+    $("#summary-items").innerHTML = items.join("");
   }
 
   let detailsOpen = false; try { detailsOpen = localStorage.getItem("t2a_details") === "1"; } catch {}
   function setDetails(open) {
     detailsOpen = open; $("#details").classList.toggle("hidden", !open);
-    const b = $("#toggle-details"); b.textContent = open ? "Hide the details" : "Show how this was computed"; b.setAttribute("aria-expanded", String(open));
+    const b = $("#toggle-details"); b.firstChild.textContent = open ? "Hide the details" : "Show how this was computed"; b.setAttribute("aria-expanded", String(open));
     try { localStorage.setItem("t2a_details", open ? "1" : "0"); } catch {}
   }
 
@@ -375,7 +373,7 @@
   async function loadScenes() {
     try { state.scenes = state.static ? (window.T2A_SCENES || []) : await (await fetch("/api/scenes")).json(); } catch { state.scenes = []; }
     const el = $("#scene-list");
-    el.innerHTML = state.scenes.length ? state.scenes.map((s, i) => `<div class="scene" data-i="${i}"><span class="sys">${esc(labelOf(s.result?.system || ""))}</span><div class="t">${esc(s.title)}</div><div class="s">${esc(s.subtitle || "")}</div><div class="q">${esc(s.result?.question || "")}</div></div>`).join("") : `<p class="muted">No recorded scenes yet. Run <span class="mono">python3 demo/make_scenes.py</span>.</p>`;
+    el.innerHTML = state.scenes.length ? state.scenes.map((s, i) => `<button type="button" class="rec scene" data-i="${i}"><b>${esc(s.title)}</b><span class="muted">${esc(s.subtitle || "")}</span><span>${esc(s.result?.question || "")}</span><span class="muted small">${esc(labelOf(s.result?.system || ""))}</span></button>`).join("") : `<p class="muted">No recorded scenes yet. Run <span class="mono">python3 demo/make_scenes.py</span>.</p>`;
     $$(".scene", el).forEach((d) => d.onclick = () => playScene(state.scenes[+d.dataset.i]));
   }
   function playScene(s) {
@@ -389,7 +387,8 @@
     setSystem(s.result.system);
     if (s.card) { state.card = s.card; renderProfile(s.card); } else if (ds.path && !state.static) pickDataset(ds, { silent: true });
     render(s.result);
-    if (s.note) $("#answer").insertAdjacentHTML("afterbegin", `<div class="replay-banner" style="margin-bottom:8px"><span>${esc(s.note)}</span></div>`);
+    if (s.note) $("#answer").insertAdjacentHTML("beforeend", `<div class="notice none">${esc(s.note)}</div>`);
+    setGraph(false);
   }
 
   function setSystem(sys) {
@@ -406,6 +405,8 @@
   $("#btn-theme").onclick = () => applyTheme(currentDark() ? "light" : "dark");
   $("#question").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
   $("#question").addEventListener("focus", () => setStep(3));
+  $("#graph-toggle").onclick = () => setGraph($("#graph-more").classList.contains("hidden"));
+  $("#options-toggle").onclick = () => { const o = $("#options"), open = o.classList.contains("hidden"); o.classList.toggle("hidden", !open); $("#options-toggle").setAttribute("aria-expanded", open); };
   $("#btn-scenes").onclick = () => { $("#scenes").classList.toggle("hidden"); };
   $("#scenes-close").onclick = () => $("#scenes").classList.add("hidden");
   $("#btn-help").onclick = () => $("#help").classList.remove("hidden");
@@ -426,8 +427,6 @@
 
   (async () => {
     await loadDatasets(); await loadScenes();
-    let seen = false; try { seen = !!localStorage.getItem("t2a_help_seen"); } catch {}
-    if (!seen && !state.static) $("#help").classList.remove("hidden");
     if (state.static && state.scenes.length) playScene(state.scenes[0]);
   })();
 })();

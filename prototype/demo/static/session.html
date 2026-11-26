@@ -4,71 +4,74 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GraphAudit session</title>
+<meta name="description" content="Ask follow-up questions about one graph and see, for each answer, what was reused, what was computed and how it was checked.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="session.css">
+<link rel="stylesheet" href="audit.css">
 </head>
 <body class="session-page">
 <header class="top">
-  <div class="brand">
+  <a class="brand" href="session.html" aria-label="GraphAudit, session view">
     <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="7" cy="9" r="3.2"/><circle cx="25" cy="7" r="3.2"/><circle cx="16" cy="18" r="3.6"/><circle cx="8" cy="26" r="3.2"/><circle cx="26" cy="24" r="3.2"/><path d="M9.5 10.8 14 15.4M22.8 8.6 18.4 15.2M14 20.8 10 23.6M18.6 20.6 23.4 22.6" /></svg>
-    <div><div class="name">Graph<span>Audit</span> · session</div><div class="tag">follow-up questions on one graph: what is reused, what is recomputed, and why</div></div>
-  </div>
-  <nav class="modes" aria-label="View">
-    <a class="mode" href="index.html">Single question</a>
-    <span class="mode active" aria-current="page">Session</span>
-    <a class="mode" href="compare.html">Side by side</a>
+    GraphAudit
+  </a>
+  <nav class="views" aria-label="View">
+    <a class="view" href="index.html">Single question</a>
+    <span class="view active" aria-current="page">Session</span>
+    <a class="view" href="compare.html">Side by side</a>
   </nav>
-  <div class="right">
-    <label class="model">model <select id="model"><option value="claude-opus-5-5">Opus</option><option value="claude-haiku-5-5">Haiku</option></select></label>
-    <button id="btn-recorded" class="ghost">Recorded session</button>
-    <button id="btn-audit" class="ghost" disabled>Audit record</button>
-    <button id="btn-theme" class="ghost icon" aria-label="Switch between light and dark" title="Light / dark">
-      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
-      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
-    </button>
-  </div>
+  <button type="button" id="btn-theme" class="btn icon" aria-label="Switch between light and dark" title="Light / dark">
+    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+  </button>
 </header>
 
-<main class="layout">
-  <aside class="rail">
-    <section class="card" id="graph-card">
-      <h2>Graph</h2>
-      <div id="graph-info" class="profile empty">Pick a graph to start a session, or open the recorded one.</div>
-      <div class="ds-list" id="ds-list"></div>
-    </section>
-    <section class="card" id="ledger-card">
-      <h2>Session ledger <span class="hint">running totals</span></h2>
-      <div id="ledger" class="profile empty">Nothing asked yet.</div>
-    </section>
-  </aside>
-
-  <section class="main">
-    <div id="timeline" class="timeline">
-      <section class="card intro" id="intro">
-        <h2>How a session works</h2>
-        <p>Ask a first question, then follow up in plain words: <i>which region are they from</i>, <i>show the top 20 instead</i>, <i>and within Bratislava</i>. Each follow-up is planned against the session so far.</p>
-        <ul>
-          <li><span class="key reused"></span><b>Reused</b>: a step whose operator, parameters and inputs are identical to one already computed, traced back to the same graph under the same reading. Its stored result is used.</li>
-          <li><span class="key ran"></span><b>Executed</b>: everything else. A result computed on a different scope or under a different reading is never reused.</li>
-          <li><span class="key ask"></span><b>Two contracts</b>: when a request can be read two ways that give different answers, both are shown with what each would reuse, before anything runs.</li>
-        </ul>
-      </section>
+<main class="col">
+  <section class="panel" id="session-bar" aria-label="Session">
+    <div class="bar-line">
+      <div id="bar-summary" class="bar-figs"><span class="muted">No graph yet.</span></div>
+      <button type="button" class="btn" id="bar-toggle" aria-expanded="false" aria-controls="bar-more">Session details</button>
     </div>
-
-    <section class="card ask dock" id="ask-card">
-      <div class="askrow">
-        <textarea id="question" rows="1" placeholder="Pick a graph first"></textarea>
-        <button id="run" class="primary" disabled>Ask</button>
+    <div class="bar-more hidden" id="bar-more">
+      <div class="bar-cols">
+        <section id="graph-card">
+          <h2>Graph</h2>
+          <div id="graph-info" class="profile empty">Pick a graph to start a session, or open the recorded one.</div>
+          <div class="ds-list" id="ds-list"></div>
+        </section>
+        <section id="ledger-card">
+          <h2>Running totals</h2>
+          <div id="ledger" class="profile empty">Nothing asked yet.</div>
+        </section>
       </div>
-      <div class="chips" id="examples"></div>
-      <div id="status" class="status hidden"></div>
+      <div class="bar-actions">
+        <button type="button" id="btn-recorded" class="btn">Recorded session</button>
+        <button type="button" id="btn-audit" class="btn" disabled>Audit record</button>
+        <button type="button" id="btn-expand" class="btn">Open all details</button>
+        <label class="model">Model <select id="model" name="model"><option value="claude-haiku-5-5" selected>Haiku</option><option value="claude-opus-5-5">Opus</option></select></label>
+      </div>
+    </div>
+  </section>
+
+  <div id="timeline" class="timeline">
+    <section class="panel intro" id="intro">
+      <h1>Ask about a graph, then follow up</h1>
+      <p>Ask a first question, then follow up in plain words: <i>which region are they from</i>, <i>show the top 20 instead</i>, <i>and within Bratislava</i>. Each follow-up is planned against the session so far.</p>
+      <p>Every answer comes with one line on how it was checked. Open its details to see the plan, which steps were reused and which were executed.</p>
     </section>
+  </div>
+
+  <section class="panel dock" id="ask-card">
+    <div class="askrow">
+      <textarea id="question" name="question" rows="1" aria-label="Your question" placeholder="Pick a graph first"></textarea>
+      <button type="button" id="run" class="primary" disabled>Ask</button>
+    </div>
+    <div class="chips" id="examples"></div>
+    <div id="status" class="status hidden" role="status"></div>
   </section>
 </main>
 
-<div class="modal hidden" id="modal"><div class="modal-box wide"><div class="modal-head"><h3 id="modal-title"></h3><button class="ghost" id="modal-close">close</button></div><div id="modal-body"></div></div></div>
+<div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-box"><div class="modal-head"><h2 id="modal-title"></h2><button type="button" class="btn" id="modal-close">Close</button></div><div id="modal-body"></div></div></div>
 
 <script src="session.js"></script>
 </body>

@@ -10,7 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE);
 from server import _datasets, _scenes  # noqa: E402
 
 html = open(os.path.join(HERE, "static", "index.html")).read()
-css = open(os.path.join(HERE, "static", "style.css")).read()
+css = open(os.path.join(HERE, "static", "audit.css")).read()
 js = open(os.path.join(HERE, "static", "app.js")).read()
 scenes = _scenes()
 cards = {s["result"]["dataset"]: s.get("card") for s in scenes if s.get("card")}
@@ -22,7 +22,7 @@ for name, card in cards.items():
     if not any(d["name"] == name for d in datasets):
         datasets.append({"name": name, "path": name, "file": card.get("file", name), "tier": "scale", "bytes": 0, "description": "", "head": [], "examples": [], "card": card})
 data = f"<script>window.T2A_STATIC=true;window.T2A_SCENES={json.dumps(scenes, default=str)};window.T2A_DATASETS={json.dumps(datasets, default=str)};</script>"
-html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>\n{css}\n</style>")
+html = html.replace('<link rel="stylesheet" href="audit.css">', f"<style>\n{css}\n</style>")
 html = html.replace('<script src="app.js"></script>', data + f"<script>\n{js}\n</script>")
 os.makedirs(os.path.join(HERE, "dist"), exist_ok=True)
 out = os.path.join(HERE, "dist", "index.html")
