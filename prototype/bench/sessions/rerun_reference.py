@@ -7,6 +7,10 @@ For each row: the main answer as recomputed, every variant with its label, and w
 the loose test of compare_written.py. A match with a variant says the two systems computed the same thing under a
 convention the reference itself listed as an alternative; it does not say which convention the user meant.
 Sessions in which the data file was changed before the turn are skipped (the script would run on the wrong file).
+
+Every script of a reference run, for table_written.py --variants (no answers of ours are needed):
+
+  python bench/sessions/rerun_reference.py --all runs/written-runs --ref claude-opus-5-5/codegen_independent-cache@1 --snap $T2A_DATA/snap --out runs/written-runs/ref_variants.jsonl
 """
 from __future__ import annotations
 
@@ -19,7 +23,9 @@ import subprocess
 import sys
 import tempfile
 
-from compare_written import agree
+from compare_written import agree, load
+
+CAP = 3000          # characters kept of one candidate answer; --all raises it, since the table matches against them
 
 
 def run(row, snap, timeout):
@@ -47,18 +53,32 @@ def run(row, snap, timeout):
     cands = [("main", doc.get("answer"))] + [(str(v.get("label")), v.get("answer")) for v in doc.get("variants") or [] if isinstance(v, dict)]
     out["main_reproduced"] = agree(doc.get("answer"), row["ref_answer"])
     out["measure"] = (doc.get("assumptions") or {}).get("measure")
-    out["candidates"] = [{"label": l, "answer": json.loads(json.dumps(a, default=str)[:3000]) if len(json.dumps(a, default=str)) <= 3000 else json.dumps(a, default=str)[:3000]} for l, a in cands]
+    out["candidates"] = [{"label": l, "answer": json.loads(json.dumps(a, default=str)) if len(json.dumps(a, default=str)) <= CAP else json.dumps(a, default=str)[:CAP]} for l, a in cands]
     out["ours_match"] = {rep: [l for l, a in cands if a is not None and agree(o["answer"], a)] for rep, o in row["ours"].items()}
     return out
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("stable"); ap.add_argument("--snap", required=True); ap.add_argument("--out", required=True)
+    ap.add_argument("stable", nargs="?"); ap.add_argument("--snap", required=True); ap.add_argument("--out", required=True)
+    ap.add_argument("--all", help="root of the runs: every answered turn of --ref instead of a list of stable differences"); ap.add_argument("--ref")
     ap.add_argument("--jobs", type=int, default=4); ap.add_argument("--timeout", type=int, default=3600)
     a = ap.parse_args()
-    rows = [json.loads(l) for l in open(a.stable)]
-    todo = [r for r in rows if r.get("ref_script") and not r.get("event_before")]
+    if a.all:
+        global CAP
+        CAP = 60000
+        ref = load(a.all, a.ref, "1")
+        changed = set()                                    # (writer, graph, session) from the first turn with a data change on
+        rows = []
+        for k in sorted(ref):
+            r = ref[k]
+            if r.get("event"):
+                changed.add(k[:3])
+            if r["outcome"] == "answer":
+                rows.append({"key": list(k), "q": r["q"], "ref_answer": r["answer"], "ref_script": r.get("code") or r.get("plan"), "event_before": k[:3] in changed, "ours": {}})
+    else:
+        rows = [json.loads(l) for l in open(a.stable)]
+    todo = [r for r in rows if isinstance(r.get("ref_script"), str) and not r.get("event_before")]
     print(len(rows), "rows,", len(todo), "to run", flush=True)
     with open(a.out, "w") as f, cf.ThreadPoolExecutor(a.jobs) as ex:
         for res in ex.map(lambda r: run(r, a.snap, a.timeout), todo):

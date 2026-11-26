@@ -37,7 +37,7 @@ from t2r.graphs import load_graph, sidecar_node_table  # noqa: E402
 from t2r.ir import validate  # noqa: E402
 from t2r.llm import LLM  # noqa: E402
 
-VARIANTS = ("full", "full_noreuse", "codegen_stateful", "codegen_stateful_warned", "codegen_independent", "codeact", "codeact_warned")
+VARIANTS = ("full", "full_noreuse", "codegen_stateful", "codegen_stateful_warned", "codegen_independent", "codeact", "codeact_warned", "graphteam", "graphteam_nosearch")
 
 
 # ------------------------------------------------------------------------------------------------ files and events
@@ -218,6 +218,9 @@ class GraphAudit:
 
 
 def outside(spec, live, llm, variant, timeout):
+    if variant.startswith("graphteam"):                    # GraphTeam: needs the .venv-gt environment and T2A_GRAPHTEAM
+        from run_graphteam import GraphTeam
+        return GraphTeam(spec, live, llm, variant, timeout)
     from run_langgraph import CodeAct                      # LangGraph CodeAct: needs the .venv-lg environment
     return CodeAct(spec, live, llm, variant, timeout)
 
@@ -306,7 +309,7 @@ def main():
                 continue
             files = Files(spec, os.path.join(a.work or os.path.join(a.out, "work"), sess["id"].replace("/", "_")))
             t_setup = time.time()
-            system = None if a.dry or a.rescore else (GraphAudit(spec, files.live, llm, reuse=a.variant != "full_noreuse") if a.variant.startswith("full") else outside(spec, files.live, llm, a.variant, a.timeout) if a.variant.startswith("codeact") else Codegen(spec, files.live, llm, a.variant, a.timeout))
+            system = None if a.dry or a.rescore else (GraphAudit(spec, files.live, llm, reuse=a.variant != "full_noreuse") if a.variant.startswith("full") else outside(spec, files.live, llm, a.variant, a.timeout) if a.variant.startswith(("codeact", "graphteam")) else Codegen(spec, files.live, llm, a.variant, a.timeout))
             setup = round(time.time() - t_setup, 2)       # GraphAudit: load and profile; agents: file facts
             reading = {}
             for i, t in enumerate(sess["turns"], 1):

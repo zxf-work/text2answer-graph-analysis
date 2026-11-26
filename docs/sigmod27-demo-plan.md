@@ -786,6 +786,66 @@ Reason: the three pages showed everything at once (a session turn was about 600 
 
 Open: whether the explanation should be visible by default on the single-question page (it is in the details now); which reading stays in force after "Show reading A instead" (section 7, notes on the live run); a recorded "Not supported" and "Not confirmed" example; the booth offline test with the fonts (the pages load IBM Plex from Google Fonts and fall back to system faces without a network).
 
+### 3.23 Judging against the matching variant, Opus repetitions, and GraphTeam (2026-11-26)
+
+**Judging against the matching variant.** 3.21 left this open: the judge saw only the reference's main answer, although each reference script also prints its variants (self-loops excluded, another reading, ...). `rerun_reference.py --all` ran every answered reference script again on the cluster (498 scripts, no model calls, no errors; 476 reproduced the stored main answer) and stored the variants (`runs/written-runs/ref_variants.jsonl`). `table_written.py --variants` then moves an answer judged "different" or "unjudged" to a new column, "variant", when it equals a variant other than the main answer (same test as `compare_written.agree`, and the two answers must be of similar size).
+
+| set | run | same | variant | different before | different now |
+|---|---|---|---|---|---|
+| written (429) | 11 | 316 | 39 | 82 | 43 |
+| | 12 | 316 | 39 | 72 | 33 |
+| | 13 | 317 | 42 | 78 | 36 |
+| published (101) | p11 to p13 | 87–93 | 1 each | 5, 4, 3 | 4, 3, 2 |
+
+- Checked against the 60 hand labels of 3.21: none of the 20 answers labelled as an error, an open choice or a randomised algorithm matched a variant (no false match). Of the 40 labelled as a convention or another listed reading, 35 matched in all three runs, 1 in one run, 4 in none.
+- To report: written, 316 to 317 the same answer, 39 to 42 the same computation under a reading the reference itself lists, 33 to 43 different. "Variant" is not "correct": it says the two systems disagree on a convention, and GraphAudit states its convention with the answer.
+
+**Opus on the practice sessions, three runs (closes the Opus part of G4).** 43 turns, 6 trap turns, prompt cache on. Runs 2 and 3 are new; fees for them about $9.
+
+| system | correct | stale | fees per run | compute |
+|---|---|---|---|---|
+| GraphAudit (cache, replay) | 43, 43, 43 | 0 | $0.64–0.71 | 62–66 s |
+| GraphAudit (cache, no replay) | 43, 43 (2 runs) | 0 | $0.80–0.81 | |
+| GraphAudit (cache, no reuse) | 43, 43 (2 runs) | 0 | $0.80–0.83 | 146–164 s |
+| stateful agent | 41, 33, 33 | 2, 5, 5 | $0.42–0.62 | |
+| warned agent | 43, 43, 43 | 0 | $0.78–0.89 | 281–473 s |
+| independent agent | 43, 43, 43 | 0 | $0.91–1.00 | 932–972 s |
+
+(The first run of the two middle rows was on the older 28-turn set and is left out.) Same picture as E2b and E4: with Opus the warned and independent agents reach GraphAudit's answers, at 4 to 16 times the compute; the unwarned agent is stale in every run.
+
+**LangGraph CodeAct with Opus, E2b, one run each** (fees $5.84 and $5.87).
+
+| system | correct of 122 | stale | compute |
+|---|---|---|---|
+| GraphAudit, Opus (3.15) | 122, 122, 122 | 0 | |
+| our stateful agent, Opus (3.15) | 114–117 | 5–6 | |
+| CodeAct, Opus | 108 | 5 | 55 s |
+| our warned agent, Opus (3.15) | 121–122 | 0 | |
+| CodeAct warned, Opus | 109 | 0 | 142 s |
+
+The stale answers do not go away with the stronger model (5, the same as our agent's 5 to 6), and the warning removes them (0). CodeAct's other losses are mostly its own: 2 and 5 turns ended without a JSON answer, and the warned run has 6 trap turns wrong for other reasons.
+
+**GraphTeam (BUPT-GAMMA, arXiv 2410.18032), E2b, Haiku 5.5, three runs.** Adapter `bench/sessions/run_graphteam.py`, variants `graphteam` and `graphteam_nosearch` in `run_stale.py`; its repository (commit 7bf090b) is imported as it is. Its six phases, prompts, knowledge base and experience base are the published ones. Three things it takes from outside are ours, and the paper has to say so:
+
+- the chat model: its code calls the OpenAI client with a fixed list of OpenAI models; every call goes to the model under test instead, with the same messages. Its temperature of 0.2 is not passed (the SDK takes none for these models);
+- the sandbox: it runs code in a Docker container; the cluster has none, so the code runs as a script in a Python environment with its own 600 s limit;
+- the embeddings behind search: its stored indexes hold OpenAI embeddings; both indexes were rebuilt from its own documents with an open model (BAAI/bge-small-en-v1.5). Its similarity threshold for the experience base (0.85) is kept.
+
+It answers single questions and keeps nothing, so a session is given turn by turn: file facts, the earlier questions with the answers it gave, the question, the answer format, and the same library sentence the other agents get (igraph preferred on large graphs). It has its own environment on the cluster (`.venv-gt`).
+
+| system (Haiku 5.5, E2b, 122 turns, 47 traps) | correct | stale | traps correct | fees | compute | model calls |
+|---|---|---|---|---|---|---|
+| GraphAudit | 122 | 0 | 47 | $0.16 | | |
+| our independent agent (3.15) | 111–122 | 0 | | | | |
+| CodeAct (3.16) | 103–114 | 1–4 | | $0.13–0.18 | 232–310 s | |
+| GraphTeam | 85, 82, 81 | 2, 0, 0 | 30, 33, 28 | $0.36–0.38 | 880–991 s | 372–375 |
+
+- It runs: no errors, every answer but one (of 366) came from executed code, search returned documents on every turn, a second execution was needed on 3 or 4 turns per run. A run takes about 55 minutes of wall time.
+- It is close to our independent agent in design (everything is computed again on every turn), and it is almost never stale: 2 stale answers in one run, 0 in the other two. The 2 come from the earlier answers we put in the question.
+- What it loses is accuracy on the larger graphs, not sessions. The two small graphs are fully correct in all runs (20 turns); all 37 to 41 wrong answers are on the three Pokec regions, and 29 to 35 of them are rankings. Cause, read from the stored code: where the code calls NetworkX PageRank with the default settings, the answer is wrong (12 of 91 such ranking turns correct over the three runs), because NetworkX stops when the total change is below 1e-6 times the number of nodes, which is loose on a graph of this size and changes the order below the first few places; where the code uses igraph, it is right (46 of 48). Its knowledge base is the NetworkX documentation, which is likely why it chooses NetworkX for most PageRank turns (91 of 154) despite the sentence about igraph. 61 turns are right in all three runs, 15 wrong in all three.
+- So the fair reading for the paper: GraphTeam does not have the stale-answer problem because it reuses nothing, and it pays for that (about 900 s of compute, 3 model calls per turn, twice GraphAudit's fees); its accuracy problem here is a library default, which is the kind of silent failure E3 is about.
+- Not run: Opus (needs a yes, about $15 per run by the token counts: 0.82M in, 0.58M out), the no-search variant, E4 (a 30M-edge graph in NetworkX will not fit its 600 s limit).
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**
@@ -1135,11 +1195,13 @@ The stale answers are gone. What is left on Qwen3-14B are turns with no answer a
 
 ### G4. Variance — mostly closed
 
-3.14 and 3.15 give 3 to 6 runs for Haiku and 3 for Opus on E2b and E4; 3.21 gives 3 runs of the written and published sets. Left: the Qwen3-32B repetitions (queued), two more Opus runs of the practice sessions (about $12), and reporting every table in the paper as a range, not a single run.
+3.14 and 3.15 give 3 to 6 runs for Haiku and 3 for Opus on E2b and E4; 3.21 gives 3 runs of the written and published sets. The two more Opus runs of the practice sessions are done (3.23). Left: the Qwen3-32B repetitions (queued), and reporting every table in the paper as a range, not a single run.
 
 ### G5. Outside baselines — 5 days, by Dec 6
 
 *Status 2026-11-24: LangGraph CodeAct done on Haiku, results in 3.16. Opus (1 run, about $25 for both variants on E2b) not run: needs a yes. GraphTeam not started.*
+
+*Status 2026-11-26: done except for one optional run. CodeAct with Opus on E2b and GraphTeam with Haiku on E2b (3 runs) are in 3.23. GraphTeam with Opus is not run (about $15, needs a yes).*
 
 Two systems we did not write, both run with the same models and the same file facts:
 
