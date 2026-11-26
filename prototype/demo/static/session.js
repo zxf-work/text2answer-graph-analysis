@@ -34,10 +34,26 @@
 
   // ------------------------------------------------------------------ session bar: graph and running totals
   const fig = (v, l) => `<div><dt>${esc(l)}</dt><dd>${esc(v)}</dd></div>`;
+  // A recording stores the card and the list of data changes as they were at its end. While it is replayed, a change
+  // that has not been reached yet is not shown, and the link count is the one of the file at that step.
+  const changesNow = () => ((S.ledger || {}).data_changes || []).filter((c) => !S.rec || S.turns.size >= c.before_turn);
+  function edgesNow() {
+    const c = S.card, later = S.rec ? (((S.rec.steps[S.rec.steps.length - 1] || {}).ledger || {}).data_changes || []).find((d) => d.edges && S.turns.size < d.before_turn) : null;
+    if (later) return later.edges[0];
+    const seen = S.rec ? null : ((S.ledger || {}).data_changes || []).filter((d) => d.edges).pop();   // live: the card is from the start of the session
+    return seen ? seen.edges[1] : c.n_edges;
+  }
+  // The question box is docked over the bottom of the page: keep a new card clear of it (its last line says what was reused).
+  function reveal(el) {
+    const dock = $("#ask-card"), r = el.getBoundingClientRect(), top = 88;
+    const bottom = innerHeight - (dock && !dock.classList.contains("hidden") ? dock.offsetHeight + 24 : 0) - 12;
+    const dy = r.top < top ? r.top - top : r.bottom > bottom ? Math.min(r.bottom - bottom, r.top - top) : 0;   // a card taller than the space shows its top
+    if (dy) scrollBy({ top: dy, behavior: "smooth" });
+  }
   function renderBar() {
     const c = S.card, L = S.ledger, el = $("#bar-summary");
     if (!c) { el.innerHTML = `<span class="muted">No graph yet.</span>`; return; }
-    el.outerHTML = `<dl id="bar-summary" class="bar-figs"><div><dd class="bar-name">${esc(S.name)}</dd></div>${fig(fmt(c.n_nodes), "nodes")}${fig(fmt(c.n_edges), "links")}
+    el.outerHTML = `<dl id="bar-summary" class="bar-figs"><div><dd class="bar-name">${esc(S.name)}</dd></div>${fig(fmt(c.n_nodes), "nodes")}${fig(fmt(edgesNow()), "links")}
       ${L && L.turns ? fig(`${L.steps_reused} of ${L.steps_reused + L.steps_executed}`, "steps reused") + fig(secs(L.seconds_saved), "not recomputed") : ""}</dl>`;
   }
   function setBar(open) { $("#bar-more").classList.toggle("hidden", !open); $("#bar-toggle").setAttribute("aria-expanded", open); $("#bar-toggle").textContent = open ? "Hide session details" : "Session details"; }
@@ -46,7 +62,7 @@
     const attrs = Object.entries(c.node_attributes?.attributes || {});
     const s = c.semantics || {};
     $("#graph-info").className = "profile";
-    $("#graph-info").innerHTML = `<div><b>${esc(S.name)}</b>, ${fmt(c.n_nodes)} nodes and ${fmt(c.n_edges)} ${s.directed ? "directed links" : "links"}</div><div class="gi-file">${esc(S.file)}</div>
+    $("#graph-info").innerHTML = `<div><b>${esc(S.name)}</b>, ${fmt(c.n_nodes)} nodes and ${fmt(edgesNow())} ${s.directed ? "directed links" : "links"}</div><div class="gi-file">${esc(S.file)}</div>
       ${attrs.length ? `<div class="attrs" aria-label="Node attributes the planner can use">${attrs.map(([k, v]) => `<span class="attr">${esc(k)}<small>${v.type === "categorical" ? fmt(v.n_distinct) + " values" : "numeric"}</small></span>`).join("")}</div>` : `<div class="muted small">No node attribute table next to this file.</div>`}`;
     renderBar();
   }
@@ -70,9 +86,9 @@
       <ul class="notes">
         ${sem ? li(`Reading of the graph: <b>${sem.directed ? "directed" : "undirected"}${sem.weighted ? ", weighted" : ""}</b>`) : ""}
         ${L.scope_choice ? li(`Group restrictions: <b>reading ${esc(L.scope_choice.reading)}</b>, chosen in turn ${L.scope_choice.turn}`) : ""}
-        ${L.turns_replayed ? li(`${plural(L.turns_replayed, "turn")} replayed without asking the model`) : ""}
+        ${L.turns_replayed ? li(`${plural(L.turns_replayed, "turn")} replayed without a planning call`) : ""}
         ${L.tokens_cache_read ? li(`${Math.round(100 * L.tokens_cache_read / Math.max(1, L.tokens_in))}% of the tokens read came from the prompt cache`) : ""}
-        ${(L.data_changes || []).map((c) => li(`Before turn ${c.before_turn} the ${esc((c.changed || []).join(" and "))} changed${c.edges ? `: ${fmt(c.edges[0])} to ${fmt(c.edges[1])} edges` : ""}; earlier results were dropped`)).join("")}
+        ${changesNow().map((c) => li(`Before turn ${c.before_turn} the ${esc((c.changed || []).join(" and "))} changed${c.edges ? `: ${fmt(c.edges[0])} to ${fmt(c.edges[1])} edges` : ""}; earlier results were dropped`)).join("")}
         ${L.outcomes && L.outcomes["answer by code"] ? li(`${plural(L.outcomes["answer by code"], "answer")} by generated code`) : ""}
         ${L.outcomes && (L.outcomes.unsupported || L.outcomes.unconfirmed) ? li(`${plural((L.outcomes.unsupported || 0) + (L.outcomes.unconfirmed || 0), "request")} declined, with the reason`) : ""}
         ${(L.conventions || []).map((c) => li(esc(c))).join("")}
@@ -183,7 +199,8 @@
       const work = !t.steps_executed ? `<span>Nothing recomputed, <b>${plural(t.steps_reused, "step")}</b> reused</span>`
         : t.steps_reused ? `<span><b>${plural(t.steps_reused, "step")}</b> reused, <b>${t.steps_executed}</b> run in <b>${secs(t.execute_seconds)}</b></span>`
         : `<span><b>${plural(t.steps_executed, "step")}</b> run in <b>${secs(t.execute_seconds)}</b></span>`;
-      line = ver + work;
+      const replay = t.plan_replayed_from ? `<span>plan of turn <b>${esc(t.plan_replayed_from)}</b> replayed, no planning call</span>` : "";
+      line = ver + work + replay;
     }
     const hasMore = t.trace || rules.length || Object.keys(t.references || {}).length || t.intent;
     const more = hasMore ? `<button type="button" class="link more-btn" data-act="more" aria-expanded="${open}" aria-controls="more-${t.turn}">${open ? "Hide details" : "Details"}${CHEV}</button>` : "";
@@ -258,9 +275,9 @@
     if (!el) { el = document.createElement("section"); el.className = "panel turn"; el.id = `turn-${t.turn}`; $("#timeline").appendChild(el); }
     el.innerHTML = turnHtml(t);
     $$("[data-act]", el).forEach((b) => b.onclick = () => act(t.turn, b.dataset));
-    if (!quiet) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!quiet) reveal(el);
   }
-  function apply(r) { S.ledger = r.ledger; showTurn(r.turn); renderLedger(); if (r.turn.reading && r.turn.contracts) compareNote(r.turn); }
+  function apply(r) { S.ledger = r.ledger; showTurn(r.turn); if (S.rec) renderGraph(); renderLedger(); if (r.turn.reading && r.turn.contracts) compareNote(r.turn); }
 
   // the turn that reruns a request under the other reading: say how far the two answers differ
   function compareNote(t) { /* placeholder for symmetric notes on choose; the comparison is added when the other reading is shown */ }
@@ -305,23 +322,24 @@
     const st = S.rec.steps[S.recIdx]; if (!st) return;
     setBusy(true, st.kind === "ask" ? "Replaying the recorded turn" : "Replaying"); await new Promise((r) => setTimeout(r, 350)); setBusy(false);
     S.recIdx++;
-    if (st.kind === "event") { showEvent(st); return recPrompt(); }
+    if (st.kind === "event") { showEvent(st); recPrompt(); return revealLast(); }
     apply({ turn: st.turn, ledger: st.ledger });
     if (st.kind === "reading") compareWith(st.turn, st.of_turn);
-    recPrompt();
+    recPrompt(); revealLast();
   }
   function showEvent(st) {
     $("#intro")?.remove();
     const el = document.createElement("section"); el.className = "panel event";
     el.innerHTML = `<b>The data changed.</b>${esc(st.text)}`;
-    $("#timeline").appendChild(el); el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("#timeline").appendChild(el); reveal(el);
   }
+  const revealLast = () => { const el = $("#timeline").lastElementChild; if (el) reveal(el); };   // after the prompt: the note under it changes the height of the box
   function recPrompt() {
     const st = S.rec.steps[S.recIdx], q = $("#question"), run = $("#run");
     q.readOnly = true; $("#examples").innerHTML = "";
     const say = (x) => x ? `<div class="say">${esc(x)}</div>` : "";
     const prev = S.rec.steps[S.recIdx - 1];
-    if (!st) { q.value = ""; q.placeholder = "End of the recorded session. Open the session details to pick a graph and ask your own questions."; run.disabled = true; note(S.rec.close ? say(S.rec.close) : ""); return; }
+    if (!st) { q.value = ""; q.placeholder = "End of the recorded session."; run.disabled = true; note(S.rec.close ? say(S.rec.close) : ""); return; }
     run.disabled = false;
     const where = `<div class="where">Recorded session, step ${S.recIdx + 1} of ${S.rec.steps.length}, model ${esc(S.rec.model)}</div>`;
     if (st.kind === "event") { q.value = ""; q.placeholder = "Next: the edge file changes"; run.textContent = "Next"; note(where + say(prev?.say)); return; }

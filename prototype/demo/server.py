@@ -233,7 +233,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*a, directory=STATIC, **k)
 
     def log_message(self, fmt, *args):  # quieter
-        if "/api/job/" not in (args[0] if args else ""):
+        if "/api/job/" not in str(args[0] if args else ""):   # str: for an error the first argument is a status, not the request line
             sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
     def _json(self, obj, code=200):

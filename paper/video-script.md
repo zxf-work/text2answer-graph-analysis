@@ -54,7 +54,7 @@ Total 4:50. The narration is 546 words, about 3:55 of speech at that pace, so ea
 
 **6. Step 5, the same words again (0:28)**
 
-> We ask the first question again, word for word. The plan is replayed with no call to the model. But nothing computed on the old file is reused: the engine noticed the change from the file itself, and says so. Two users who gained links now lead the ranking.
+> We ask the first question again, word for word. The plan is replayed with no planning call. But nothing computed on the old file is reused: the engine noticed the change from the file itself, and says so. Two users who gained links now lead the ranking.
 
 **7. Step 6, two readings (0:38)**
 
@@ -80,14 +80,29 @@ Total 4:50. The narration is 546 words, about 3:55 of speech at that pace, so ea
 
 > GraphAudit: what was assumed, what was reused, and what was not checked is on screen for every answer.
 
-## Before recording (dry run)
+## Dry run (done 2026-11-26)
 
-- **"Four users" in step 6** is confirmed from the recording (the two top-10 lists share 4 users), and the recording's final ledger reads 6 reused, 20 executed, 1 replayed, 15 model calls. Both only need a glance on screen.
-- Figure 2 of the paper shows the ledger at step 6, where the totals are smaller; the video shows it at the end.
-- **Scene 8:** see that "Generated code" opens both functions without a long scroll at 110% zoom; if not, show the first function and the two equal values only.
-- **Scene 10:** start the demo server on the cluster (`slurm/demo_server.sbatch`) and the SSH tunnel beforehand; a live session takes about 35 seconds to start and turns take 5 to 30 seconds, so record the scene whole and cut the waits in editing. Use a short first question (step 1 of the script) so the wait is the same one the paper quotes.
-- **Scene 11:** the comparison page says it is one run on Haiku; leave that line in frame.
-- **Pronunciation:** "Pokec" is Slovak, roughly "POH-kets". The region in step 6 need not be read aloud; the screen shows it.
+All scenes were played in a browser at the capture size (a 1164 × 655 viewport, which is 1280 × 720 at 110% zoom): the recorded session, the comparison page, and the live scene against the server on the cluster (Haiku, about one cent). Scene lengths were not clocked against spoken narration; they are still estimates from word counts.
+
+Fixed in the pages during the dry run:
+
+- **Link count.** The recorded session showed the link count from after the file change (30,650,030) from step 1 on, and listed the change in the session details before it happened. It now shows 30,622,564 until the change is noticed. Live, the header kept the old count after a change; it now shows the new one.
+- **New cards hidden behind the question box.** On both pages the last lines of a new turn (what was reused, the agent's code line, the session totals) sat behind the docked box at the bottom. New cards are now scrolled clear of it.
+- **Replay was not visible on the turn.** The repeated question (step 5) now says "plan of turn 1 replayed, no planning call" under its answer.
+- **"No model call" was wrong.** A replayed turn skips the planning call but still makes one model call for the written explanation. Corrected on the page, in the presenter's line, in this narration and in one sentence of the paper.
+- The end-of-recording text in the question box was cut off; shortened. A page that is not found on the demo server returned an error trace; fixed in `server.py` (takes effect at the next server start).
+
+What to do by hand while recording:
+
+- **Scene 2:** the plan and the reading of the file are under "Details" on the turn; open it before pointing at them.
+- **Scene 5:** the counter under the question box reads "step 5 of 9" (the recording has nine entries for the paper's seven steps). Keep that line out of frame or do not point at it.
+- **Scene 7:** the two-readings card is taller than the window; scroll once to reach the two "Use reading" buttons. After B is chosen, "Next" shows A with the line "the two top-10 lists share 4 of 10 nodes".
+- **Scene 8:** open "Details", then "Generated code". The dialog shows the task statement, the inputs and the first function; scroll once for the second.
+- **Scene 9:** scroll once inside the session details to bring the last ledger lines above the question box. In the audit record the lineage keys wrap onto two lines at this width; they are readable.
+- **Scene 10:** the page is at `/session.html` on the tunnelled server (not `/static/session.html`). A live session took 35 s to start and a question 14 s. "Change the data file" takes several seconds, with the Ask button disabled until the change card appears; cut the wait in editing. The repeated first question came back replayed, with the change reported and users 27511 and 25855 leading. Live answers can be laid out differently from the recording (this run listed PageRank and in-degree side by side).
+- **Scene 11:** open "Details" on turn 5 and scroll once to bring the agent's quoted code line fully into view. The page's "one run of each system on Haiku" line is in the totals at the end, not at turn 5; add it as a caption.
+- **Tunnel:** a direct jump to the compute node failed on host-key checking from this Mac; the two-step form worked: `ssh -L 8772:localhost:18765 <login node> 'ssh -N -L 18765:localhost:8765 <compute node>'`.
+- **Pronunciation:** "Pokec" is Slovak, roughly "POH-kets". The region in step 6 need not be read aloud.
 
 ## Recording and editing
 

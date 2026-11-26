@@ -125,10 +125,10 @@ contracts (compute on the whole graph, then list the group; or compute on the gr
 what it would reuse. Nothing executes until the user chooses, and the choice is carried to later turns and
 stated there.
 
-\textbf{Replay and prompt caching.} A question repeated word for word runs its earlier plan with no model
+\textbf{Replay and prompt caching.} A question repeated word for word runs its earlier plan with no planner
 call, but only if that plan was self-contained (no reference to an earlier turn, no setting, no open
 reading) and the settings in force are unchanged. The plan is still validated and executed against the
-data as it then is, so replay removes a model call and never a check. The catalogue, the rules and the
+data as it then is, so replay removes the planner call and never a check. The catalogue, the rules and the
 profile card are sent as a cached prompt prefix.
 
 \textbf{Checked code fallback, declined requests, conventions.} When no combination of operators computes

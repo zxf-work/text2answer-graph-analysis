@@ -15,7 +15,7 @@
   {"event": {"type": "append_edges", "targets": [15, 40], "n": "max"},
    "say": "Meanwhile the edge file grows: new rows arrive, as they would from a nightly load. Nobody tells the system."},
   {"ask": "Who are the 10 most influential users?",
-   "say": "The same words as turn 1. The plan is replayed without a model call, but nothing computed on the old file is reused: the change was noticed from the file itself, and the answer is different."},
+   "say": "The same words as turn 1. The plan is replayed without a planning call, but nothing computed on the old file is reused: the change was noticed from the file itself, and the answer is different."},
   {"ask": "Who are the 10 most influential users within region \"{x}\"?",
    "say": "The safety moment. This request has two readings that give different answers. Both contracts are shown with what each would reuse, and nothing runs until one is chosen. The recorded user picks B, then looks at A to see how far the two differ."},
   {"ask": "Among the 20 most influential users, what is the largest group in which every two are friends, ignoring the direction of friendships, and who is in it?",

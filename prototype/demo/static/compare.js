@@ -51,7 +51,7 @@
     $$("#rows [data-code]").forEach((b) => b.onclick = () => code(+b.dataset.sys, +b.dataset.code));
     $$("#rows [data-more]").forEach((b) => b.onclick = () => {
       const i = +b.dataset.more, on = !open.has(i); on ? open.add(i) : open.delete(i);
-      $$(`#row-${i} .cmp-more`).forEach((m) => m.classList.toggle("hidden", !on));
+      $$(`#row-${i} .cmp-more`).forEach((m) => m.classList.toggle("hidden", !on)); if (on) reveal($(`#row-${i}`));
       b.setAttribute("aria-expanded", on); b.firstChild.textContent = on ? "Hide details" : "Details";
     });
   }
@@ -68,12 +68,18 @@
     if (shown >= D.turns.length) return;
     $("#rows").insertAdjacentHTML("beforeend", row(shown)); shown++;
     wire();
-    $("#rows").lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    prompt();
+    prompt(); reveal($("#rows").lastElementChild);
+  }
+  // The bar with the next question is docked over the bottom of the page: keep a new row clear of it.
+  function reveal(el) {
+    const dock = document.querySelector(".dock"), r = el.getBoundingClientRect(), top = 88;
+    const bottom = innerHeight - (dock ? dock.offsetHeight + 24 : 0) - 12;
+    const dy = r.top < top ? r.top - top : r.bottom > bottom ? Math.min(r.bottom - bottom, r.top - top) : 0;
+    if (dy) scrollBy({ top: dy, behavior: "smooth" });
   }
   function prompt() {
     const t = D.turns[shown];
-    if (!t) { $("#next-q").innerHTML = `<span class="muted">End of the session.</span>`; $("#next").disabled = true; $("#all").disabled = true; totals(); $("#cmp-total").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
+    if (!t) { $("#next-q").innerHTML = `<span class="muted">End of the session.</span>`; $("#next").disabled = true; $("#all").disabled = true; totals(); reveal($("#cmp-total")); return; }
     $("#next-q").innerHTML = `<span class="muted">${t.event ? "The file changes, then turn" : "Turn"} ${esc(t.turn)} of ${D.turns.length}:</span> ${esc(t.question)}`;
   }
   function code(k, i) {
