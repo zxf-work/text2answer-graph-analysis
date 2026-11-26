@@ -61,6 +61,7 @@ fallback, under the same profile, checks and budget.
 - Benchmarks: base 60, hard 27, scale 16 (synthetic graphs), scorer, fault-injection harness.
 - Demo UI: profile card, plan diagram, verifier findings, answer with variants, executor switcher, graph panel,
   replay of seven recorded scenes.
+  Rebuilt 2026-11-26 as "answer first, details on request" (section 3.22).
 
 ### 3.2 What the code has toward reuse, and what it lacks
 
@@ -755,6 +756,36 @@ Result: the guards do not find the disagreements. Written: 2 answers flagged per
 
 Open: a seed argument for `communities`; judging against the matching variant; whether the comparison check should stay a warning, since most of its flags are on correct answers.
 
+### 3.22 The interface rebuilt: answer first, details on request (2026-11-26)
+
+Reason: the three pages showed everything at once (a session turn was about 600 px tall: tags, answer, explanation, reuse line, plan drawing, rules, footer), next to a side rail with the graph card and the ledger. A visitor could not tell the answer from the apparatus. The pages now show the answer and one line on how it was checked, and open the rest on a click. Commits 851a52f and 30fb624.
+
+**The rule on every page.** Shown by default: the question, the answer, one status line. Shown without being asked: only what needs the visitor (a choice between two readings, a warning from a check or a guard, an answer by generated code, a declined request, a data change). Everything else is behind a "Details" toggle on that answer. One column, 54 rem wide; one stylesheet for the three pages (`demo/static/audit.css`; `style.css` and `session.css` are removed).
+
+| page | by default | on a click |
+|---|---|---|
+| Session (`session.html`) | top line: graph, nodes, links, steps reused of total, time not recomputed. Per turn: question, answer, "Verified, 1 check passed, 2 steps reused, 1 run in 40 ms" | **Details** on a turn: how the question was read (intent, turn built on, reading, what "them" was taken to be), explanation, plan drawing with reused and executed steps, checks, conventions, the two readings that were offered, and the links to the other reading, the plan editor, the step record and the generated code. **Session details** on the top line: graph picker, attributes, full running totals, recorded session, audit record, model, and "Open all details" for presenting |
+| Single question (`index.html`) | one-line graph summary, question box with example questions, answer, "Verified, 2 checks passed, 5.8 s" | **Show how this was computed**: explanation, answers under other readings, interpretation, plan, checks, cost, graph drawing. **Change graph, or see its profile**: file list, upload, profile card. **Options**: executor, model, description |
+| Side by side (`compare.html`) | per turn and system: verdict and answer; for a stale or wrong answer the reason and the correct answer | **Details** on a turn: compute time, model calls, steps, and the line of the agent's own code behind a stale answer, with its whole script |
+
+**Removed or changed, on purpose.**
+- Session page: the side rail and the outcome pill on every turn ("Computed", "Partial reuse"). A label on the turn remains only for: needs your choice, answered by code, not supported, not confirmed, error.
+- Single-question page: the four-step ribbon (its text is in "How it works"); the help dialog no longer opens by itself on a first visit; the plan drawing lost its per-type colours and matches the session page; the page now links to the other two views.
+- The "Scope ambiguity" rule is not repeated as a warning once the reading has been chosen; it stays in the details.
+- The model menu defaults to Haiku on both pages (it was Opus, while the server's default was Haiku).
+- One line of recorded narration said "the ledger on the left"; it now says "the session details" (`demo/signature.json`, `demo/sessions/pokec.json`).
+
+**Design rules used.** The Hallmark skill (github.com/nutlope/hallmark, cloned and read, its rules for app screens followed): every colour and face through a token; no labels in capitals; no strings joined by middle dots; no box inside a box; one spacing scale of 4 px; the teal kept for the Ask button, the current view and state; focus rings, reduced motion, phone width. Its static lint reports 0 failures on the three pages; the remaining warnings are straight quotes and one repeated box recipe. Its browser-render check was not run (it needs Puppeteer).
+
+**Checked.**
+- On recorded data, in the browser: the Pokec session (9 steps), the side-by-side record (10 turns), six recorded scenes on the single-question page; light and dark; phone width (375 px) with no sideways overflow; the step record, generated-code and audit dialogs.
+- Live, job 310334 on itiger10, Haiku, over an SSH tunnel: the seven-turn Pokec session gave the recorded outcomes (computed, two partial reuses, the data change noticed, two readings then B, answer by code; 4 of 22 steps reused, 8.0 s not recomputed); two single questions on the trust graph (typed plan 5.8 s, verified; code generation 5.6 s, not verified); the side-by-side page from `/api/compare`. No console errors.
+- Not tried live: "Show reading A instead", the plan editor, the tool-agent executor, file upload. Not rechecked after the change: the Haiku default (a reorder of two menu options).
+
+**Where to open it.** Recorded data, no server: serve `prototype/demo` with any static file server and open `static/session.html` and `static/compare.html`; `dist/index.html` (built by `demo/build_static.py`, which needs the project's Python environment) is the single-question page with the recorded scenes inlined. Live: `sbatch slurm/demo_server.sbatch`, then the tunnel printed in that script's header.
+
+Open: whether the explanation should be visible by default on the single-question page (it is in the details now); which reading stays in force after "Show reading A instead" (section 7, notes on the live run); a recorded "Not supported" and "Not confirmed" example; the booth offline test with the fonts (the pages load IBM Plex from Google Fonts and fall back to system faces without a network).
+
 ## 4. Where things run
 
 **No experiment runs on a laptop. Every experiment and every large-graph load goes to a remote server.**
@@ -990,7 +1021,7 @@ Seen in the live run: "Show reading A instead" makes A the reading in force for 
 
 **Side by side with the stateful agent, built 2026-11-25.** Page `demo/static/compare.html` (third tab of the header), data `demo/compare/refresh.json`, built by `demo/make_compare.py` from two stored runs of the practice session `pokec/refresh` and calling no model: stateful agent `runs/practice/claude-haiku-5-5/codegen_stateful-cache/rep1` (job 307147) and GraphAudit `full-cache-replay/rep1` (job 307150), both Haiku, commit 20e1e0a. One row per turn, the two answers next to each other, each with the harness's verdict (correct / stale / wrong), compute time and model calls; the file change is a card between turns 4 and 5; ids that differ from the correct list are marked and the correct answer is printed under the row when either side is wrong. For the agent the row quotes the line of its own code that decides the reuse (turn 5: "# Reuse the PageRank vector from turn 2 if it is still in the session; otherwise recompute it.") and opens the whole script; for GraphAudit it says what was reused and that the change was noticed. Totals of this run: agent 5 of 10 correct, 3 stale, 2 more wrong after the change, 19 s compute, $0.006; GraphAudit 10 of 10, 0 stale, 48 s compute with loading (29 s of it), $0.005. The page says it is one run on Haiku and that the agent's result depends on the model and on the warning (3.14: the warned agent on Opus was right on every turn). Checked in the browser, light and dark, and at phone width. The server serves the record at `/api/compare`; that route was checked by calling the handler, not through a running server.
 
-Not done: recordings of the dashboard session and of GraphAudit's refresh session in the session page (the side-by-side covers refresh); the single-question page is unchanged and has no link to the other two pages; the GraphAudit run in the side-by-side predates the code fallback and the convention note (neither applies to these ten questions).
+Not done: recordings of the dashboard session and of GraphAudit's refresh session in the session page (the side-by-side covers refresh); the single-question page was unchanged and had no link to the other two pages (both done 2026-11-26, section 3.22); the GraphAudit run in the side-by-side predates the code fallback and the convention note (neither applies to these ten questions).
 
 ### Booth extras, visitor-driven
 
@@ -1143,6 +1174,7 @@ For every question from G6: (a) can a gold plan be written with the operators (5
 | item | by |
 |---|---|
 | Fix the script of the signature session to what the numbers support: reuse, the two-contract moment, a data change caught, the cost ledger (fees, cache, replay, compute) | Dec 8 |
+| UI simplified to "answer first, details on request" on all three pages (3.22) | done Nov 26 |
 | UI: cost ledger with cached and replayed turns; `plan_replayed`, `data_changed`, `unsupported` and `earlier_turn_unanswered` shown in the timeline; side-by-side with the stateful agent on the refresh session | Dec 20 (freeze) |
 | Recorded sessions for the booth with no network: Pokec signature, refresh, dashboard | Dec 22 |
 | Paper: full draft from 3.9–3.15 with every number as a range | Dec 27 |

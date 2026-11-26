@@ -24,6 +24,8 @@ for name, card in cards.items():
 data = f"<script>window.T2A_STATIC=true;window.T2A_SCENES={json.dumps(scenes, default=str)};window.T2A_DATASETS={json.dumps(datasets, default=str)};</script>"
 html = html.replace('<link rel="stylesheet" href="audit.css">', f"<style>\n{css}\n</style>")
 html = html.replace('<script src="app.js"></script>', data + f"<script>\n{js}\n</script>")
+for page in ("session.html", "compare.html"):                 # the other two views live in ../static
+    html = html.replace(f'href="{page}"', f'href="../static/{page}"')
 os.makedirs(os.path.join(HERE, "dist"), exist_ok=True)
 out = os.path.join(HERE, "dist", "index.html")
 open(out, "w").write(html)
