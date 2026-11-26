@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- Title, architecture and closing cards of the video. cards.html?card=title | arch | end -->
+<meta charset="utf-8">
+<title>GraphAudit video card</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f6f4ee; color: #1c1b18; font-family: "IBM Plex Sans", system-ui, -apple-system, "Helvetica Neue", sans-serif; }
+  .card { height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 90px; box-sizing: border-box; }
+  .card.on { display: flex; }
+  h1 { font-size: 64px; margin: 0 0 14px; letter-spacing: -0.5px; color: #1f5f5b; }
+  h2 { font-size: 30px; font-weight: 500; margin: 0 0 30px; }
+  p { font-size: 22px; margin: 6px 0; color: #55524a; }
+  img { max-width: 1040px; width: 100%; background: #fff; border: 1px solid #ddd8cb; border-radius: 10px; padding: 22px; box-sizing: border-box; }
+  .small { font-size: 18px; }
+</style>
+<div class="card" id="title">
+  <h1>GraphAudit</h1>
+  <h2>Verifiable Conversational Graph Analytics with Computation Reuse</h2>
+  <p>Xiaofei Zhang, University of Memphis</p>
+  <p class="small">SIGMOD 2027 demonstration</p>
+</div>
+<div class="card" id="arch"><img src="fig1.png" alt="Architecture of GraphAudit"></div>
+<div class="card" id="end">
+  <h1>GraphAudit</h1>
+  <h2>What was assumed, what was reused, and what was not checked<br>is on screen for every answer.</h2>
+  <p class="small">The session in this video is recorded on the Pokec social network (SNAP), with Claude Haiku 5.5 as the planner.</p>
+</div>
+<script>
+  document.getElementById(new URLSearchParams(location.search).get("card") || "title").classList.add("on");
+</script>

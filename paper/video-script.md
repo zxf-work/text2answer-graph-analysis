@@ -104,7 +104,18 @@ What to do by hand while recording:
 - **Tunnel:** a direct jump to the compute node failed on host-key checking from this Mac; the two-step form worked: `ssh -L 8772:localhost:18765 <login node> 'ssh -N -L 18765:localhost:8765 <compute node>'`.
 - **Pronunciation:** "Pokec" is Slovak, roughly "POH-kets". The region in step 6 need not be read aloud.
 
-## Recording and editing
+## Automated recording (2026-11-26)
+
+`video/graphaudit-demo.mp4` (4:03, 1920 × 1080, H.264, no sound, captions drawn in a band under the picture) was made without a person at the screen:
+
+- `video/record.mjs` drives the demo pages in headless Chrome, with a drawn cursor, and stores the screen as timed frames with the caption for each moment. The scenes and captions are in that file; they follow the narration above, cut into shorter pieces. The pages are shown at 150% zoom of a 1280 × 630 window.
+- `video/compose.mjs` plays the frames onto a canvas in a second headless Chrome and encodes them with the browser's own recorder; no encoder is installed on the machine.
+- The live scene ran against the server on the cluster; 88 s of waiting (session start, two questions, the file change) are cut and the caption band says so. The other scenes are labelled "recorded session" and "stored runs".
+- Two clicks are sent to the button directly instead of through the simulated mouse (closing a dialog, and a button lying under the docked question box); the cursor is drawn on the button in both cases.
+
+To make it again: serve `prototype/demo` on port 8771, start the demo server and its tunnel for the live scene, then `node video/record.mjs <dir> --live http://localhost:8772` and `node video/compose.mjs <dir> video/graphaudit-demo`. Without `--live` the live scene is left out.
+
+## Recording and editing by hand (alternative)
 
 1. Record each scene as its own take, in order, with a second of stillness at each end.
 2. Record the narration separately, one block per scene, then fit the picture to the voice: speed up waits, never the reading time of an answer.
