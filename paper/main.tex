@@ -209,85 +209,88 @@ weights are inferred.
 \section{Evidence}
 \label{sec:evidence}
 
-All runs were made on a university cluster with Claude Haiku 5.5 and Opus 5.5. Baselines are three code
-agents of our own, given the same file facts (\emph{stateful}: one Python process per session;
-\emph{warned}: the same plus one sentence that the file may change; \emph{independent}: a fresh script per
-turn), and two outside systems: the LangGraph CodeAct agent~\cite{codeact}, and
-GraphTeam~\cite{graphteam} with its published phases, prompts and knowledge base; we supplied the model
-client, the sandbox (a script, not its container) and the search embeddings (an open model), and gave
-each turn the earlier questions with its own answers.
+Runs used Claude Haiku 5.5 and Opus 5.5. Baselines: three code
+agents of ours, given the same file facts (\emph{stateful}: one Python process per session;
+\emph{warned}: told that the file may change; \emph{independent}: a fresh script per
+turn), and two others: the LangGraph CodeAct agent~\cite{codeact}, plain and warned, and
+GraphTeam~\cite{graphteam} with its published prompts and knowledge base; we supplied the model
+client, the sandbox (a script, no container) and the search embeddings (an open model), and gave
+each turn the earlier questions and its answers.
 
-\textbf{Key ingredients.} In 246 templated fault scenarios and 201 valid-reuse scenarios over nine graphs,
-with no model involved, the full key served no wrong value and reused all 390 valid steps. Removing any one
-ingredient admitted wrong values (from 12 without the node table to 117 without input lineage). These
-counts show coverage of fault classes, not rates in real use.
+\textbf{Key ingredients.} In 246 templated fault scenarios and 201 valid-reuse scenarios on nine graphs,
+with no model, the full key served no wrong value and reused all 390 valid steps; removing any one
+ingredient admitted 12 (node table) to 117 (input lineage) wrong values. These are fault classes
+covered, not rates in real use.
 
-\begin{table}[t]
-\caption{Sessions with reuse traps: correct turns, with stale answers in brackets; ranges over repeated
-runs. E2b: 22 templated sessions, 47 traps, on three regional subgraphs of Pokec and two small graphs.
-E4: an 8-turn session on each of Pokec, LiveJournal and Orkut, 6 traps. Runs per cell: E2b 5
-(Haiku) and 3 (Opus); E4 4 to 6 (Haiku) and 3 (Opus); CodeAct 3 (Haiku) and 1 (Opus); GraphTeam 3.}
+\begin{table*}[t]
+\caption{Sessions with reuse traps. Correct turns [stale answers] are ranges over runs; the rest are
+means: \emph{time} in seconds outside the model, with loading; \emph{tokens} in millions, in and out;
+model \emph{fees} in cents (Haiku) or dollars (Opus). E2b: 22 sessions on three Pokec regions and two small
+graphs. E4: 8-turn sessions on Pokec, LiveJournal and Orkut. P: four sessions on Pokec, with prompt
+caching (\sys{} and our agents only) and plan replay. Traps: 47, 6, 6. Runs: 3 to 6; CodeAct on Opus 1.}
 \label{tab:traps}
-\small
-\setlength{\tabcolsep}{2.6pt}
-\begin{tabular}{@{}lcccc@{}}
+\footnotesize
+\renewcommand{\arraystretch}{0.88}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}ll crrr crrr crrr@{}}
 \toprule
- & \multicolumn{2}{c}{E2b (122 turns)} & \multicolumn{2}{c}{E4 (24 turns)} \\
-\cmidrule(lr){2-3}\cmidrule(l){4-5}
-System & Haiku & Opus & Haiku & Opus \\
+ & & \multicolumn{4}{c}{E2b (122 turns)} & \multicolumn{4}{c}{E4 (24 turns)} & \multicolumn{4}{c}{P (43 turns)} \\
+\cmidrule(lr){3-6}\cmidrule(lr){7-10}\cmidrule(l){11-14}
+Model & System & Correct & Time & Tokens & Fees & Correct & Time & Tokens & Fees & Correct & Time & Tokens & Fees \\
 \midrule
-\sys{}            & 122 [0]         & 122 [0]       & 24 [0]       & 24 [0] \\
-Stateful agent    & 107--118 [2--6] & 114--117 [5--6] & 13 [5--6]  & 13 [6] \\
-Warned agent      & 114--120 [0--1] & 121--122 [0]  & 12--15 [5--6] & 24 [0] \\
-Independent agent & 111--122 [0]    & 121--122 [0]  & 23--24 [0]   & 24 [0] \\
-CodeAct           & 103--114 [1--4] & 108 [5]       & 13--14 [6]   & not run \\
-CodeAct, warned   & 111--117 [0--2] & 109 [0]       & 15--20 [2--6] & not run \\
-GraphTeam         & 81--85 [0--2]   & not run       & not run      & not run \\
+Haiku & \sys{}            & 122 [0]         & 331  & 1.16 & 15.6 & 24 [0]        & 257  & 0.22 & 2.9 & 42 [0]        & 188 & 0.33 & 2.0 \\
+ & Stateful agent    & 107--118 [2--6] & 388  & 0.59 & 10.8 & 13 [5--6]     & 332  & 0.15 & 2.5 & 29--30 [5--6] & 147 & 0.31 & 2.6 \\
+ & Warned agent      & 114--120 [0--1] & 366  & 0.63 & 11.6 & 12--15 [5--6] & 459  & 0.18 & 3.2 & 33--40 [2--5] & 361 & 0.36 & 3.2 \\
+ & Independent agent & 111--122 [0]    & 407  & 0.62 & 11.7 & 23--24 [0]    & 1318 & 0.17 & 3.1 & 43 [0]        & 659 & 0.36 & 3.3 \\
+ & CodeAct           & 103--114 [1--4] & 386  & 1.14 & 16.2 & 13--14 [6]    & 381  & 0.23 & 3.1 & 30--33 [5--6] & 247 & 0.37 & 4.6 \\
+ & CodeAct, warned   & 111--117 [0--2] & 429  & 1.34 & 19.2 & 15--20 [2--6] & 504  & 0.30 & 4.1 & 41--42 [1]    & 741 & 0.61 & 7.7 \\
+ & GraphTeam         & 81--85 [0--2]   & 1091 & 1.40 & 37.2 & --            & --   & --   & --  & --            & --  & --   & --  \\
+\midrule
+Opus & \sys{}            & 122 [0]         & 324  & 1.14 & 5.86 & 24 [0]        & 239  & 0.22 & 1.10 & 43 [0]       & 183 & 0.40 & 0.67 \\
+ & Stateful agent    & 114--117 [5--6] & 191  & 0.40 & 2.33 & 13 [6]        & 396  & 0.11 & 0.59 & 33--41 [2--5] & 156 & 0.23 & 0.51 \\
+ & Warned agent      & 121--122 [0]    & 295  & 0.49 & 3.10 & 24 [0]        & 741  & 0.14 & 0.88 & 43 [0]       & 355 & 0.30 & 0.85 \\
+ & Independent agent & 121--122 [0]    & 677  & 0.53 & 3.43 & 24 [0]        & 1720 & 0.17 & 1.08 & 43 [0]       & 958 & 0.34 & 0.97 \\
+ & CodeAct           & 108 [5]         & 174  & 0.99 & 5.84 & --            & --   & --   & --   & --           & --  & --   & --   \\
+ & CodeAct, warned   & 109 [0]         & 259  & 1.09 & 5.87 & --            & --   & --   & --   & --           & --  & --   & --   \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
-\textbf{Stale answers.} Table~\ref{tab:traps} gives the two session benchmarks we wrote to contain turns
-where an earlier result looks reusable and is not. \sys{} is correct on every turn of every run on both
-models. The unwarned stateful agent is stale in every run on both models, and the framework agent behaves
-like ours: with Opus it is still stale on 5 turns, and on none when warned. In a single run per model broken down by trap class, stale answers occurred only when the data
-change was unannounced; where the user said what changed, no agent was stale. The warning is the important
-row: with Opus the warned agent matches \sys{}'s answers, at 5 to 7 times the compute on the large graphs
-(590--874 s against 118--122 s), and with Haiku it is still stale on 5 or 6 of the 6 large-graph traps. So
-the result is not that agents cannot get this right. \sys{} gets it right by construction and with the
-small model; an agent did so only with the large model, a warning and recomputation. With prompt caching on
-both sides model fees are about equal, and we claim no fee advantage. GraphTeam keeps
-nothing between turns and is almost never stale (2 answers in one of three runs), at about 900 s of
-compute and twice \sys{}'s fees. Its 37--41 wrong answers are all on the Pokec subgraphs and mostly
-rankings: its code usually calls NetworkX PageRank, whose default stopping rule is loose at this size (12
-of 91 such turns correct, against 46 of 48 with igraph). That is a library default, not a session effect.
+\textbf{Sessions with reuse traps.} Table~\ref{tab:traps} compares the systems on three sets of sessions
+with reuse traps.
+\emph{Accuracy.} \sys{} is never stale, and it alone is correct on every turn of E2b and E4 in every run
+(in P, Haiku misreads one ``them'' in each run). Agents that keep their variables are stale in every run
+with both models, and the framework agent behaves like ours. A warning removes this with Opus only. So
+agents can avoid stale answers, with the large model and a warning or by recomputing everything; \sys{}
+does so by construction, with the small model.
+\emph{Time.} Most of \sys{}'s time is one load and profile per session. On the large graphs it needs a
+third of the warned Opus agent's time and a fifth to a seventh of the independent agent's. On the small
+graphs of E2b loading dominates, and most Opus agents finish sooner.
+\emph{Tokens and fees.} \sys{} sends its operator catalogue with every question, so without caching it
+reads up to twice the tokens of our agents and costs more on E2b: as much as CodeAct, under half
+of GraphTeam. With caching on both sides (P) fees are about equal (Opus: \$0.80 without plan replay), and
+we claim no advantage.
+\emph{GraphTeam} keeps nothing and is rarely stale. Its errors are mostly rankings on the Pokec regions: it usually
+calls NetworkX PageRank, whose default stopping rule is loose at this size (12 of 91 turns correct; 46 of
+48 with igraph): a library default, not a session effect.
 
 \textbf{Coverage on questions we did not write.} Two writer models (Opus 5.5, Qwen3-14B), told nothing about
-the system, wrote 429 conversational questions on three graphs. With the fallback on, over three runs \sys{}
-on Haiku answered 399--406 (13--15 by code), withheld 11--12 as not confirmed, declined 1--3 and ended 4--7
-in an error. An Opus judge found 316--317 answers (74\%) the same as those of an independent Opus script
-agent, 8--11 incomplete and 72--82 different; of the latter, 39--42 equal a variant that the reference
-script itself prints (such as ``self-loops excluded''), which leaves 33--43. We also restated the task types of
+the system, wrote 429 conversational questions on three graphs; we restated the task types of
 GraphArena~\cite{grapharena}, NLGraph~\cite{nlgraph} and the benchmarks GraphTeam is evaluated on as 101
-stand-alone questions. In the one run made before anything was changed, without the fallback, \sys{}
-answered 63, declined 38 with the reason (among them all six NP-complete GraphArena tasks) and matched the
-reference on 52. After an operator fix and with the fallback, over three runs it answered 95--100 and
-matched on 87--93, with 3--5 different (1 a printed variant); of the answers by code, 28--35 matched and 1--2 differed. The
-reference is itself a model, so ``different'' means disagreement with it, not an error. The disagreement
-is largely stable: 57 written and 3 published questions differ in all three runs (290 and 81 are the same
-in all three). One reader labelled these 60 by hand. In 35 our value is the one the reference script itself prints for ``self-loops
-excluded'', the convention \sys{} states with the answer; 5 match another reading the reference lists; 11
-turn on a choice the question leaves open, a randomised algorithm or the cut of a list. \sys{} is wrong in 8 and the reference in 1. None of the 8 errors was flagged by any check;
-three share one cause, a ``them'' resolved to the previous answer instead of the group named.
-Questions that differ in only one or two runs are not labelled.
+stand-alone questions. Over three runs on Haiku, \sys{} answered 399--406 and 95--100. An Opus judge
+found 316--317 and 87--93 answers the same as an independent Opus script agent's; another 39--42
+written answers equal a variant that script itself prints (such as ``self-loops excluded''), which leaves
+33--43 and 2--4 different. Before an operator fix and the fallback, \sys{} answered 63 of the published
+questions and declined the rest, among them all six NP-complete GraphArena tasks. The
+reference is itself a model, so ``different'' is disagreement, not error; one reader labelled the 60
+questions that differ in all three runs. 40 follow a convention or reading the reference lists, 11 turn on
+an open choice or a randomised algorithm, \sys{} is wrong in 8 and the reference in 1. No check flagged the
+8 errors; three share one cause, a misread ``them''.
 
-\textbf{Errors that passed every check.} Reading results by hand found error classes no check caught. On a
-directed graph, ``ignoring direction'' was planned so that a pair linked both ways counted twice (fixed with
-a new operator). Of 47 confirmed code answers,
-41 equalled the reference and 2 were wrong, both because the shared task statement changed the question;
-the instruction was tightened, but the statement remains the weak point of the fallback. Which earlier
-result ``again'' refers to is not covered by any rule. Advisory notes written from such errors are shown with an answer; they flagged 1 of the 232 differing
-written answers and we claim nothing for them.
+\textbf{Errors that passed every check.} Reading results by hand found errors no check caught. On a
+directed graph, a plan for ``ignoring direction'' counted a pair linked both ways twice. Of 47 confirmed
+code answers, 2 were wrong because the shared task statement changed the question; that statement is the
+weak point of the fallback. No rule covers what ``again'' refers to.
 
 \section{Related Work}
 
