@@ -118,13 +118,12 @@ were only appended, it adds them instead of reloading.
 
 \textbf{Session state and clarification.} The planner never sees the chat history or raw values. It sees
 the accepted reading, earlier plans with the sizes of their results, the selection that ``them'' refers to,
-and standing settings such as ``use damping 0.9 from now on''. Each turn it returns a complete plan and
-repeats earlier steps where it needs them. The engine recognises a repeated step by its key. So the
+and standing settings such as ``use damping 0.9 from now on''. Each turn it returns a complete plan, repeating earlier steps as needed. The engine recognises a repeated step by its key. So the
 engine, not the model, decides whether a turn reuses everything, reuses a part, recomputes, or needs a
 clarification. Some operators give a different result on a group than on the whole graph. When a plan
 restricts such an operator to a group, the engine rewrites the plan into the other reading and shows both.
 Each reading states what will be computed and what would be reused. Nothing runs
-until the user chooses. The choice is carried to later turns and stated there.
+until the user chooses. The choice carries over to later turns.
 
 \textbf{Replay and prompt caching.} When a question is repeated word for word, its earlier plan runs again
 without a call to the planner. This is allowed only if that plan referred to no earlier turn and no setting, and left no reading
@@ -154,7 +153,7 @@ show as 4 and 5.}
 \label{sec:demo}
 
 The demonstration uses the Pokec social network from SNAP~\cite{snap} with its profile table: 1,632,803
-users, 30,622,564 directed friendship links, and attributes such as region, age and gender.
+users, 30,622,564 directed friendship links, and attributes such as region, age and gender. Every part of it is implemented.
 
 \textbf{A scripted session.} Seven steps, playable live or from a recording (Figure~\ref{fig:session}).
 \emph{(1)} ``Who are the 10 most influential users?'' The answer comes with the plan, the way the file was
@@ -172,9 +171,9 @@ top-10 lists share 4 users.
 friends?'' The catalogue has no operator for this and says so. Four checked steps prepare the 20-user
 subgraph, two functions agree on a group of 5, and the answer is marked as an answer by code. The task
 statement and both functions are one click away.
-Two views close the session. The \emph{ledger} is the bill: in the recording, 6 steps reused and 20
+The \emph{ledger} is the bill: in the recording, 6 steps reused and 20
 executed, 1 turn replayed, and 15 model calls for about one cent on Claude Haiku 5.5. The \emph{audit
-record} is the full trace: every plan, every reuse decision with its key, and every finding.
+record} is the trace: every plan, every reuse decision with its key, and every finding.
 
 \textbf{The live path.} Against a server that holds the graph, visitors type their own questions or pick
 those of the script. A button labelled ``Change the data file'' appends rows on disk and tells the session
@@ -192,10 +191,9 @@ the browser with no server and no model.
 
 \textbf{Side by side with a code agent.} A separate page (Figure~\ref{fig:compare}) replays one stored run
 of each system on another session of ten questions, during which 27,466 links are appended. Each row shows both answers, whether each is correct, stale or wrong
-for another reason, the compute time and the model calls. For the agent, the page quotes the line of its
-own code that decides the reuse. In this run, on Haiku, the agent is correct on 5 of 10 turns, stale on 3
+for another reason, the compute time and the model calls. It quotes the line of the agent's code that decides the reuse. In this run, on Haiku, the agent is correct on 5 of 10 turns, stale on 3
 and wrong on 2 more; \sys{} is correct on all 10.  The page says that this is one run and that the
-result depends on the model: with Claude Opus 5.5 and a warning that the file may change, the agent was
+result depends on the model: on Claude Opus 5.5 with a warning, the agent was
 right on every turn in three runs.
 
 \textbf{What attendees do.} They ask Pokec their own questions, press the data-change button when they
@@ -226,10 +224,10 @@ runs its code, and the embeddings for its search. It answers single questions, s
 earlier questions and its answers.
 
 \begin{table*}[t]
-\caption{Sessions with traps. \emph{Correct}: correct turns [stale turns], lowest to highest over runs. The other columns are totals for the whole set, as means over runs. \emph{Time}: seconds of computing, loading included, model calls excluded.
-\emph{Tokens}: millions, input plus output. \emph{Fees}: model fees in US dollars. The long sessions use
-prompt caching (not for CodeAct) and plan replay. Runs per cell: 3 to 6; CodeAct on Opus: 1. A
-dash means not run.}
+\caption{Sessions with traps. \emph{Correct}: correct turns [stale turns], as a range over runs.
+The other columns are per turn, as means over runs. \emph{Time}: seconds of computing, with loading, without model calls. \emph{Tokens}: thousands, input plus output. \emph{Fees}: US cents. The
+long sessions use prompt caching (not for CodeAct) and plan replay. Runs per cell: 3 to 6; CodeAct on
+Opus: 1.}
 \label{tab:traps}
 \footnotesize
 \renewcommand{\arraystretch}{0.88}
@@ -240,20 +238,20 @@ dash means not run.}
 \cmidrule(lr){3-6}\cmidrule(lr){7-10}\cmidrule(l){11-14}
 Model & System & Correct & Time & Tokens & Fees & Correct & Time & Tokens & Fees & Correct & Time & Tokens & Fees \\
 \midrule
-Haiku & \sys{}            & 122 [0]         & 331  & 1.16 & 0.156 & 24 [0]        & 257  & 0.22 & 0.029 & 42 [0]        & 188 & 0.33 & 0.020 \\
- & Stateful agent    & 107--118 [2--6] & 388  & 0.59 & 0.108 & 13 [5--6]     & 332  & 0.15 & 0.025 & 29--30 [5--6] & 147 & 0.31 & 0.026 \\
- & Warned agent      & 114--120 [0--1] & 366  & 0.63 & 0.116 & 12--15 [5--6] & 459  & 0.18 & 0.032 & 33--40 [2--5] & 361 & 0.36 & 0.032 \\
- & Independent agent & 111--122 [0]    & 407  & 0.62 & 0.117 & 23--24 [0]    & 1318 & 0.17 & 0.031 & 43 [0]        & 659 & 0.36 & 0.033 \\
- & CodeAct           & 103--114 [1--4] & 386  & 1.14 & 0.162 & 13--14 [6]    & 381  & 0.23 & 0.031 & 30--33 [5--6] & 247 & 0.37 & 0.046 \\
- & CodeAct, warned   & 111--117 [0--2] & 429  & 1.34 & 0.192 & 15--20 [2--6] & 504  & 0.30 & 0.041 & 41--42 [1]    & 741 & 0.61 & 0.077 \\
- & GraphTeam         & 81--85 [0--2]   & 1091 & 1.40 & 0.372 & --            & --   & --   & --  & --            & --  & --   & --  \\
+Haiku & \sys{} & 122 [0] & 2.7 & 9.5 & 0.13 & 24 [0] & 10.7 & 9.3 & 0.12 & 42 [0] & 4.4 & 7.7 & 0.05 \\
+ & Stateful agent & 107--118 [2--6] & 3.2 & 4.8 & 0.09 & 13 [5--6] & 13.8 & 6.2 & 0.10 & 29--30 [5--6] & 3.4 & 7.2 & 0.06 \\
+ & Warned agent & 114--120 [0--1] & 3.0 & 5.2 & 0.10 & 12--15 [5--6] & 19.1 & 7.6 & 0.13 & 33--40 [2--5] & 8.4 & 8.3 & 0.07 \\
+ & Independent agent & 111--122 [0] & 3.3 & 5.1 & 0.10 & 23--24 [0] & 54.9 & 7.2 & 0.13 & 43 [0] & 15.3 & 8.5 & 0.08 \\
+ & CodeAct & 103--114 [1--4] & 3.2 & 9.3 & 0.13 & 13--14 [6] & 15.9 & 9.4 & 0.13 & 30--33 [5--6] & 5.7 & 8.5 & 0.11 \\
+ & CodeAct, warned & 111--117 [0--2] & 3.5 & 11.0 & 0.16 & 15--20 [2--6] & 21.0 & 12.5 & 0.17 & 41--42 [1] & 17.2 & 14.2 & 0.18 \\
+ & GraphTeam & 81--85 [0--2] & 8.9 & 11.5 & 0.31 & --            & --   & --   & --   & --            & --   & --   & --   \\
 \midrule
-Opus & \sys{}            & 122 [0]         & 324  & 1.14 & 5.86 & 24 [0]        & 239  & 0.22 & 1.10 & 43 [0]       & 183 & 0.40 & 0.67 \\
- & Stateful agent    & 114--117 [5--6] & 191  & 0.40 & 2.33 & 13 [6]        & 396  & 0.11 & 0.59 & 33--41 [2--5] & 156 & 0.23 & 0.51 \\
- & Warned agent      & 121--122 [0]    & 295  & 0.49 & 3.10 & 24 [0]        & 741  & 0.14 & 0.88 & 43 [0]       & 355 & 0.30 & 0.85 \\
- & Independent agent & 121--122 [0]    & 677  & 0.53 & 3.43 & 24 [0]        & 1720 & 0.17 & 1.08 & 43 [0]       & 958 & 0.34 & 0.97 \\
- & CodeAct           & 108 [5]         & 174  & 0.99 & 5.84 & --            & --   & --   & --   & --           & --  & --   & --   \\
- & CodeAct, warned   & 109 [0]         & 259  & 1.09 & 5.87 & --            & --   & --   & --   & --           & --  & --   & --   \\
+Opus & \sys{} & 122 [0] & 2.7 & 9.3 & 4.8 & 24 [0] & 10.0 & 9.1 & 4.6 & 43 [0] & 4.3 & 9.4 & 1.6 \\
+ & Stateful agent & 114--117 [5--6] & 1.6 & 3.3 & 1.9 & 13 [6] & 16.5 & 4.6 & 2.5 & 33--41 [2--5] & 3.6 & 5.3 & 1.2 \\
+ & Warned agent & 121--122 [0] & 2.4 & 4.0 & 2.5 & 24 [0] & 30.9 & 6.0 & 3.7 & 43 [0] & 8.3 & 7.1 & 2.0 \\
+ & Independent agent & 121--122 [0] & 5.5 & 4.3 & 2.8 & 24 [0] & 71.7 & 7.0 & 4.5 & 43 [0] & 22.3 & 7.8 & 2.3 \\
+ & CodeAct & 108 [5] & 1.4 & 8.1 & 4.8 & --            & --   & --   & --   & --            & --   & --   & --   \\
+ & CodeAct, warned & 109 [0] & 2.1 & 9.0 & 4.8 & --            & --   & --   & --   & --            & --   & --   & --   \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -266,20 +264,20 @@ So an agent can avoid stale answers: with the large model and a warning, or by r
 \sys{} avoids them by construction, with the small model.
 \emph{Time.} \sys{} loads and profiles the graph once per session, and that is most of its time. On the
 large graphs it needs a third of the time of the warned Opus agent, and a fifth to a seventh of the time
-of the independent agent. On the short sessions loading dominates, and most Opus agents finish sooner.
-\emph{Tokens and fees.} \sys{} sends its catalogue with every question. Without caching it reads up to
+of the independent agent. On the short sessions loading dominates, and most Opus agents are faster.
+\emph{Tokens and fees.} The model never sees the graph, so graph size shows in the time per turn and not
+in the fees. \sys{} sends its catalogue with every question. Without caching it reads up to
 three times the tokens of our agents, and on the short sessions it costs up to 2.5 times as much: the same
 as CodeAct and, on Haiku, under half of GraphTeam. With caching (the long sessions), its fees are close to those of
-our agents. That fee includes replay; without it, Opus costs \$0.80. We claim no advantage
+our agents. That fee includes replay; without it, a turn on Opus costs 1.9 cents. We claim no advantage
 in fees.
 \emph{GraphTeam.} It keeps nothing between turns and is rarely stale. Its errors are mostly rankings on
 the Pokec regions. Its code usually calls NetworkX PageRank, whose default stopping rule is loose at this
 size: 12 of 91 such turns are correct, against 46 of 48 when it uses igraph. This is a library default,
 not a session effect.
 
-\textbf{Questions we did not write.} We tested coverage on two sets. For the first, two models (Opus 5.5
-and Qwen3-14B) that were told nothing about \sys{} wrote 429 conversational questions on three graphs. For
-the second, we restated the task types of GraphArena~\cite{grapharena}, NLGraph~\cite{nlgraph} and the
+\textbf{Questions we did not write.} For a first set, two models (Opus 5.5
+and Qwen3-14B) that were told nothing about \sys{} wrote 429 conversational questions on three graphs. For a second, we restated the task types of GraphArena~\cite{grapharena}, NLGraph~\cite{nlgraph} and the
 benchmarks used for GraphTeam as 101 stand-alone questions. The reference is an independent agent on Opus
 that writes one script per question, and an Opus judge compares the answers. The reference is itself a
 model, so a difference is a disagreement, not an error. \sys{} ran three times on Haiku. Of the 429
@@ -309,12 +307,15 @@ Conversational text-to-SQL (SParC~\cite{sparc}, CoSQL~\cite{cosql}) translates e
 database and does not ask when an earlier result may stand in for a new computation. Helix~\cite{helix} reuses intermediate results across iterations of a machine-learning workflow, or
 recomputes them when that is cheaper; the workflow there is a program, not a conversation.
 
-\section{Status}
+\section{Conclusion}
 
-\textbf{Implemented and shown:} everything described above, including the live session, the data-change
-button, the fallback and the side-by-side page. \textbf{Planned before the conference:} recordings of
-further sessions; a second annotator for the hand labels, and labels for the answers that differ in only some
-runs; a check on what ``them'' refers to; showing the user the task statement of an answer by code before it runs; and GraphTeam on the large model.
+\sys{} lets an analyst hold a conversation with a large graph without an answer resting on an outdated
+result. Code agents leave the reuse of earlier results to the model, which cannot tell when its variables
+have expired. \sys{} decides reuse by a key over the data, the reading and the inputs. It therefore
+notices a changed file or a changed reading without being told, and it shows both readings of an ambiguous
+request before anything runs. In our sessions it gave no stale answer, even with a small model, while the
+stateful agent gave one in every run. At the conference, attendees change the data themselves and watch
+both kinds of system answer the same question on a graph with 30 million links.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
