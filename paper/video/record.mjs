@@ -124,40 +124,40 @@ const scenes = {
   async title() {
     tag = "";
     await goto(`file://${HERE}/cards.html?card=title`, false);
-    await beat("An assistant that answers questions about a graph usually keeps state between questions. That is where a session can go wrong without any sign of it.");
-    await beat("The data file grows, or the follow-up reads the graph differently, and an old result is used again.");
-    await beat("GraphAudit puts a typed plan between the question and the computation. The model writes the plan; the engine owns the loading, the result store and every check.", () => goto(`file://${HERE}/cards.html?card=arch`, false), 1.5);
+    await beat("When you ask an assistant about a graph, it keeps things in memory between questions. And that's where a session can quietly go wrong.");
+    await beat("Maybe the data file grew, or the follow-up means something different, and an old result still gets used.");
+    await beat("So GraphAudit puts a typed plan between your question and the computation. The model only writes the plan. The engine does the loading, keeps the results, and runs every check.", () => goto(`file://${HERE}/cards.html?card=arch`, false), 1.5);
   },
   async session() {
     tag = "RECORDED SESSION";
     const play = () => click(`document.querySelector("#run")`, { pause: 900 });
-    await beat("This is the Pokec social network: 1.6 million users and 30.6 million friendship links. We ask who the ten most influential users are.", async () => { await goto(`${PAGES}/session.html`); await sleep(2500); await play(); });
-    await beat("Before the answer is trusted, the page shows how the question was read, the plan, and the measure chosen for “influential”: PageRank.", async () => {
+    await beat("Here's the Pokec social network: 1.6 million users and 30.6 million friendship links. Let's ask who the ten most influential users are.", async () => { await goto(`${PAGES}/session.html`); await sleep(2500); await play(); });
+    await beat("Before you trust the answer, you can see how the question was read, the plan, and what it took “influential” to mean. Here, that's PageRank.", async () => {
       await click(`${last}.querySelector("[data-act=more]")`); await sleep(1200); await scroll(300); await sleep(1500); await scroll(320);
     }, 1);
     await click(`${last}.querySelector("[data-act=more]")`); await sleep(300);
-    await beat("Which region is each of them from? The ranking is not computed again: two steps are marked reused, because they carry the same key as before, and one lookup runs.", play);
-    await beat("Show the top twenty instead. Only the final cut runs. It is taken from the stored scores, not from the earlier list of ten.", play);
-    await beat("Now the edge file grows by 27,466 rows, as it would after a nightly load. Nobody tells the system.", play);
-    await beat("We ask the first question again, word for word. The plan is replayed with no planning call.", play);
-    await beat("But nothing computed on the old file is reused: the engine noticed the change from the file itself, and says so. Two users who gained links now lead the ranking.");
-    await beat("The most influential users within one region. This request has two readings, and nothing runs until one is chosen.", play);
-    await beat("Reading A ranks the whole network and lists the members of the region. Reading B ranks again inside the region alone. Each contract shows what it would reuse.", async () => { await sleep(2500); await scroll(230); });
-    await beat("We choose B.", () => click(btn("Use reading B", last), { pause: 1200 }));
-    await beat("Then we open A beside it. The two top-ten lists share only four users.", play, 1);
-    await beat("Among the top twenty, what is the largest group in which every two are friends? No operator computes that, and the system says so.", play);
-    await beat("It prepares the twenty-user subgraph with checked steps, then has two functions written separately. They agree on a group of five, so the value is shown, marked as an answer by code.");
-    await beat("The task statement and both functions are one click away.", async () => {
+    await beat("Next: which region is each of them from? Notice the ranking isn't computed again. Two steps are reused, since they have the same key as before, and just one lookup runs.", play);
+    await beat("Now let's see the top twenty instead. Only the last step runs, and it works from the stored scores, not from the old list of ten.", play);
+    await beat("Now the edge file grows by 27,466 rows, like it would after a nightly load. And nobody tells the system.", play);
+    await beat("So we ask the very first question again, word for word. The plan is replayed, with no planning call.", play);
+    await beat("But nothing from the old file gets reused. The engine saw the change in the file itself, and it tells you. Two users who gained links are now at the top.");
+    await beat("Now, the most influential users within one region. That can mean two things, so nothing runs until we pick one.", play);
+    await beat("Reading A ranks the whole network, then lists the people in that region. Reading B ranks again inside the region only. Each one shows what it would reuse.", async () => { await sleep(2500); await scroll(230); });
+    await beat("Let's go with B.", () => click(btn("Use reading B", last), { pause: 1200 }));
+    await beat("Then we open A next to it. The two top-ten lists have only four users in common.", play, 1);
+    await beat("Among the top twenty, what's the largest group where everyone is friends with everyone else? No operator computes that, and the system says so.", play);
+    await beat("So it prepares the twenty-user subgraph with checked steps, and then has two functions written separately. They agree on a group of five, so you get the value, marked as an answer by code.");
+    await beat("And the task statement and both functions are just one click away.", async () => {
       await click(`${last}.querySelector("[data-act=more]")`); await sleep(500);
       await click(`${last}.querySelector("[data-act=code]")`); await sleep(2200);
       await scroll(420, `document.querySelector(".modal-box")`); await sleep(1600); await scroll(520, `document.querySelector(".modal-box")`); await sleep(1600);
       await closeModal();
     });
-    await beat("The ledger is the session's bill: six steps reused, twenty executed, one turn replayed, fifteen model calls, about one cent.", async () => {
+    await beat("The ledger is the bill for the session: six steps reused, twenty executed, one turn replayed, fifteen model calls, about one cent.", async () => {
       await ev(`scrollTo({ top: 0, behavior: "smooth" })`); await sleep(900);
       await click(`document.querySelector("#bar-toggle")`); await waitFor(`!document.querySelector("#bar-more").classList.contains("hidden")`, 5); await sleep(2500); await scroll(210);
     }, 1);
-    await beat("The audit record holds every plan, every reuse decision with its key, and every check.", async () => {
+    await beat("And the audit record keeps everything: every plan, every reuse decision with its key, and every check.", async () => {
       await click(`document.querySelector("#btn-audit")`); await sleep(1800); await scroll(380, `document.querySelector(".modal-box")`); await sleep(1500);
     }, 1);
     await closeModal();
@@ -167,7 +167,7 @@ const scenes = {
     tag = "LIVE SERVER · waiting time cut";
     const q = `document.querySelector("#question")`, q1 = "Who are the 10 most influential users?";
     const turns = `document.querySelectorAll("#timeline > .turn").length`, idle = `!document.querySelector("#run").disabled`;
-    await beat("The same system, running live against a server that holds the graph. A visitor picks the graph and types a question.", async () => {
+    await beat("This is the same system, now running live on a server that holds the graph. A visitor picks a graph and types a question.", async () => {
       await goto(`${LIVE}/session.html`);
       if (await ev(`document.querySelector("#bar-more").classList.contains("hidden")`)) await click(`document.querySelector("#bar-toggle")`);
       await sleep(800); await click(btn("pokec")); await sleep(700);
@@ -175,11 +175,11 @@ const scenes = {
       await type(q, q1); await click(`document.querySelector("#run")`); await sleep(700);
       cut(); await waitFor(`${turns} === 1 && ${idle}`); await uncut();
     }, 1.5);
-    await beat("This button appends rows to the file on disk and tells the session nothing.", async () => {
+    await beat("This button adds rows to the file on disk, and doesn't tell the session anything.", async () => {
       await click(btn("Change the data file", `document.querySelector("#ask-card")`)); await sleep(700);
       cut(); await waitFor(`document.querySelector("#timeline .event") && ${idle}`); await uncut();
     }, 1);
-    await beat("On the next question, the change is reported and the answer is computed on the new file.", async () => {
+    await beat("Ask the next question, and the change is reported, and the answer comes from the new file.", async () => {
       await type(q, q1); await click(`document.querySelector("#run")`); await sleep(700);
       cut(); await waitFor(`${turns} === 2 && ${idle}`); await uncut();
     }, 2.5);
@@ -187,17 +187,17 @@ const scenes = {
   async compare() {
     tag = "STORED RUNS · one run of each system, small model";
     const next = `document.querySelector("#next")`;
-    await beat("The same ten questions for GraphAudit and for a code-writing agent that keeps its variables.", async () => { await goto(`${PAGES}/compare.html`); await sleep(1500); for (let i = 0; i < 4; i++) await click(next, { pause: 800 }); });
-    await beat("After the file grows, the agent answers from its stored PageRank vector. The page quotes the line of its own code that does it.", async () => {
+    await beat("Here are the same ten questions, for GraphAudit and for a code-writing agent that keeps its variables around.", async () => { await goto(`${PAGES}/compare.html`); await sleep(1500); for (let i = 0; i < 4; i++) await click(next, { pause: 800 }); });
+    await beat("After the file grows, the agent just answers from the PageRank vector it stored earlier. The page shows the exact line of its own code that does it.", async () => {
       await click(next, { pause: 1800 });
       await click(`document.querySelector("#rows").lastElementChild.querySelector("[data-more]")`); await sleep(1200); await scroll(170);
     }, 1.5);
-    await beat("In this run the agent is correct on five of ten turns and stale on three. GraphAudit is correct on all ten.", async () => { await click(`document.querySelector("#all")`); await sleep(1200); await ev(`document.querySelector("#cmp-total").scrollIntoView({ behavior: "smooth", block: "center" })`); await sleep(1200); }, 1.5);
-    await beat("An agent can get this right, with a larger model, a warning, and recomputation. GraphAudit gets it right by construction.");
+    await beat("In this run, the agent gets five of ten turns right, and three are stale. GraphAudit gets all ten right.", async () => { await click(`document.querySelector("#all")`); await sleep(1200); await ev(`document.querySelector("#cmp-total").scrollIntoView({ behavior: "smooth", block: "center" })`); await sleep(1200); }, 1.5);
+    await beat("An agent can get this right, with a bigger model, a warning, and recomputing. GraphAudit gets it right by design.");
   },
   async end() {
     tag = "";
-    await beat("GraphAudit: what was assumed, what was reused, and what was not checked is on screen for every answer.", () => goto(`file://${HERE}/cards.html?card=end`, false), 1.5);
+    await beat("That's GraphAudit. What was assumed, what was reused, and what wasn't checked: it's on screen for every answer.", () => goto(`file://${HERE}/cards.html?card=end`, false), 1.5);
   },
 };
 

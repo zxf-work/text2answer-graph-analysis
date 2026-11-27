@@ -32,53 +32,55 @@ Total 4:50. The narration is 546 words, about 3:55 of speech at that pace, so ea
 
 ## Narration
 
+These are the captions of the video, written to be read aloud. Each block is one scene.
+
 **1. Opening (0:32)**
 
-> An assistant that answers questions about a graph usually keeps state between questions, and that is where a session can go wrong without any sign of it. The data file grows, or the follow-up reads the graph differently, and an old result is used again. GraphAudit puts a typed plan between the question and the computation. The model writes the plan; the engine owns the loading, the result store and every check.
+> When you ask an assistant about a graph, it keeps things in memory between questions. And that's where a session can quietly go wrong. Maybe the data file grew, or the follow-up means something different, and an old result still gets used. So GraphAudit puts a typed plan between your question and the computation. The model only writes the plan. The engine does the loading, keeps the results, and runs every check.
 
 **2. Step 1, a first question (0:22)**
 
-> This is the Pokec social network: 1.6 million users and 30.6 million friendship links. We ask who the ten most influential users are. Before the answer, the page shows the plan, how the file was read, and the measure chosen for "influential", which is PageRank.
+> Here's the Pokec social network: 1.6 million users and 30.6 million friendship links. Let's ask who the ten most influential users are. Before you trust the answer, you can see how the question was read, the plan, and what it took “influential” to mean. Here, that's PageRank.
 
 **3. Step 2, a drill-down (0:15)**
 
-> Which region is each of them from? The ranking is not computed again. Two steps are marked reused, because they carry the same key as before, and one lookup runs.
+> Next: which region is each of them from? Notice the ranking isn't computed again. Two steps are reused, since they have the same key as before, and just one lookup runs.
 
 **4. Step 3, a changed parameter (0:15)**
 
-> Show the top twenty instead. Only the final cut runs. It is taken from the stored scores, not from the earlier list of ten.
+> Now let's see the top twenty instead. Only the last step runs, and it works from the stored scores, not from the old list of ten.
 
 **5. Step 4, the file changes (0:12)**
 
-> Now the edge file grows by 27,466 rows, as it would after a nightly load. Nobody tells the system.
+> Now the edge file grows by 27,466 rows, like it would after a nightly load. And nobody tells the system.
 
 **6. Step 5, the same words again (0:28)**
 
-> We ask the first question again, word for word. The plan is replayed with no planning call. But nothing computed on the old file is reused: the engine noticed the change from the file itself, and says so. Two users who gained links now lead the ranking.
+> So we ask the very first question again, word for word. The plan is replayed, with no planning call. But nothing from the old file gets reused. The engine saw the change in the file itself, and it tells you. Two users who gained links are now at the top.
 
 **7. Step 6, two readings (0:38)**
 
-> The most influential users within one region. This request has two readings. One ranks the whole network and lists the members of the region. The other ranks again inside the region alone. Both are shown as contracts, each with what it would reuse, and nothing runs until one is chosen. We choose the second, then open the first beside it. The two lists share only four users.
+> Now, the most influential users within one region. That can mean two things, so nothing runs until we pick one. Reading A ranks the whole network, then lists the people in that region. Reading B ranks again inside the region only. Each one shows what it would reuse. Let's go with B. Then we open A next to it. The two top-ten lists have only four users in common.
 
 **8. Step 7, outside the catalogue (0:32)**
 
-> Among the top twenty, what is the largest group in which every two are friends? No operator computes that, and the system says so. It prepares the twenty-user subgraph with checked steps, then has two functions written separately. They agree on a group of five, so the value is shown, marked as an answer by code. Both functions are one click away.
+> Among the top twenty, what's the largest group where everyone is friends with everyone else? No operator computes that, and the system says so. So it prepares the twenty-user subgraph with checked steps, and then has two functions written separately. They agree on a group of five, so you get the value, marked as an answer by code. And the task statement and both functions are just one click away.
 
 **9. Ledger and audit record (0:22)**
 
-> The ledger is the session's bill: six steps reused, twenty executed, one turn replayed, fifteen model calls, about one cent. The audit record holds every plan, every reuse decision with its key, and every check.
+> The ledger is the bill for the session: six steps reused, twenty executed, one turn replayed, fifteen model calls, about one cent. And the audit record keeps everything: every plan, every reuse decision with its key, and every check.
 
 **10. Live (0:24)**
 
-> This is the same session running live. Visitors type their own questions. This button appends rows to the file on disk and tells the session nothing. On the next question, the change is reported and the answer is computed on the new file.
+> This is the same system, now running live on a server that holds the graph. A visitor picks a graph and types a question. This button adds rows to the file on disk, and doesn't tell the session anything. Ask the next question, and the change is reported, and the answer comes from the new file.
 
 **11. Side by side (0:38)**
 
-> Here are the same ten questions for GraphAudit and for a code-writing agent that keeps its variables. After the file grows, the agent answers from its stored PageRank vector; the page quotes the line of its own code that does it. In this run it is correct on five of ten turns and stale on three. GraphAudit is correct on all ten. An agent can get this right, with a larger model, a warning, and recomputation. GraphAudit gets it right by construction.
+> Here are the same ten questions, for GraphAudit and for a code-writing agent that keeps its variables around. After the file grows, the agent just answers from the PageRank vector it stored earlier. The page shows the exact line of its own code that does it. In this run, the agent gets five of ten turns right, and three are stale. GraphAudit gets all ten right. An agent can get this right, with a bigger model, a warning, and recomputing. GraphAudit gets it right by design.
 
 **12. Closing (0:12)**
 
-> GraphAudit: what was assumed, what was reused, and what was not checked is on screen for every answer.
+> That's GraphAudit. What was assumed, what was reused, and what wasn't checked: it's on screen for every answer.
 
 ## Dry run (done 2026-11-26)
 
