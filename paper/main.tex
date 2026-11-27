@@ -34,8 +34,7 @@ grown, or the follow-up asks for a different computation. We demonstrate \sys{}.
 into a plan, a short list of steps taken from a catalogue of 76 operators. It stores every step
 result under a key that covers the file contents, the parameters and all inputs, and it reuses a result
 only when the key matches. When a request has two meanings, \sys{} shows both and runs nothing until the
-user picks one. When no operator fits, two functions are written independently and must agree, or the
-request is declined. Attendees drive a seven-step session on the Pokec social network (30.6 million
+user picks one. When no operator fits, two functions are written independently and the answer is given only if they agree. Attendees drive a seven-step session on the Pokec social network (30.6 million
 links), change the data file themselves, and compare each answer with that of a code-writing agent that
 keeps its variables.
 Video: \emph{[URL to be added]}.
@@ -89,8 +88,7 @@ owns the loading of the file, the result store and every check.}
 \section{System}
 \label{sec:system}
 
-\sys{} (Figure~\ref{fig:arch}) is written in Python on igraph~\cite{igraph}. It reads an edge file and an
-optional node table, of up to 117 million links.
+\sys{} (Figure~\ref{fig:arch}) is written in Python on igraph~\cite{igraph}. It reads an edge file and an optional node table, so far up to 117 million links.
 
 \textbf{Profile and plans.} On load, the engine builds a profile card: the size of the graph, whether
 links are directed and weighted (inferred, with the evidence shown), and the node attributes with their
@@ -113,8 +111,7 @@ node table and the way the file was read (directed or not, weighted or not). So 
 cannot collide with PageRank on the whole graph, and a changed file changes every key that depends on it.
 Rankings are cut from stored full score maps, so ``top 20 instead'' is an exact reuse, not an extension
 of a list of ten. Before each turn the engine compares the file's size and modification time and, if they
-moved, its hash. On a change it reloads the graph and reports \texttt{data\_changed} in the turn. If rows
-were only appended, it adds them instead of reloading.
+moved, its hash. On a change it reports \texttt{data\_changed} in the turn and reloads the graph, or adds the rows if they were only appended.
 
 \textbf{Session state and clarification.} The planner never sees the chat history or raw values. It sees
 the accepted reading, earlier plans with the sizes of their results, the selection that ``them'' refers to,
@@ -129,7 +126,7 @@ until the user chooses. The choice carries over to later turns.
 without a call to the planner. This is allowed only if that plan referred to no earlier turn and no setting, and left no reading
 open. The plan is still validated and
 run on the data as it is now, so replay saves a model call and skips no check. The catalogue, the rules
-and the profile card form a fixed start of the prompt, which the provider caches at a lower fee.
+and the profile card form a fixed prefix of the prompt, which the provider caches at a lower fee.
 
 \textbf{Fallback to checked code.} When no combination of operators computes exactly what is asked, the
 planner must say so and name what is missing. It may not answer an easier question. With the fallback on,
@@ -173,7 +170,7 @@ subgraph, two functions agree on a group of 5, and the answer is marked as an an
 statement and both functions are one click away.
 The \emph{ledger} is the bill: in the recording, 6 steps reused and 20
 executed, 1 turn replayed, and 15 model calls for about one cent on Claude Haiku 5.5. The \emph{audit
-record} is the trace: every plan, every reuse decision with its key, and every finding.
+record} is the trace: every plan, reuse decision and finding.
 
 \textbf{The live path.} Against a server that holds the graph, visitors type their own questions or pick
 those of the script. A button labelled ``Change the data file'' appends rows on disk and tells the session
@@ -212,7 +209,7 @@ counts are not rates in real use.
 
 \textbf{Sessions with traps.} A \emph{trap} is a turn where an earlier result looks reusable and is not.
 We wrote three sets of sessions that contain traps. The \emph{short sessions} are 22 sessions on three
-regions of Pokec and two small graphs (47 traps). The \emph{large graphs} set has one 8-turn session on
+regions of Pokec and two small graphs (47 traps). The \emph{large graphs} are one 8-turn session on
 each of Pokec, LiveJournal and Orkut (6 traps). The \emph{long sessions} are four sessions on Pokec (6
 traps), run with prompt caching.
 We compare \sys{} with six agents that write code. Three are ours. The \emph{stateful} agent keeps one
@@ -264,16 +261,14 @@ So an agent can avoid stale answers: with the large model and a warning, or by r
 \sys{} avoids them by construction, with the small model.
 \emph{Time.} \sys{} loads and profiles the graph once per session, and that is most of its time. On the
 large graphs it needs a third of the time of the warned Opus agent, and a fifth to a seventh of the time
-of the independent agent. On the short sessions loading dominates, and most Opus agents are faster.
-\emph{Tokens and fees.} The model never sees the graph, so graph size shows in the time per turn and not
-in the fees. \sys{} sends its catalogue with every question. Without caching it reads up to
-three times the tokens of our agents, and on the short sessions it costs up to 2.5 times as much: the same
+of the independent agent. On the short sessions loading dominates: \sys{} is the fastest on Haiku, and most Opus agents are faster.
+\emph{Tokens and fees.} \sys{}'s model never sees the graph, so graph size shows in its time per turn and not in its fees. It sends its catalogue with every question. Without caching it uses nearly three times the tokens of our agents, and on the short sessions it costs up to 2.5 times as much: the same
 as CodeAct and, on Haiku, under half of GraphTeam. With caching (the long sessions), its fees are close to those of
-our agents. That fee includes replay; without it, a turn on Opus costs 1.9 cents. We claim no advantage
+our agents. Without replay, its Opus fee there is 1.9 cents, not 1.6. We claim no advantage
 in fees.
-\emph{GraphTeam.} It keeps nothing between turns and is rarely stale. Its errors are mostly rankings on
+\emph{GraphTeam.} It keeps nothing between turns; its two stale answers come from the earlier answers we give it. Its errors are mostly rankings on
 the Pokec regions. Its code usually calls NetworkX PageRank, whose default stopping rule is loose at this
-size: 12 of 91 such turns are correct, against 46 of 48 when it uses igraph. This is a library default,
+size: over all runs, 12 of 91 such turns are correct, against 46 of 48 with igraph. This is a library default,
 not a session effect.
 
 \textbf{Questions we did not write.} For a first set, two models (Opus 5.5
@@ -282,12 +277,10 @@ benchmarks used for GraphTeam as 101 stand-alone questions. The reference is an 
 that writes one script per question, and an Opus judge compares the answers. The reference is itself a
 model, so a difference is a disagreement, not an error. \sys{} ran three times on Haiku. Of the 429
 written questions it answered 399--406, and 316--317 answers matched the reference. Another 39--42 matched an
-alternative value that the reference also prints, such as a count without self-loops. Then 33--43 differ
-and 8--11 are incomplete. Of the 101 published questions it answered 95--100; 87--93 matched, 2--4 differ, and the rest are incomplete. In an
+alternative value that the reference also prints, such as a count without self-loops. The rest differ (33--43) or are incomplete (8--11). Of the 101 published questions it answered 95--100; 87--93 matched, 2--4 differ, and the rest are incomplete. In an
 earlier run without the fallback it answered 63 and declined the rest, among them all six NP-complete
-GraphArena tasks. Before alternative values were counted, 60 questions differed in all three runs; one annotator labelled
-them by hand. In 51 the difference is a convention, a reading the reference also lists, an open choice or a
-randomised algorithm. \sys{} is wrong in 8, flagged by no check, and the reference in 1.
+GraphArena tasks. Over both sets, before alternative values were counted, 60 questions differed in all three runs; one annotator labelled
+them by hand. In 51 the difference is a convention, a reading the reference also lists, an open choice or randomness. \sys{} is wrong in 8, flagged by no check; the reference in 1.
 
 \textbf{Errors that passed every check.} Checking by hand found more errors that no check caught.
 One plan for ``ignoring direction'' counted mutual links twice. Of 47 confirmed answers by
@@ -310,8 +303,7 @@ recomputes them when that is cheaper; the workflow there is a program, not a con
 \section{Conclusion}
 
 \sys{} lets an analyst hold a conversation with a large graph without an answer resting on an outdated
-result. Code agents leave the reuse of earlier results to the model, which cannot tell when its variables
-have expired. \sys{} decides reuse by a key over the data, the reading and the inputs. It therefore
+result. Code agents leave the reuse of earlier results to the model, and a small model gets it wrong even when warned. \sys{} decides reuse by a key over the data, the reading and the inputs. It therefore
 notices a changed file or a changed reading without being told, and it shows both readings of an ambiguous
 request before anything runs. In our sessions it gave no stale answer, even with a small model, while the
 stateful agent gave one in every run. At the conference, attendees change the data themselves and watch
