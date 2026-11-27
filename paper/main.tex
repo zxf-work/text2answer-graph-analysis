@@ -28,15 +28,16 @@
   \country{USA}}
 
 \begin{abstract}
-Analysts ask a graph a sequence of related questions, and a language-model assistant that keeps state
-between them can answer a follow-up from a result that is no longer valid: the data file has grown, or the
-follow-up reads the graph differently. We demonstrate \sys{}, which turns each question into a typed plan
-over a catalogue of 76 checked operators and stores every step result under a key that covers the file
-contents, the reading of the graph, the parameters and all inputs. A result is reused only when its key
-matches. A request with two readings is shown as two contracts and nothing runs until one is chosen; a
-request outside the catalogue is answered by two independently written functions that must agree, or is
-declined. Attendees drive a seven-step session on the Pokec social network (30.6 million links), change
-the data file themselves, and compare each turn with a code-writing agent that keeps its variables.
+Analysts ask a graph a series of related questions. An assistant built on a language model keeps results
+between questions, and it can answer a follow-up from a result that no longer holds: the data file has
+grown, or the follow-up asks for a different computation. We demonstrate \sys{}. It turns each question
+into a plan, a short list of steps taken from a catalogue of 76 operators. It stores every step
+result under a key that covers the file contents, the parameters and all inputs, and it reuses a result
+only when the key matches. When a request has two meanings, \sys{} shows both and runs nothing until the
+user picks one. When no operator fits, two functions are written independently and must agree, or the
+request is declined. Attendees drive a seven-step session on the Pokec social network (30.6 million
+links), change the data file themselves, and compare each answer with that of a code-writing agent that
+keeps its variables.
 Video: \emph{[URL to be added]}.
 \end{abstract}
 
@@ -47,107 +48,105 @@ Video: \emph{[URL to be added]}.
 \section{Introduction}
 
 A language model can turn ``who are the ten most influential users?'' into code that loads an edge file and
-runs PageRank. Real analysis is a session: \emph{which regions are they from}, \emph{show the top 20
-instead}, \emph{and within this region?} Systems for such sessions keep state. A notebook-style agent keeps
-Python variables between turns~\cite{codeact}, which makes follow-ups cheap, and which is where a session can
-go wrong without any sign of it.
+runs PageRank. Real analysis is a session of follow-ups: \emph{which regions are they from}, \emph{show the
+top 20 instead}, \emph{and within this region?} To make follow-ups cheap, an agent keeps its Python
+variables between turns~\cite{codeact}. This is also where a session can go wrong with no sign of it. We
+call an answer \emph{stale} when it comes from a result that no longer holds.
 
-\textbf{The data changes underneath.} A nightly load appends rows to the edge file and the analyst asks the
-next question. An agent that kept the graph in memory answers from the old graph. We measured this
-(Section~\ref{sec:evidence}): an agent with a persistent Python process gave stale answers in every run we
-made, with a small and with a large model. Telling it that the file may change removed the stale answers
-with the large model, at the price of recomputation, and did not on large graphs with the small one.
+\textbf{The data changes.} A nightly load appends rows to the edge file, and the analyst asks the next
+question. An agent that kept the graph in memory answers from the old graph. In our runs, an agent with a
+persistent Python process gave stale answers in every run, with a small model (Claude Haiku 5.5) and with
+a large one (Claude Opus 5.5). Warning it that the file may change fixed this with the large model, which
+then recomputed. With the small model on large graphs, the warning did not help.
 
-\textbf{The reading changes underneath.} ``Most influential within region $X$'' can mean the whole-graph
-scores listed for the members of $X$, or scores recomputed on the subgraph induced by $X$. The first reuses
-the earlier result and the second must not. Over 60 group restrictions on real profile data the two
-readings gave a different top-10 set in all 60 and shared 3.7 of 10 nodes on average. An assistant that
-picks one in silence returns a well-formed answer to a question the analyst may not have asked.
+\textbf{The reading changes.} ``Most influential
+within region $X$'' has two readings. One ranks the whole graph and lists the members of $X$. The other
+ranks again inside $X$ alone. The first may reuse the earlier scores; the second must not. We tried both
+on 60 groups from real profile data. The two top-10 lists differed for every group and shared 3.7 of 10
+users on average. An assistant that picks one reading silently gives a well-formed answer to a question
+the analyst did not ask.
 
-\textbf{Approach.} Generated code runs, but it is not an analysis whose semantics, assumptions and reuse can
-be examined. \sys{} places an explicit contract between the question and the computation: a typed plan over
-a fixed operator catalogue, executed by an engine that owns loading, the reading of the file and the result
-store. Reuse then becomes a property of keys, not a judgment of the model. We do not claim that typed plans
-are more accurate than generated code; in a pilot on sessions that contain no trap the two did not separate on accuracy. The
-claim is narrower: wrong reuse is excluded by construction, and what was assumed, reused and not checked is
-on screen.
+\textbf{Approach.} \sys{} puts a plan between the question and the computation. A plan is a list of steps,
+and each step is an operator from a fixed catalogue with typed arguments. The model only writes the plan.
+An engine runs it, and the engine owns the loading of the file and the store of results. Whether a result
+may be reused is decided by a key, not by the model. We do not claim that plans are more accurate than
+generated code: in a pilot on sessions where neither the data nor the reading changes, the two did not differ. Our claim is
+narrower. Stale answers are excluded by construction, other errors are not, and the screen shows what was assumed, what was reused
+and what was not checked.
 
-\textbf{Contributions.} (1) A session engine with lineage-keyed reuse that detects file changes and reading
-changes without being told. (2) A two-contract clarification for scope-ambiguous requests, produced by a
-mechanical plan rewrite. (3) Plan replay for repeated questions and a checked code fallback for requests
-outside the catalogue, with declined requests and loading conventions stated instead of hidden. (4) A
-demonstration in which the audience changes the data and watches both \sys{} and a stateful code agent
-respond.
+\textbf{Contributions.} (1) A session engine that reuses results by key and notices a changed file or
+reading without being told. (2) A clarification step that shows both readings of an ambiguous request
+before anything runs. (3) Replay of repeated questions, and a checked fallback to generated code. (4) A
+demonstration where the audience changes the data under \sys{} and a code agent.
 
 \begin{figure}[t]
 \includegraphics[width=\linewidth]{figs/fig1-architecture.pdf}
-\caption{Architecture of \sys{}. The model writes plans and, in the fallback, two functions; loading, the
-reading of the file, the result store and every check belong to the engine.}
+\caption{Architecture of \sys{}. The model writes plans and, in the fallback, two functions. The engine
+owns the loading of the file, the result store and every check.}
 \label{fig:arch}
 \end{figure}
 
 \section{System}
 \label{sec:system}
 
-\sys{} (Figure~\ref{fig:arch}) is written in Python on igraph~\cite{igraph}. It reads an edge file with an
-optional node table, and has been run on files of up to 117 million links.
+\sys{} (Figure~\ref{fig:arch}) is written in Python on igraph~\cite{igraph}. It reads an edge file and an
+optional node table, of up to 117 million links.
 
-\textbf{Profile and typed plans.} On load, the engine derives file facts and a profile card: size, inferred
-direction and weights with the evidence for each, node attributes with type and coverage. The planner model
-sees the card, the catalogue and a compact session record, and returns a plan: a list of steps, each an
-operator from the catalogue with typed arguments that may refer to earlier steps, together with the
-interpretation it assumed. The 76 operators cover counts, degrees and centralities, components and cores,
-communities, paths, attribute filters and groupings, arithmetic on results, and graph-reading operators
-such as the undirected or the mutual-link graph. A validator checks operators, types, references, attribute
-names and category values; a cost model rejects a plan over budget before anything runs; a verifier
-attaches findings to the answer (for example, that PageRank scores sum to one).
+\textbf{Profile and plans.} On load, the engine builds a profile card: the size of the graph, whether
+links are directed and weighted (inferred, with the evidence shown), and the node attributes with their
+type and coverage. Loading choices that change counts, such as leaving out self-loops, are printed with
+every answer. The planner model sees the card, the catalogue and a short record of the session. It
+returns a plan and the reading it assumed. A step may take the result of an earlier step as input. The 76
+operators cover counts, degrees and centralities, components and cores, communities, paths, attribute
+filters and groupings, arithmetic on results, and derived graphs such as the undirected one. A validator checks operators, types, references, attribute names and category values. A cost
+model rejects a plan over budget before anything runs. A verifier attaches findings to the answer, for
+example that PageRank scores sum to one.
 
-\textbf{Lineage-keyed result store.} Every step result is stored under
+\textbf{Result store.} Every step result is stored under a key
 \[
 k(s)=H\bigl(\mathit{op},\ \mathit{params},\ \mathit{reading},\ \mathit{seed},\
 k(\mathit{in}_1),\dots,k(\mathit{in}_n)\bigr),
 \]
-with parameters in canonical form (defaults written out), whose root is a hash of the whole edge file and node table together with the reading under which the graph
-was loaded. PageRank on an induced subgraph cannot collide with PageRank on the whole graph, and a changed
-reading or file changes every key downstream. Rankings are always cut from stored full score maps, so ``top
-20 instead'' is an exact reuse and never an extension of a list of ten. Before each turn the engine compares
-the file's size and modification time and, if they moved, its hash. On a change it reloads the graph, or
-appends in place when the file only grew and a set of conditions guarantees the same graph as a full load,
-and reports \texttt{data\_changed} in the turn.
+where $H$ is a hash, $\mathit{seed}$ is the random seed if the operator uses one, and
+$\mathit{in}_1,\dots,\mathit{in}_n$ are the steps it takes as input. Defaults are filled in before hashing. The key of the loaded graph is a hash of the whole edge file, the
+node table and the way the file was read (directed or not, weighted or not). So PageRank on a subgraph
+cannot collide with PageRank on the whole graph, and a changed file changes every key that depends on it.
+Rankings are cut from stored full score maps, so ``top 20 instead'' is an exact reuse, not an extension
+of a list of ten. Before each turn the engine compares the file's size and modification time and, if they
+moved, its hash. On a change it reloads the graph and reports \texttt{data\_changed} in the turn. If rows
+were only appended, it adds them instead of reloading.
 
-\textbf{Session state and two contracts.} The planner never sees the chat history or raw values. It sees
-the accepted reading, earlier plans with result sizes, the current selection that ``them'' refers to, and
-standing settings (``use damping 0.9 from now on''). It returns a complete plan that copies earlier steps
-unchanged; the engine recognises them by key, so each turn's outcome is derived, not declared: exact reuse,
-partial reuse, recompute, or clarify. Operators are marked scope-sensitive. When a plan restricts a
-scope-sensitive measure to a group, the engine rewrites the plan into its other reading and returns both as
-contracts (compute on the whole graph, then list the group; or compute on the group's subgraph), each with
-what it would reuse. Nothing executes until the user chooses, and the choice is carried to later turns and
-stated there.
+\textbf{Session state and clarification.} The planner never sees the chat history or raw values. It sees
+the accepted reading, earlier plans with the sizes of their results, the selection that ``them'' refers to,
+and standing settings such as ``use damping 0.9 from now on''. Each turn it returns a complete plan and
+repeats earlier steps where it needs them. The engine recognises a repeated step by its key. So the
+engine, not the model, decides whether a turn reuses everything, reuses a part, recomputes, or needs a
+clarification. Some operators give a different result on a group than on the whole graph. When a plan
+restricts such an operator to a group, the engine rewrites the plan into the other reading and shows both.
+Each reading states what will be computed and what would be reused. Nothing runs
+until the user chooses. The choice is carried to later turns and stated there.
 
-\textbf{Replay and prompt caching.} A question repeated word for word runs its earlier plan with no planner
-call, but only if that plan was self-contained (no reference to an earlier turn, no setting, no open
-reading) and the settings in force are unchanged. The plan is still validated and executed against the
-data as it then is, so replay removes the planner call and never a check. The catalogue, the rules and the
-profile card are sent as a cached prompt prefix.
+\textbf{Replay and prompt caching.} When a question is repeated word for word, its earlier plan runs again
+without a call to the planner. This is allowed only if that plan referred to no earlier turn and no setting, and left no reading
+open. The plan is still validated and
+run on the data as it is now, so replay saves a model call and skips no check. The catalogue, the rules
+and the profile card form a fixed start of the prompt, which the provider caches at a lower fee.
 
-\textbf{Checked code fallback, declined requests, conventions.} When no combination of operators computes
-exactly what is asked, the planner must say so and name the missing capability; it may not answer an easier
-question. With the fallback on, a second plan prepares the inputs with catalogue steps (select the nodes,
-induce the subgraph, drop direction) and states the task. Two functions are then written by two model calls
-that do not see each other, one told to prefer igraph's routine and the other to avoid it, and each runs in
-its own process on the prepared inputs. Neither reads the file. If both return the same value the turn is
-an \emph{answer by code}, shown as a lower grade of answer than an operator answer; otherwise it is
-\emph{not confirmed}, and both candidates are shown without an answer. Both writers read one task statement,
-so a wrong reading of the question passes this check; we return to this in Section~\ref{sec:evidence}.
-Finally, loading conventions that change counts are printed with every answer: on LiveJournal, 518,382 of
-the 68,993,773 rows link a node to itself and are left out of the graph, and each answer says so.
+\textbf{Fallback to checked code.} When no combination of operators computes exactly what is asked, the
+planner must say so and name what is missing. It may not answer an easier question. With the fallback on,
+a second plan prepares the inputs with catalogue steps and states the task. Two model calls that do not see each other each write a function. One is
+told to prefer igraph's routine and the other to avoid it. Each function runs in its own process on the
+prepared inputs, and neither reads the file. If both return the same value, the turn is an \emph{answer by
+code}, labelled as weaker than an operator answer. Otherwise it is \emph{not confirmed}: both
+candidates are shown and no answer is given. Both writers read the same task statement, so this check
+does not catch a wrong reading of the question.
 
 \begin{figure*}[t]
 \includegraphics[width=\textwidth]{figs/fig2-session.pdf}
-\caption{The session page at the scope-ambiguity step of the signature session on Pokec: (a) steps reused
-by lineage key, (b) the file change noticed without being announced, (c) two contracts, with nothing
-executed until one is chosen, (d) the ledger of reused and executed steps, model calls and replayed turns.}
+\caption{The session page of the scripted session on Pokec, at the step with two readings: (a) steps
+reused by key, (b) the file change, noticed without being announced, (c) the two readings, with nothing run
+until one is chosen, (d) the ledger so far. The page numbers questions only, so steps 5 and 6 of the script
+show as 4 and 5.}
 \label{fig:session}
 \end{figure*}
 
@@ -155,96 +154,99 @@ executed until one is chosen, (d) the ledger of reused and executed steps, model
 \label{sec:demo}
 
 The demonstration uses the Pokec social network from SNAP~\cite{snap} with its profile table: 1,632,803
-users, 30,622,564 directed friendship links, and attributes such as region, age and gender. It has three parts.
+users, 30,622,564 directed friendship links, and attributes such as region, age and gender.
 
-\textbf{The signature session.} Seven steps, scripted as data and playable live or from a recording
-(Figure~\ref{fig:session}).
-\emph{(1)} ``Who are the 10 most influential users?'' The plan, the reading of the file and the measure
-chosen for ``influential'' (PageRank) are shown with the answer.
+\textbf{A scripted session.} Seven steps, playable live or from a recording (Figure~\ref{fig:session}).
+\emph{(1)} ``Who are the 10 most influential users?'' The answer comes with the plan, the way the file was
+read, and the measure chosen for ``influential'' (PageRank).
 \emph{(2)} ``Which region is each of them from?'' Two steps are marked reused; one attribute lookup runs.
-\emph{(3)} ``Show the top 20 instead.'' Only the final cut runs; the scores are reused.
+\emph{(3)} ``Show the top 20 instead.'' The scores are reused; only the cut and the lookup run.
 \emph{(4)} The edge file grows by 27,466 rows. Nobody tells the system.
-\emph{(5)} The words of step 1 again. The plan is replayed with no planner call, the turn reports
-\texttt{data\_changed}, nothing computed on the old file is reused, and two users who gained links now lead
-the ranking.
-\emph{(6)} The same question ``within region $X$'': two contracts appear and nothing runs. Reading B is
-chosen and then A is shown beside it; the two top-10 lists share 4 users.
+\emph{(5)} The first question again, word for word. The plan is replayed without a planner call. The turn
+reports \texttt{data\_changed}, nothing computed on the old file is reused, and two users who gained links
+now lead the ranking.
+\emph{(6)} The same question ``within region $X$''. Both readings appear and nothing runs: A ranks the
+whole graph and lists the region, B ranks inside the region. We choose B, then open A beside it. The two
+top-10 lists share 4 users.
 \emph{(7)} ``Among the 20 most influential users, what is the largest group in which every two are
-friends?'' The catalogue has no maximum-clique operator and says so; four checked steps prepare the 20-user
-subgraph, two functions agree on a group of 5, and the answer is marked as an answer by code, with the task
-statement and both functions one click away.
-The ledger closes the session: in the recording, 6 steps reused and 20 executed, 1 turn replayed, 15 model
-calls for about one cent on Claude Haiku 5.5, and 61\% of input tokens read from the prompt cache. The
-audit record holds every plan, every reuse decision with its key, and every finding.
+friends?'' The catalogue has no operator for this and says so. Four checked steps prepare the 20-user
+subgraph, two functions agree on a group of 5, and the answer is marked as an answer by code. The task
+statement and both functions are one click away.
+Two views close the session. The \emph{ledger} is the bill: in the recording, 6 steps reused and 20
+executed, 1 turn replayed, and 15 model calls for about one cent on Claude Haiku 5.5. The \emph{audit
+record} is the full trace: every plan, every reuse decision with its key, and every finding.
 
-\textbf{The live path.} Against a server holding the graph, visitors type their own questions or pick the
-script's. A button labelled ``Change the data file'' appends rows on disk and tells the session nothing;
-the next question shows whether the change was noticed. In our check of this path all seven steps gave the
-recorded outcomes; a session starts in about 35 seconds (copying and loading Pokec) and turns take 5 to 30
-seconds, most of it the model. If the network fails, the recorded session replays in the browser with no
-server and no model.
+\textbf{The live path.} Against a server that holds the graph, visitors type their own questions or pick
+those of the script. A button labelled ``Change the data file'' appends rows on disk and tells the session
+nothing; the next question shows whether the change was noticed. When we checked this path, all seven
+steps gave the recorded outcomes. A session starts in about 35 seconds, and a
+turn takes 5 to 30 seconds, most of it the model. If the network fails, the recorded session replays in
+the browser with no server and no model.
 
 \begin{figure}[t]
 \centering\includegraphics[width=0.68\linewidth]{figs/fig3-compare.png}
-\caption{Side by side on the refresh session: after the file grows, the stateful agent reuses its PageRank
-vector (the deciding line of its code is quoted) while \sys{} reports the change and recomputes.}
+\caption{Side by side: after the file grows, the agent that keeps its variables reuses its PageRank vector
+(the page quotes the deciding line of its code), while \sys{} reports the change and recomputes.}
 \label{fig:compare}
 \end{figure}
 
-\textbf{Side by side with a stateful code agent.} The third page (Figure~\ref{fig:compare}) replays one
-stored run of each system on a ten-question ``morning dashboard'' session on Pokec during which the same
-27,466 links are appended. Each row shows both answers with the harness's verdict (correct, stale, wrong),
-compute time and model calls; for the agent it quotes the line of its own code that decides the reuse. In
-this run, on Haiku, the agent is correct on 5 of 10 turns, stale on 3 and wrong on 2 more after the change; \sys{} is correct on 10 of 10. The agent used 19 seconds of compute and \sys{} 48, of which 29
-are loading; model fees are \$0.006 and \$0.005. The page states that this is one run and that the agent's
-result depends on the model and on a warning: on this session the warned agent on Claude Opus 5.5 was right
-on every turn in three runs.
+\textbf{Side by side with a code agent.} A separate page (Figure~\ref{fig:compare}) replays one stored run
+of each system on another session of ten questions, during which 27,466 links are appended. Each row shows both answers, whether each is correct, stale or wrong
+for another reason, the compute time and the model calls. For the agent, the page quotes the line of its
+own code that decides the reuse. In this run, on Haiku, the agent is correct on 5 of 10 turns, stale on 3
+and wrong on 2 more; \sys{} is correct on all 10.  The page says that this is one run and that the
+result depends on the model: with Claude Opus 5.5 and a warning that the file may change, the agent was
+right on every turn in three runs.
 
-\textbf{What attendees do.} They ask Pokec their own questions; press the data-change button when they choose; pick a reading at a
-two-contract card and open the other to see how far the lists differ; ask for something outside the
-catalogue (a maximum clique, a matching, a maximum flow) to see a declined request, an answer by code or
-a withheld answer; open the audit record; and upload their own edge list to see how its direction and
-weights are inferred.
+\textbf{What attendees do.} They ask Pokec their own questions, press the data-change button when they
+choose, and pick one of two readings. They ask for something outside the catalogue (a maximum
+clique, a matching, a maximum flow) and see a declined request, an answer by code or an answer that is not
+confirmed. They can also open the audit record or upload their own edge list.
 
 \section{Evidence}
 \label{sec:evidence}
 
-Runs used Claude Haiku 5.5 and Opus 5.5. Baselines: three code
-agents of ours, given the same file facts (\emph{stateful}: one Python process per session;
-\emph{warned}: told that the file may change; \emph{independent}: a fresh script per
-turn), and two others: the LangGraph CodeAct agent~\cite{codeact}, plain and warned, and
-GraphTeam~\cite{graphteam} with its published prompts and knowledge base; we supplied the model
-client, the sandbox (a script, no container) and the search embeddings (an open model), and gave
-each turn the earlier questions and its answers.
+\textbf{Does the key work?} We built 246 scenarios in which reuse would be wrong and 201 in which it is
+valid, on nine graphs, and ran them without a model. With the full key, no wrong value was served, and all
+390 steps of the valid scenarios were reused. Removing any one part of the key let wrong values through: 12 wrong values without the
+node table, up to 117 without the input keys. The scenarios cover classes of faults; the
+counts are not rates in real use.
 
-\textbf{Key ingredients.} In 246 templated fault scenarios and 201 valid-reuse scenarios on nine graphs,
-with no model, the full key served no wrong value and reused all 390 valid steps; removing any one
-ingredient admitted 12 (node table) to 117 (input lineage) wrong values. These are fault classes
-covered, not rates in real use.
+\textbf{Sessions with traps.} A \emph{trap} is a turn where an earlier result looks reusable and is not.
+We wrote three sets of sessions that contain traps. The \emph{short sessions} are 22 sessions on three
+regions of Pokec and two small graphs (47 traps). The \emph{large graphs} set has one 8-turn session on
+each of Pokec, LiveJournal and Orkut (6 traps). The \emph{long sessions} are four sessions on Pokec (6
+traps), run with prompt caching.
+We compare \sys{} with six agents that write code. Three are ours. The \emph{stateful} agent keeps one
+Python process per session. The \emph{warned} agent adds one instruction: the file may change. The
+\emph{independent} agent writes a fresh script every turn. Two are the LangGraph CodeAct
+agent~\cite{codeact}, plain and warned. The last is GraphTeam~\cite{graphteam} with its published prompts
+and knowledge base. We supplied three parts it takes from outside: the model client, the sandbox that
+runs its code, and the embeddings for its search. It answers single questions, so each turn was given the
+earlier questions and its answers.
 
 \begin{table*}[t]
-\caption{Sessions with reuse traps. Correct turns [stale answers] are ranges over runs; the rest are
-means: \emph{time} in seconds outside the model, with loading; \emph{tokens} in millions, in and out;
-model \emph{fees} in cents (Haiku) or dollars (Opus). E2b: 22 sessions on three Pokec regions and two small
-graphs. E4: 8-turn sessions on Pokec, LiveJournal and Orkut. P: four sessions on Pokec, with prompt
-caching (\sys{} and our agents only) and plan replay. Traps: 47, 6, 6. Runs: 3 to 6; CodeAct on Opus 1.}
+\caption{Sessions with traps. \emph{Correct}: correct turns [stale turns], lowest to highest over runs. The other columns are totals for the whole set, as means over runs. \emph{Time}: seconds of computing, loading included, model calls excluded.
+\emph{Tokens}: millions, input plus output. \emph{Fees}: model fees in US dollars. The long sessions use
+prompt caching (not for CodeAct) and plan replay. Runs per cell: 3 to 6; CodeAct on Opus: 1. A
+dash means not run.}
 \label{tab:traps}
 \footnotesize
 \renewcommand{\arraystretch}{0.88}
-\setlength{\tabcolsep}{5pt}
+\setlength{\tabcolsep}{4.6pt}
 \begin{tabular}{@{}ll crrr crrr crrr@{}}
 \toprule
- & & \multicolumn{4}{c}{E2b (122 turns)} & \multicolumn{4}{c}{E4 (24 turns)} & \multicolumn{4}{c}{P (43 turns)} \\
+ & & \multicolumn{4}{c}{Short sessions (122 turns)} & \multicolumn{4}{c}{Large graphs (24 turns)} & \multicolumn{4}{c}{Long sessions (43 turns)} \\
 \cmidrule(lr){3-6}\cmidrule(lr){7-10}\cmidrule(l){11-14}
 Model & System & Correct & Time & Tokens & Fees & Correct & Time & Tokens & Fees & Correct & Time & Tokens & Fees \\
 \midrule
-Haiku & \sys{}            & 122 [0]         & 331  & 1.16 & 15.6 & 24 [0]        & 257  & 0.22 & 2.9 & 42 [0]        & 188 & 0.33 & 2.0 \\
- & Stateful agent    & 107--118 [2--6] & 388  & 0.59 & 10.8 & 13 [5--6]     & 332  & 0.15 & 2.5 & 29--30 [5--6] & 147 & 0.31 & 2.6 \\
- & Warned agent      & 114--120 [0--1] & 366  & 0.63 & 11.6 & 12--15 [5--6] & 459  & 0.18 & 3.2 & 33--40 [2--5] & 361 & 0.36 & 3.2 \\
- & Independent agent & 111--122 [0]    & 407  & 0.62 & 11.7 & 23--24 [0]    & 1318 & 0.17 & 3.1 & 43 [0]        & 659 & 0.36 & 3.3 \\
- & CodeAct           & 103--114 [1--4] & 386  & 1.14 & 16.2 & 13--14 [6]    & 381  & 0.23 & 3.1 & 30--33 [5--6] & 247 & 0.37 & 4.6 \\
- & CodeAct, warned   & 111--117 [0--2] & 429  & 1.34 & 19.2 & 15--20 [2--6] & 504  & 0.30 & 4.1 & 41--42 [1]    & 741 & 0.61 & 7.7 \\
- & GraphTeam         & 81--85 [0--2]   & 1091 & 1.40 & 37.2 & --            & --   & --   & --  & --            & --  & --   & --  \\
+Haiku & \sys{}            & 122 [0]         & 331  & 1.16 & 0.156 & 24 [0]        & 257  & 0.22 & 0.029 & 42 [0]        & 188 & 0.33 & 0.020 \\
+ & Stateful agent    & 107--118 [2--6] & 388  & 0.59 & 0.108 & 13 [5--6]     & 332  & 0.15 & 0.025 & 29--30 [5--6] & 147 & 0.31 & 0.026 \\
+ & Warned agent      & 114--120 [0--1] & 366  & 0.63 & 0.116 & 12--15 [5--6] & 459  & 0.18 & 0.032 & 33--40 [2--5] & 361 & 0.36 & 0.032 \\
+ & Independent agent & 111--122 [0]    & 407  & 0.62 & 0.117 & 23--24 [0]    & 1318 & 0.17 & 0.031 & 43 [0]        & 659 & 0.36 & 0.033 \\
+ & CodeAct           & 103--114 [1--4] & 386  & 1.14 & 0.162 & 13--14 [6]    & 381  & 0.23 & 0.031 & 30--33 [5--6] & 247 & 0.37 & 0.046 \\
+ & CodeAct, warned   & 111--117 [0--2] & 429  & 1.34 & 0.192 & 15--20 [2--6] & 504  & 0.30 & 0.041 & 41--42 [1]    & 741 & 0.61 & 0.077 \\
+ & GraphTeam         & 81--85 [0--2]   & 1091 & 1.40 & 0.372 & --            & --   & --   & --  & --            & --  & --   & --  \\
 \midrule
 Opus & \sys{}            & 122 [0]         & 324  & 1.14 & 5.86 & 24 [0]        & 239  & 0.22 & 1.10 & 43 [0]       & 183 & 0.40 & 0.67 \\
  & Stateful agent    & 114--117 [5--6] & 191  & 0.40 & 2.33 & 13 [6]        & 396  & 0.11 & 0.59 & 33--41 [2--5] & 156 & 0.23 & 0.51 \\
@@ -256,61 +258,63 @@ Opus & \sys{}            & 122 [0]         & 324  & 1.14 & 5.86 & 24 [0]        
 \end{tabular}
 \end{table*}
 
-\textbf{Sessions with reuse traps.} Table~\ref{tab:traps} compares the systems on three sets of sessions
-with reuse traps.
-\emph{Accuracy.} \sys{} is never stale, and it alone is correct on every turn of E2b and E4 in every run
-(in P, Haiku misreads one ``them'' in each run). Agents that keep their variables are stale in every run
-with both models, and the framework agent behaves like ours. A warning removes this with Opus only. So
-agents can avoid stale answers, with the large model and a warning or by recomputing everything; \sys{}
-does so by construction, with the small model.
-\emph{Time.} Most of \sys{}'s time is one load and profile per session. On the large graphs it needs a
-third of the warned Opus agent's time and a fifth to a seventh of the independent agent's. On the small
-graphs of E2b loading dominates, and most Opus agents finish sooner.
-\emph{Tokens and fees.} \sys{} sends its operator catalogue with every question, so without caching it
-reads up to twice the tokens of our agents and costs more on E2b: as much as CodeAct, under half
-of GraphTeam. With caching on both sides (P) fees are about equal (Opus: \$0.80 without plan replay), and
-we claim no advantage.
-\emph{GraphTeam} keeps nothing and is rarely stale. Its errors are mostly rankings on the Pokec regions: it usually
-calls NetworkX PageRank, whose default stopping rule is loose at this size (12 of 91 turns correct; 46 of
-48 with igraph): a library default, not a session effect.
+\emph{Accuracy} (Table~\ref{tab:traps}). \sys{} is never stale. It is the only system that is correct on
+every turn of both the short sessions and the large graphs in every run. In the long sessions on Haiku, it
+misreads one ``them'' in each run. The stateful agent and plain CodeAct are stale in every run; their
+other wrong turns are ordinary errors. A warning removes the stale answers with Opus only.
+So an agent can avoid stale answers: with the large model and a warning, or by recomputing everything.
+\sys{} avoids them by construction, with the small model.
+\emph{Time.} \sys{} loads and profiles the graph once per session, and that is most of its time. On the
+large graphs it needs a third of the time of the warned Opus agent, and a fifth to a seventh of the time
+of the independent agent. On the short sessions loading dominates, and most Opus agents finish sooner.
+\emph{Tokens and fees.} \sys{} sends its catalogue with every question. Without caching it reads up to
+three times the tokens of our agents, and on the short sessions it costs up to 2.5 times as much: the same
+as CodeAct and, on Haiku, under half of GraphTeam. With caching (the long sessions), its fees are close to those of
+our agents. That fee includes replay; without it, Opus costs \$0.80. We claim no advantage
+in fees.
+\emph{GraphTeam.} It keeps nothing between turns and is rarely stale. Its errors are mostly rankings on
+the Pokec regions. Its code usually calls NetworkX PageRank, whose default stopping rule is loose at this
+size: 12 of 91 such turns are correct, against 46 of 48 when it uses igraph. This is a library default,
+not a session effect.
 
-\textbf{Coverage on questions we did not write.} Two writer models (Opus 5.5, Qwen3-14B), told nothing about
-the system, wrote 429 conversational questions on three graphs; we restated the task types of
-GraphArena~\cite{grapharena}, NLGraph~\cite{nlgraph} and the benchmarks GraphTeam is evaluated on as 101
-stand-alone questions. Over three runs on Haiku, \sys{} answered 399--406 and 95--100. An Opus judge
-found 316--317 and 87--93 answers the same as an independent Opus script agent's; another 39--42
-written answers equal a variant that script itself prints (such as ``self-loops excluded''), which leaves
-33--43 and 2--4 different. Before an operator fix and the fallback, \sys{} answered 63 of the published
-questions and declined the rest, among them all six NP-complete GraphArena tasks. The
-reference is itself a model, so ``different'' is disagreement, not error; one reader labelled the 60
-questions that differ in all three runs. 40 follow a convention or reading the reference lists, 11 turn on
-an open choice or a randomised algorithm, \sys{} is wrong in 8 and the reference in 1. No check flagged the
-8 errors; three share one cause, a misread ``them''.
+\textbf{Questions we did not write.} We tested coverage on two sets. For the first, two models (Opus 5.5
+and Qwen3-14B) that were told nothing about \sys{} wrote 429 conversational questions on three graphs. For
+the second, we restated the task types of GraphArena~\cite{grapharena}, NLGraph~\cite{nlgraph} and the
+benchmarks used for GraphTeam as 101 stand-alone questions. The reference is an independent agent on Opus
+that writes one script per question, and an Opus judge compares the answers. The reference is itself a
+model, so a difference is a disagreement, not an error. \sys{} ran three times on Haiku. Of the 429
+written questions it answered 399--406, and 316--317 answers matched the reference. Another 39--42 matched an
+alternative value that the reference also prints, such as a count without self-loops. Then 33--43 differ
+and 8--11 are incomplete. Of the 101 published questions it answered 95--100; 87--93 matched, 2--4 differ, and the rest are incomplete. In an
+earlier run without the fallback it answered 63 and declined the rest, among them all six NP-complete
+GraphArena tasks. Before alternative values were counted, 60 questions differed in all three runs; one annotator labelled
+them by hand. In 51 the difference is a convention, a reading the reference also lists, an open choice or a
+randomised algorithm. \sys{} is wrong in 8, flagged by no check, and the reference in 1.
 
-\textbf{Errors that passed every check.} Reading results by hand found errors no check caught. On a
-directed graph, a plan for ``ignoring direction'' counted a pair linked both ways twice. Of 47 confirmed
-code answers, 2 were wrong because the shared task statement changed the question; that statement is the
-weak point of the fallback. No rule covers what ``again'' refers to.
+\textbf{Errors that passed every check.} Checking by hand found more errors that no check caught.
+One plan for ``ignoring direction'' counted mutual links twice. Of 47 confirmed answers by
+code, 2 were wrong because the task statement changed the question.
 
 \section{Related Work}
 
 Benchmarks for language models on graph problems, such as NLGraph~\cite{nlgraph} and
 GraphArena~\cite{grapharena}, place a small graph in the prompt and pose single questions. Agent systems
-such as GraphTeam~\cite{graphteam} and CodeAct~\cite{codeact} have the model write and run code, and
-CodeAct-style agents keep variables across turns: reuse without a validity condition, which is the baseline
-of our comparison. GraphSeek~\cite{graphseek} is the closest system in design; it also separates planning by the model, over a catalogue of operations, from deterministic execution,
-on a graph database. \sys{} works on
-files and adds the session layer: reuse decided by keys, change detection, and clarification of scope.
+such as GraphTeam~\cite{graphteam} and CodeAct~\cite{codeact} have the model write and run code. CodeAct-style
+agents keep variables across turns, so they reuse results with no test of whether the reuse is valid; this
+is the baseline of our comparison. GraphSeek~\cite{graphseek} is the closest system in design. It also
+separates planning by the model, over a catalogue of operations, from deterministic execution, on a graph
+database. \sys{} works on files and adds the session layer: reuse decided by keys, change detection, and
+clarification of readings.
 Conversational text-to-SQL (SParC~\cite{sparc}, CoSQL~\cite{cosql}) translates every turn over a fixed
 database and does not ask when an earlier result may stand in for a new computation. Helix~\cite{helix} reuses intermediate results across iterations of a machine-learning workflow, or
 recomputes them when that is cheaper; the workflow there is a program, not a conversation.
 
 \section{Status}
 
-\textbf{Implemented and shown:} everything in Sections~\ref{sec:system} and~\ref{sec:demo},
-including the live session, the data-change button, the fallback and the side-by-side page. \textbf{Planned before the conference:} recordings of further sessions; a second reader for the hand labels, and labels for the answers
-that differ in only some runs; a check on the referent of ``them''; showing the task statement of a code answer to the user as the contract of the turn; and
-GraphTeam on the large model.
+\textbf{Implemented and shown:} everything described above, including the live session, the data-change
+button, the fallback and the side-by-side page. \textbf{Planned before the conference:} recordings of
+further sessions; a second annotator for the hand labels, and labels for the answers that differ in only some
+runs; a check on what ``them'' refers to; showing the user the task statement of an answer by code before it runs; and GraphTeam on the large model.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
