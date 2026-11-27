@@ -137,7 +137,7 @@ const scenes = {
     }, 1);
     await click(`${last}.querySelector("[data-act=more]")`); await sleep(300);
     await beat("Next: which region is each of them from? Notice the ranking isn't computed again. Two steps are reused, since they have the same key as before, and just one lookup runs.", play);
-    await beat("Now let's see the top twenty instead. Only the last step runs, and it works from the stored scores, not from the old list of ten.", play);
+    await beat("Now let's see the top twenty instead. The ranking isn't run again. The new list is cut from the stored scores, with one lookup for the regions.", play);
     await beat("Now the edge file grows by 27,466 rows, like it would after a nightly load. And nobody tells the system.", play);
     await beat("So we ask the very first question again, word for word. The plan is replayed, with no planning call.", play);
     await beat("But nothing from the old file gets reused. The engine saw the change in the file itself, and it tells you. Two users who gained links are now at the top.");

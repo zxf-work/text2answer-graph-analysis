@@ -11,7 +11,7 @@
   {"ask": "Which region is each of them from?",
    "say": "A drill-down. The ranking is not computed again: the steps marked reused carry the same lineage key as in turn 1."},
   {"ask": "Show the top 20 instead.",
-   "say": "A changed parameter. Only the last step runs; the scores are reused, and the longer list is cut from the full scores, not from the earlier list of 10."},
+   "say": "A changed parameter. The ranking is not run again: the longer list is cut from the full scores, not from the earlier list of 10, and one lookup adds the regions."},
   {"event": {"type": "append_edges", "targets": [15, 40], "n": "max"},
    "say": "Meanwhile the edge file grows: new rows arrive, as they would from a nightly load. Nobody tells the system."},
   {"ask": "Who are the 10 most influential users?",

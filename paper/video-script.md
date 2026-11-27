@@ -48,7 +48,7 @@ These are the captions of the video, written to be read aloud. Each block is one
 
 **4. Step 3, a changed parameter (0:15)**
 
-> Now let's see the top twenty instead. Only the last step runs, and it works from the stored scores, not from the old list of ten.
+> Now let's see the top twenty instead. The ranking isn't run again. The new list is cut from the stored scores, with one lookup for the regions.
 
 **5. Step 4, the file changes (0:12)**
 
@@ -108,7 +108,7 @@ What to do by hand while recording:
 
 ## Automated recording (2026-11-26)
 
-`video/graphaudit-demo.mp4` (4:03, 1920 × 1080, H.264, no sound, captions drawn in a band under the picture) was made without a person at the screen:
+`video/graphaudit-demo.mp4` (4:09, 1920 × 1080, H.264, no sound, captions drawn in a band under the picture) was made without a person at the screen:
 
 - `video/record.mjs` drives the demo pages in headless Chrome, with a drawn cursor, and stores the screen as timed frames with the caption for each moment. The scenes and captions are in that file; they follow the narration above, cut into shorter pieces. The pages are shown at 150% zoom of a 1280 × 630 window.
 - `video/compose.mjs` plays the frames onto a canvas in a second headless Chrome and encodes them with the browser's own recorder; no encoder is installed on the machine.
